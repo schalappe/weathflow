@@ -1,7 +1,5 @@
 """Month model for monthly financial summaries."""
 
-from __future__ import annotations
-
 from datetime import datetime
 from typing import TYPE_CHECKING
 

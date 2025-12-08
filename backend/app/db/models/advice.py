@@ -1,7 +1,5 @@
 """Advice model for AI-generated financial recommendations."""
 
-from __future__ import annotations
-
 from datetime import datetime
 from typing import TYPE_CHECKING
 
