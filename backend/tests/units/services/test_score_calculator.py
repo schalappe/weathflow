@@ -14,7 +14,7 @@ from app.services.exceptions import (
     ScorePersistenceError,
     TransactionAggregationError,
 )
-from app.services.schemas import MonthStats
+from app.services.schemas.calculation import MonthStats
 from tests.conftest import DatabaseTestCase
 
 # =============================================================================

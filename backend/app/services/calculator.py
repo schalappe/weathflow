@@ -11,11 +11,11 @@ from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.db.enums import MoneyMapType, ScoreLabel
+from app.db.enums import SCORE_TO_LABEL, MoneyMapType, ScoreLabel
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.services.exceptions import MonthNotFoundError, ScorePersistenceError, TransactionAggregationError
-from app.services.schemas import MonthStats
+from app.services.schemas.calculation import MonthStats
 
 logger = logging.getLogger(__name__)
 
@@ -23,14 +23,6 @@ logger = logging.getLogger(__name__)
 CORE_THRESHOLD = 50.0
 CHOICE_THRESHOLD = 30.0
 COMPOUND_THRESHOLD = 20.0
-
-# ##>: Mapping from numeric score to human-readable label.
-_SCORE_TO_LABEL: dict[int, ScoreLabel] = {
-    0: ScoreLabel.POOR,
-    1: ScoreLabel.NEED_IMPROVEMENT,
-    2: ScoreLabel.OKAY,
-    3: ScoreLabel.GREAT,
-}
 
 
 def calculate_score(core_pct: float, choice_pct: float, compound_pct: float) -> tuple[int, ScoreLabel]:
@@ -65,7 +57,7 @@ def calculate_score(core_pct: float, choice_pct: float, compound_pct: float) -> 
     if compound_pct >= COMPOUND_THRESHOLD:
         score += 1
 
-    return score, _SCORE_TO_LABEL[score]
+    return score, SCORE_TO_LABEL[score]
 
 
 def _percentage_of_income(amount: float, income: float) -> float:
@@ -94,6 +86,7 @@ def calculate_month_stats(income: float, core: float, choice: float) -> MonthSta
     MonthStats
         Complete statistics including totals, percentages, and score.
     """
+    # ##>: Compound is derived, not aggregated—it represents what remains after spending.
     compound = income - core - choice
 
     # ##>: Handle zero income edge case to avoid division by zero.

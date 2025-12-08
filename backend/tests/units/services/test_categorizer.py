@@ -16,7 +16,7 @@ from app.services.exceptions import (
     BatchCategorizationError,
     InvalidResponseError,
 )
-from app.services.schemas import TransactionInput
+from app.services.schemas.categorization import TransactionInput
 
 
 def _make_transaction(

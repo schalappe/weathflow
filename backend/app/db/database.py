@@ -10,6 +10,7 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 DATABASE_PATH = Path(__file__).parent.parent.parent.parent / "data" / "moneymap.db"
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
+# ##&: SQLite requires check_same_thread=False for FastAPI's multi-threaded request handling.
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

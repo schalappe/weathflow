@@ -43,6 +43,7 @@ class Month(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
+    # ##>: Cascade delete ensures orphan transactions and advice are removed when a month is deleted.
     transactions: Mapped[list["Transaction"]] = relationship(
         back_populates="month",
         cascade="all, delete-orphan",
