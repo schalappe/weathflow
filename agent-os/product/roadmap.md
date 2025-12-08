@@ -1,6 +1,6 @@
 # Product Roadmap
 
-1. [ ] Database Models — Create SQLAlchemy models for months, transactions, and advice tables with proper relationships and indexes `S`
+1. [x] Database Models — Create SQLAlchemy models for months, transactions, and advice tables with proper relationships and indexes `S`
 
 2. [ ] CSV Parser Service — Build a service that parses Bankin' CSV exports, detects all months present, groups transactions by month, and returns structured data with summaries `M`
 

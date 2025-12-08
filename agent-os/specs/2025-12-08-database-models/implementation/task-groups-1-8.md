@@ -7,6 +7,7 @@
 ## Summary
 
 Implemented the complete database foundation for Money Map Manager, including:
+
 - Project directory structure and package setup
 - SQLAlchemy 2.0+ database configuration with sync engine
 - Enums for Money Map categories and score labels
@@ -19,6 +20,7 @@ Implemented the complete database foundation for Money Map Manager, including:
 **Selected Approach:** Sync SQLAlchemy for MVP simplicity
 
 Key decisions:
+
 - Synchronous SQLAlchemy (not async) - simpler for local SQLite, sufficient for MVP
 - String enums (`str, Enum`) for human-readable database values
 - In-memory SQLite for test isolation and speed
@@ -91,6 +93,7 @@ None - this was a greenfield implementation.
 ### Code Quality Improvements
 
 During quality review, the following issues were addressed:
+
 1. Extracted `utc_now()` function to eliminate repeated timestamp lambdas
 2. Generated CHECK constraint values dynamically from `MoneyMapType` enum
 3. Added month validation constraint (1-12)
