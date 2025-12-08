@@ -1,5 +1,6 @@
 """Unit tests for UploadService."""
 
+import os
 from datetime import date
 from decimal import Decimal
 from unittest import TestCase
@@ -11,6 +12,9 @@ from app.services.schemas.categorization import CategorizationResult
 from app.services.schemas.parsing import MonthData, MonthSummary, ParsedTransaction, ParseResult
 from app.services.upload import UploadService
 from tests.conftest import DatabaseTestCase
+
+# ##>: Fixture to mock the API key environment variable for categorization tests.
+MOCK_API_KEY_ENV = {"ANTHROPIC_API_KEY": "test-key"}
 
 
 class TestUploadServicePreview(TestCase):
@@ -124,6 +128,7 @@ class TestUploadServicePreview(TestCase):
             service.get_upload_preview(b"empty csv")
 
 
+@patch.dict(os.environ, MOCK_API_KEY_ENV)
 class TestUploadServiceCategorization(DatabaseTestCase):
     """Tests for UploadService.process_categorization()."""
 
@@ -312,6 +317,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
         self.assertGreaterEqual(result["total_api_calls"], 1)
 
 
+@patch.dict(os.environ, MOCK_API_KEY_ENV)
 class TestUploadServiceImportModes(DatabaseTestCase):
     """Tests for import mode functionality."""
 

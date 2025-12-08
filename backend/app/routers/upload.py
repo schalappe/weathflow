@@ -6,10 +6,14 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.schemas.upload import CategorizeResponse, ImportMode, UploadResponse
 from app.services.exceptions import (
+    APIConnectionError,
+    BatchCategorizationError,
     CategorizationError,
     CSVParseError,
     InvalidMonthFormatError,
+    InvalidResponseError,
     NoTransactionsFoundError,
+    ScoreCalculationError,
 )
 from app.services.upload import UploadService
 
@@ -72,19 +76,22 @@ async def categorize_file(
     months_to_process : str
         Comma-separated list of months (YYYY-MM format) or "all".
     import_mode : ImportMode
-        "replace" deletes existing month data; "merge" skips duplicates.
+        "replace" deletes existing month and all its transactions, creating fresh.
+        "merge" preserves existing month and transactions, only adding new ones.
 
     Returns
     -------
     CategorizeResponse
-        Results with month scores and API call count.
+        Results with month scores, months_not_found, and API call count.
 
     Raises
     ------
     HTTPException 400
-        If CSV format is invalid or month format is incorrect.
+        If CSV format is invalid, month format is incorrect, or no transactions found.
+    HTTPException 500
+        If score calculation fails.
     HTTPException 502
-        If Claude API is unavailable.
+        If Claude API is unavailable, returns invalid response, or API key missing.
     """
     # ##>: Parse comma-separated months into list.
     if months_to_process.lower() == "all":
@@ -106,5 +113,19 @@ async def categorize_file(
         return CategorizeResponse(**result)
     except (CSVParseError, NoTransactionsFoundError, InvalidMonthFormatError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except APIConnectionError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Claude API unreachable after {e.retry_count} retries. Please try again later.",
+        ) from e
+    except InvalidResponseError as e:
+        raise HTTPException(
+            status_code=502, detail="Claude returned an invalid response. Please try again or contact support."
+        ) from e
+    except BatchCategorizationError as e:
+        raise HTTPException(status_code=502, detail=f"Failed to categorize {len(e.failed_ids)} transactions.") from e
     except CategorizationError as e:
-        raise HTTPException(status_code=502, detail="Categorization service unavailable") from e
+        # ##>: Generic CategorizationError (e.g., missing API key).
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except ScoreCalculationError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to calculate month score: {e}") from e

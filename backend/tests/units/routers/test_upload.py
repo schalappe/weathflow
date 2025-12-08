@@ -161,7 +161,7 @@ class TestCategorizeEndpoint:
     @patch("app.routers.upload.UploadService")
     @patch("app.routers.upload.get_db")
     def test_claude_api_error_returns_502(self, mock_get_db: MagicMock, mock_service_class: MagicMock) -> None:
-        """Claude API error returns 502."""
+        """Claude API error returns 502 with actual error message."""
         mock_db = MagicMock()
         mock_get_db.return_value = iter([mock_db])
 
@@ -176,7 +176,8 @@ class TestCategorizeEndpoint:
         )
 
         assert response.status_code == 502
-        assert "unavailable" in response.json()["detail"].lower()
+        # ##>: Generic CategorizationError now returns the actual error message.
+        assert "API failed" in response.json()["detail"]
 
     @patch("app.routers.upload.UploadService")
     @patch("app.routers.upload.get_db")

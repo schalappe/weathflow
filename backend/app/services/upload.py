@@ -12,7 +12,7 @@ from app.db.models.transaction import Transaction
 from app.services.calculator import calculate_and_update_month
 from app.services.categorizer import TransactionCategorizer
 from app.services.csv_parser import BankinCSVParser
-from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError
+from app.services.exceptions import CategorizationError, InvalidMonthFormatError, NoTransactionsFoundError
 from app.services.schemas.categorization import CategorizationResult, TransactionInput
 from app.services.schemas.parsing import MonthData, ParsedTransaction
 
@@ -35,11 +35,29 @@ class UploadService:
     """
 
     def __init__(self) -> None:
-        """Initialize with parser and categorizer instances."""
+        """Initialize with parser instance. Categorizer is created lazily."""
         self._parser = BankinCSVParser()
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        self._categorizer = TransactionCategorizer(api_key=api_key)
+        self._categorizer: TransactionCategorizer | None = None
         self._api_call_count = 0
+
+    def _get_categorizer(self) -> TransactionCategorizer:
+        """
+        Get or create the categorizer instance.
+
+        Raises
+        ------
+        CategorizationError
+            If ANTHROPIC_API_KEY environment variable is not set.
+        """
+        if self._categorizer is None:
+            api_key = os.environ.get("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise CategorizationError(
+                    "ANTHROPIC_API_KEY environment variable is not set. "
+                    "Please configure it before using the categorization service."
+                )
+            self._categorizer = TransactionCategorizer(api_key=api_key)
+        return self._categorizer
 
     def get_upload_preview(self, file_content: bytes) -> dict[str, Any]:
         """
@@ -114,23 +132,30 @@ class UploadService:
         months_to_process : list[str]
             List of months to process in YYYY-MM format, or ["all"] for all months.
         import_mode : Literal["replace", "merge"]
-            "replace" deletes existing data; "merge" skips duplicates.
+            "replace" deletes existing month and all its transactions, creating fresh.
+            "merge" preserves existing month and transactions, only adding new ones.
         db : Session
             Database session for persistence.
 
         Returns
         -------
-        dict
-            Result with success, months_processed, total_api_calls.
+        dict[str, Any]
+            Keys: success (bool), months_processed (list), months_not_found (list),
+            total_api_calls (int). Months requested but not in CSV are listed in
+            months_not_found rather than causing an error.
 
         Raises
         ------
         CSVParseError
             If CSV format is invalid.
+        NoTransactionsFoundError
+            If no transactions found in the file.
         InvalidMonthFormatError
             If month format is not YYYY-MM.
         CategorizationError
             If Claude API fails.
+        ScoreCalculationError
+            If score calculation or persistence fails.
         """
         self._api_call_count = 0
         result = self._parser.parse(file_content)
@@ -147,9 +172,11 @@ class UploadService:
                 raise InvalidMonthFormatError(month_key)
 
         months_processed = []
+        months_not_found = []
 
         for month_key in target_months:
             if month_key not in result.months:
+                months_not_found.append(month_key)
                 continue
 
             month_data = result.months[month_key]
@@ -163,6 +190,7 @@ class UploadService:
         return {
             "success": True,
             "months_processed": months_processed,
+            "months_not_found": months_not_found,
             "total_api_calls": self._api_call_count,
         }
 
@@ -184,7 +212,8 @@ class UploadService:
 
         # ##>: Transform and categorize transactions. IDs start at 1 for each month.
         inputs = self._transform_to_inputs(month_data.transactions, start_id=1)
-        results = self._categorizer.categorize(inputs)
+        categorizer = self._get_categorizer()
+        results = categorizer.categorize(inputs)
 
         # ##>: Track API calls (estimate based on batch size of 50).
         pending_count = len(inputs)
@@ -199,7 +228,9 @@ class UploadService:
             skip_keys=skip_keys,
         )
 
-        db.commit()
+        # ##>: Flush to make transactions visible for aggregation query, but don't commit yet.
+        db.flush()
+        # ##>: Let calculate_and_update_month handle the final commit for atomicity.
         updated_month = calculate_and_update_month(db, month_record.id)
 
         low_confidence_count = self._count_low_confidence(results)

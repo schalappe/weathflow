@@ -1,5 +1,6 @@
 """Integration tests for upload and categorize API endpoints."""
 
+import os
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -11,6 +12,9 @@ from app.db.models.month import Month
 from app.services.exceptions import CategorizationError
 from app.services.schemas.categorization import CategorizationResult
 from tests.integration.fixtures.csv_builder import CSVBuilder, combine_csvs
+
+# ##>: Fixture to mock the API key environment variable for categorization tests.
+MOCK_API_KEY_ENV = {"ANTHROPIC_API_KEY": "test-key"}
 
 
 def _create_mock_categorizer(money_map_types: list[MoneyMapType] | None = None) -> MagicMock:
@@ -45,6 +49,7 @@ def _create_mock_categorizer(money_map_types: list[MoneyMapType] | None = None) 
     return mock_categorizer
 
 
+@patch.dict(os.environ, MOCK_API_KEY_ENV)
 class TestCategorizeReplaceMode:
     """Integration tests for replace mode categorization."""
 
@@ -131,6 +136,7 @@ class TestCategorizeReplaceMode:
         assert len(month.transactions) == 1
 
 
+@patch.dict(os.environ, MOCK_API_KEY_ENV)
 class TestCategorizeMergeMode:
     """Integration tests for merge mode categorization."""
 
@@ -211,6 +217,7 @@ class TestCategorizeMergeMode:
         assert month.total_core == 120.0
 
 
+@patch.dict(os.environ, MOCK_API_KEY_ENV)
 class TestMultiMonthProcessing:
     """Integration tests for multi-month file processing."""
 
@@ -252,6 +259,7 @@ class TestMultiMonthProcessing:
         assert july is not None
 
 
+@patch.dict(os.environ, MOCK_API_KEY_ENV)
 class TestPartialFailure:
     """Integration tests for partial success scenarios."""
 
@@ -299,11 +307,12 @@ class TestPartialFailure:
             params={"months_to_process": "all", "import_mode": "replace"},
         )
 
-        # ##>: Request fails because second month errored.
+        # ##>: Request fails because second month errored. Error message is now propagated.
         assert response.status_code == 502
-        assert "unavailable" in response.json()["detail"].lower()
+        assert "Claude API unavailable" in response.json()["detail"]
 
 
+@patch.dict(os.environ, MOCK_API_KEY_ENV)
 class TestErrorHandling:
     """Integration tests for error handling scenarios."""
 
@@ -331,4 +340,5 @@ class TestErrorHandling:
         )
 
         assert response.status_code == 502
-        assert "unavailable" in response.json()["detail"].lower()
+        # ##>: Generic CategorizationError now returns the actual error message.
+        assert "API connection failed" in response.json()["detail"]
