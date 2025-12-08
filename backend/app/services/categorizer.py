@@ -1,6 +1,7 @@
 """Transaction categorization service using Claude API."""
 
 import json
+import logging
 from typing import ClassVar
 
 import anthropic
@@ -12,9 +13,12 @@ from app.services.category_mapping import CategoryMapping
 from app.services.exceptions import (
     APIConnectionError,
     BatchCategorizationError,
+    CategorizationError,
     InvalidResponseError,
 )
 from app.services.schemas import CategorizationResult, TransactionInput
+
+logger = logging.getLogger(__name__)
 
 
 class TransactionCategorizer:
@@ -235,7 +239,16 @@ class TransactionCategorizer:
                 system=CATEGORIZATION_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_prompt}],
             )
+        except anthropic.AuthenticationError as e:
+            # ##!: Clear message for API key issues.
+            raise CategorizationError(
+                "Invalid Anthropic API key. Please check your ANTHROPIC_API_KEY environment variable."
+            ) from e
         except (anthropic.APIConnectionError, anthropic.RateLimitError) as e:
+            raise APIConnectionError(retry_count=self.MAX_RETRIES) from e
+        except anthropic.APIStatusError as e:
+            # ##!: Catch-all for other API errors (500s, etc.).
+            logger.error("Anthropic API error (status %s): %s", e.status_code, e.message)
             raise APIConnectionError(retry_count=self.MAX_RETRIES) from e
 
         # ##>: Extract text content from response. Type narrowing for mypy.
@@ -359,6 +372,11 @@ class TransactionCategorizer:
         for result in results:
             tx = tx_by_id.get(result.id)
             if tx is None:
+                # ##!: This indicates a bug - API returned an ID we did not send.
+                logger.warning(
+                    "API returned result for unknown transaction ID %d. This may indicate a parsing bug.",
+                    result.id,
+                )
                 continue
 
             self._cache.put(

@@ -58,22 +58,22 @@ class MonthSummary(FrozenModel):
     Attributes
     ----------
     year : int
-        The year of this summary.
+        The year of this summary (2000-2100).
     month : int
         The month (1-12) of this summary.
     transaction_count : int
-        Number of transactions in this month.
+        Number of transactions in this month (>= 0).
     total_income : Decimal
-        Sum of all positive amounts.
+        Sum of all positive amounts (>= 0).
     total_expenses : Decimal
-        Sum of absolute values of all negative amounts.
+        Sum of absolute values of all negative amounts (>= 0).
     """
 
-    year: int
-    month: int
-    transaction_count: int
-    total_income: Decimal
-    total_expenses: Decimal
+    year: int = Field(ge=2000, le=2100)
+    month: int = Field(ge=1, le=12)
+    transaction_count: int = Field(ge=0)
+    total_income: Decimal = Field(ge=0)
+    total_expenses: Decimal = Field(ge=0)
 
 
 class MonthData(FrozenModel):
@@ -190,4 +190,4 @@ class CachedCategorization(FrozenModel):
     money_map_type: MoneyMapType
     money_map_subcategory: str
     confidence: float = Field(ge=0.0, le=1.0)
-    hit_count: int = 0
+    hit_count: int = Field(ge=0, default=0)

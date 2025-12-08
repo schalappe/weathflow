@@ -1,6 +1,7 @@
 """In-memory cache with JSON persistence for transaction categorizations."""
 
 import json
+import logging
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -8,6 +9,8 @@ from typing import Any, ClassVar
 
 from app.db.enums import MoneyMapType
 from app.services.schemas import CachedCategorization
+
+logger = logging.getLogger(__name__)
 
 
 class CategorizationCache:
@@ -90,16 +93,23 @@ class CategorizationCache:
             return None
 
         entry = self._cache[key]
-        # ##>: Update hit_count and last_hit_at for stale entry tracking.
-        entry["hit_count"] = entry.get("hit_count", 0) + 1
-        entry["last_hit_at"] = datetime.now(UTC).isoformat()
 
-        return CachedCategorization(
-            money_map_type=MoneyMapType(entry["money_map_type"]),
-            money_map_subcategory=entry["money_map_subcategory"],
-            confidence=entry["confidence"],
-            hit_count=entry["hit_count"],
-        )
+        try:
+            # ##>: Update hit_count and last_hit_at for stale entry tracking.
+            entry["hit_count"] = entry.get("hit_count", 0) + 1
+            entry["last_hit_at"] = datetime.now(UTC).isoformat()
+
+            return CachedCategorization(
+                money_map_type=MoneyMapType(entry["money_map_type"]),
+                money_map_subcategory=entry["money_map_subcategory"],
+                confidence=entry["confidence"],
+                hit_count=entry["hit_count"],
+            )
+        except (KeyError, ValueError, TypeError) as e:
+            # ##!: Corrupted cache entry - remove it and fall through to API.
+            logger.warning("Removing corrupted cache entry for '%s': %s", key, e)
+            del self._cache[key]
+            return None
 
     def put(
         self,
@@ -145,12 +155,21 @@ class CategorizationCache:
         """
         Persist cache to JSON file, removing stale entries.
 
-        Stale entries are those not accessed in the last 180 days.
+        Stale entries are those not accessed within STALE_DAYS.
+        Cache persistence failures are logged but do not raise.
         """
         self._remove_stale_entries()
-        self._cache_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._cache_path.open("w", encoding="utf-8") as f:
-            json.dump(self._cache, f, ensure_ascii=False, indent=2)
+        try:
+            self._cache_path.parent.mkdir(parents=True, exist_ok=True)
+            with self._cache_path.open("w", encoding="utf-8") as f:
+                json.dump(self._cache, f, ensure_ascii=False, indent=2)
+        except OSError as e:
+            # ##!: Cache persistence is non-critical; log and continue.
+            logger.error(
+                "Failed to save categorization cache to %s: %s. Cache will only be in-memory for this session.",
+                self._cache_path,
+                e,
+            )
 
     def clear(self) -> None:
         """Clear all cache entries (for testing)."""
@@ -158,24 +177,46 @@ class CategorizationCache:
 
     def _load_cache(self) -> None:
         """Load cache from JSON file if it exists."""
-        if self._cache_path.exists():
+        if not self._cache_path.exists():
+            return
+
+        try:
             with self._cache_path.open(encoding="utf-8") as f:
                 self._cache = json.load(f)
+        except json.JSONDecodeError as e:
+            # ##!: Start fresh if cache file is corrupted.
+            logger.warning(
+                "Cache file corrupted at %s (line %d, col %d): starting with empty cache",
+                self._cache_path,
+                e.lineno,
+                e.colno,
+            )
+            self._cache = {}
+        except OSError as e:
+            # ##!: File permission or I/O error - start fresh.
+            logger.warning("Cannot read cache file %s: %s. Starting with empty cache", self._cache_path, e)
+            self._cache = {}
 
     def _remove_stale_entries(self) -> None:
-        """Remove entries not accessed in the last 180 days."""
+        """Remove entries not accessed within STALE_DAYS."""
         cutoff = datetime.now(UTC) - timedelta(days=self.STALE_DAYS)
-        stale_keys = []
+        stale_keys: list[str] = []
+        corrupted_keys: list[str] = []
 
         for key, entry in self._cache.items():
             last_hit = entry.get("last_hit_at")
             if last_hit:
-                last_hit_dt = datetime.fromisoformat(last_hit)
-                # ##>: Ensure timezone-aware comparison for old cache entries.
-                if last_hit_dt.tzinfo is None:
-                    last_hit_dt = last_hit_dt.replace(tzinfo=UTC)
-                if last_hit_dt < cutoff:
-                    stale_keys.append(key)
+                try:
+                    last_hit_dt = datetime.fromisoformat(last_hit)
+                    # ##>: Ensure timezone-aware comparison for old cache entries.
+                    if last_hit_dt.tzinfo is None:
+                        last_hit_dt = last_hit_dt.replace(tzinfo=UTC)
+                    if last_hit_dt < cutoff:
+                        stale_keys.append(key)
+                except (ValueError, TypeError) as e:
+                    # ##!: Corrupted entry - mark for removal.
+                    logger.warning("Removing cache entry with invalid date '%s': %s", key, e)
+                    corrupted_keys.append(key)
 
-        for key in stale_keys:
+        for key in stale_keys + corrupted_keys:
             del self._cache[key]

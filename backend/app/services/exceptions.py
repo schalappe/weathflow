@@ -1,4 +1,6 @@
-"""Custom exceptions for CSV parsing operations."""
+"""Custom exceptions for CSV parsing and transaction categorization operations."""
+
+from typing import Any
 
 
 class CSVParseError(Exception):
@@ -119,18 +121,18 @@ class BatchCategorizationError(CategorizationError):
     ----------
     failed_ids : list[int]
         IDs of transactions that failed to categorize.
-    partial_results : list
+    partial_results : list[dict[str, Any]]
         Successfully categorized results before the failure.
 
     Attributes
     ----------
     failed_ids : list[int]
         IDs of failed transactions for retry logic.
-    partial_results : list
+    partial_results : list[dict[str, Any]]
         Partial results to preserve successful categorizations.
     """
 
-    def __init__(self, failed_ids: list[int], partial_results: list[dict[str, str]]) -> None:
+    def __init__(self, failed_ids: list[int], partial_results: list[dict[str, Any]]) -> None:
         self.failed_ids = failed_ids
         self.partial_results = partial_results
         super().__init__(f"Failed to categorize {len(failed_ids)} transactions")
