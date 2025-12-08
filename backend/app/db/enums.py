@@ -37,3 +37,11 @@ class ScoreLabel(str, Enum):
     NEED_IMPROVEMENT = "Need Improvement"
     OKAY = "Okay"
     GREAT = "Great"
+
+
+SCORE_TO_LABEL: dict[int, ScoreLabel] = {
+    0: ScoreLabel.POOR,
+    1: ScoreLabel.NEED_IMPROVEMENT,
+    2: ScoreLabel.OKAY,
+    3: ScoreLabel.GREAT,
+}

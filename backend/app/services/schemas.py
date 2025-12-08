@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.db.enums import MoneyMapType, ScoreLabel
+from app.db.enums import SCORE_TO_LABEL, MoneyMapType, ScoreLabel
 
 
 class FrozenModel(BaseModel):
@@ -232,18 +232,10 @@ class MonthStats(FrozenModel):
     score: int = Field(ge=0, le=3)
     score_label: ScoreLabel
 
-    # ##>: Mapping from score to expected label for validation.
-    _SCORE_TO_LABEL: dict[int, ScoreLabel] = {
-        0: ScoreLabel.POOR,
-        1: ScoreLabel.NEED_IMPROVEMENT,
-        2: ScoreLabel.OKAY,
-        3: ScoreLabel.GREAT,
-    }
-
     @model_validator(mode="after")
     def validate_score_label_consistency(self) -> "MonthStats":
         """Ensure score and score_label match."""
-        expected_label = self._SCORE_TO_LABEL[self.score]
+        expected_label = SCORE_TO_LABEL[self.score]
         if self.score_label != expected_label:
             raise ValueError(f"score_label {self.score_label.value} does not match score {self.score}")
         return self
