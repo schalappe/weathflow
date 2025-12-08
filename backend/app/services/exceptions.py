@@ -210,3 +210,39 @@ class ScorePersistenceError(ScoreCalculationError):
     def __init__(self, month_id: int) -> None:
         self.month_id = month_id
         super().__init__(f"Failed to persist score calculation for month {month_id}")
+
+
+class UploadError(Exception):
+    """
+    Base exception for all upload operation errors.
+
+    All upload-specific exceptions inherit from this class, allowing callers
+    to catch all upload errors with a single except clause.
+    """
+
+
+class InvalidMonthFormatError(UploadError):
+    """
+    Raised when month format is not YYYY-MM.
+
+    Parameters
+    ----------
+    value : str
+        The invalid month string that was provided.
+
+    Attributes
+    ----------
+    value : str
+        The invalid value for programmatic access.
+    """
+
+    def __init__(self, value: str) -> None:
+        self.value = value
+        super().__init__(f"Invalid month format: '{value}'. Expected YYYY-MM")
+
+
+class NoTransactionsFoundError(UploadError):
+    """Raised when CSV contains no transactions after parsing."""
+
+    def __init__(self) -> None:
+        super().__init__("No transactions found in the uploaded file")

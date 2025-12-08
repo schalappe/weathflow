@@ -18,18 +18,18 @@
 
 **Dependencies:** None
 
-- [ ] 1.0 Complete schema layer
-  - [ ] 1.1 Create `backend/app/schemas/__init__.py` (empty package marker)
-  - [ ] 1.2 Create upload response schemas
+- [x] 1.0 Complete schema layer
+  - [x] 1.1 Create `backend/app/schemas/__init__.py` (empty package marker)
+  - [x] 1.2 Create upload response schemas
     - `MonthSummaryResponse`: year, month, transaction_count, total_income, total_expenses
     - `TransactionPreview`: date, description, amount
     - `UploadResponse`: success, total_transactions, months_detected, preview_by_month
     - Follow pattern from: `backend/app/services/schemas/_base.py`
-  - [ ] 1.3 Create categorize request/response schemas
+  - [x] 1.3 Create categorize request/response schemas
     - `CategorizeRequest`: months_to_process (list[str]), import_mode (Literal["replace", "merge"])
     - `MonthResult`: year, month, transactions_categorized, low_confidence_count, score, score_label
     - `CategorizeResponse`: success, months_processed, total_api_calls
-  - [ ] 1.4 Verify schemas import without errors
+  - [x] 1.4 Verify schemas import without errors
     - Run: `cd backend && uv run python -c "from app.schemas.upload import *"`
 
 **Acceptance Criteria:**
@@ -46,12 +46,12 @@
 
 **Dependencies:** None (can run parallel with Task Group 1)
 
-- [ ] 2.0 Complete exception layer
-  - [ ] 2.1 Add upload exceptions to `backend/app/services/exceptions.py`
+- [x] 2.0 Complete exception layer
+  - [x] 2.1 Add upload exceptions to `backend/app/services/exceptions.py`
     - `UploadError(Exception)`: Base exception for upload operations
     - `InvalidMonthFormatError(UploadError)`: When month format is not YYYY-MM (include `value` attribute)
     - `NoTransactionsFoundError(UploadError)`: When CSV contains no transactions
-  - [ ] 2.2 Verify exceptions import correctly
+  - [x] 2.2 Verify exceptions import correctly
     - Run: `cd backend && uv run python -c "from app.services.exceptions import UploadError, InvalidMonthFormatError, NoTransactionsFoundError"`
 
 **Acceptance Criteria:**
@@ -68,21 +68,21 @@
 
 **Dependencies:** Task Group 1, Task Group 2
 
-- [ ] 3.0 Complete upload preview functionality
-  - [ ] 3.1 Write 3 focused tests for preview functionality
+- [x] 3.0 Complete upload preview functionality
+  - [x] 3.1 Write 3 focused tests for preview functionality
     - Test: `get_upload_preview` returns correct month summaries
     - Test: `get_upload_preview` includes transaction previews per month
     - Test: `get_upload_preview` handles parser errors correctly
-  - [ ] 3.2 Create `backend/app/services/upload.py` with class skeleton
+  - [x] 3.2 Create `backend/app/services/upload.py` with class skeleton
     - Define `UploadService` class with `__init__`
     - Initialize `BankinCSVParser` in constructor
     - Define `LOW_CONFIDENCE_THRESHOLD = 0.8` constant
-  - [ ] 3.3 Implement `get_upload_preview(file_content: bytes) -> dict` method
+  - [x] 3.3 Implement `get_upload_preview(file_content: bytes) -> dict` method
     - Call `BankinCSVParser.parse(file_content)`
     - Transform `ParseResult` to response format
     - Build `months_detected` list from month summaries
     - Build `preview_by_month` dict with transaction lists
-  - [ ] 3.4 Ensure preview tests pass
+  - [x] 3.4 Ensure preview tests pass
     - Run: `cd backend && uv run pytest tests/units/services/test_upload.py -v -k "preview"`
 
 **Acceptance Criteria:**
@@ -97,26 +97,26 @@
 
 **Dependencies:** Task Group 3
 
-- [ ] 4.0 Complete categorization core functionality
-  - [ ] 4.1 Write 3 focused tests for categorization
+- [x] 4.0 Complete categorization core functionality
+  - [x] 4.1 Write 3 focused tests for categorization
     - Test: `process_categorization` categorizes transactions correctly
     - Test: `process_categorization` handles "all" months selection
     - Test: `process_categorization` tracks API call count
-  - [ ] 4.2 Add TransactionCategorizer initialization
+  - [x] 4.2 Add TransactionCategorizer initialization
     - Initialize with `ANTHROPIC_API_KEY` from environment
     - Add `_api_call_count` instance variable
-  - [ ] 4.3 Implement `_transform_to_input` helper method
+  - [x] 4.3 Implement `_transform_to_input` helper method
     - Convert `ParsedTransaction` to `TransactionInput` format
     - Assign sequential IDs starting from `start_id`
-  - [ ] 4.4 Implement `_count_low_confidence` helper method
+  - [x] 4.4 Implement `_count_low_confidence` helper method
     - Count results where `confidence < LOW_CONFIDENCE_THRESHOLD`
-  - [ ] 4.5 Implement `process_categorization` method (core flow)
+  - [x] 4.5 Implement `process_categorization` method (core flow)
     - Parse CSV with `BankinCSVParser`
     - Filter months based on `months_to_process` (handle "all")
     - Validate month format (YYYY-MM), raise `InvalidMonthFormatError` if invalid
     - For each month: transform, categorize, track API calls
     - Return results dict
-  - [ ] 4.6 Ensure categorization tests pass
+  - [x] 4.6 Ensure categorization tests pass
     - Run: `cd backend && uv run pytest tests/units/services/test_upload.py -v -k "categoriz"`
 
 **Acceptance Criteria:**
@@ -131,35 +131,35 @@
 
 **Dependencies:** Task Group 4
 
-- [ ] 5.0 Complete import mode functionality
-  - [ ] 5.1 Write 4 focused tests for import modes
+- [x] 5.0 Complete import mode functionality
+  - [x] 5.1 Write 4 focused tests for import modes
     - Test: Replace mode deletes existing month before insert
     - Test: Replace mode creates new month and transactions
     - Test: Merge mode skips duplicate transactions
     - Test: Merge mode inserts only new transactions
-  - [ ] 5.2 Implement `_generate_transaction_key` helper method
+  - [x] 5.2 Implement `_generate_transaction_key` helper method
     - Key format: `{date}_{description}_{amount}_{account}`
     - Used for duplicate detection in merge mode
-  - [ ] 5.3 Implement `_get_or_create_month` helper method
+  - [x] 5.3 Implement `_get_or_create_month` helper method
     - Query for existing month by year/month
     - Create new month if not found
     - Return month object
-  - [ ] 5.4 Implement `_handle_replace_mode` helper method
+  - [x] 5.4 Implement `_handle_replace_mode` helper method
     - Delete existing month (cascade deletes transactions)
     - Use `db.delete()` with existing month object
-  - [ ] 5.5 Implement `_get_existing_transaction_keys` helper method
+  - [x] 5.5 Implement `_get_existing_transaction_keys` helper method
     - Query transactions for given month_id
     - Return set of transaction keys for duplicate detection
-  - [ ] 5.6 Implement `_persist_transactions` helper method
+  - [x] 5.6 Implement `_persist_transactions` helper method
     - Create `Transaction` records with categorization results
     - Skip transactions with keys in `skip_keys` set (merge mode)
     - Use `db.add_all()` for bulk insert
     - Return count of inserted transactions
-  - [ ] 5.7 Integrate import modes into `process_categorization`
+  - [x] 5.7 Integrate import modes into `process_categorization`
     - Add `import_mode` handling: "replace" or "merge"
     - Call `calculate_and_update_month` after persisting
     - Build and return `MonthResult` for each processed month
-  - [ ] 5.8 Ensure import mode tests pass
+  - [x] 5.8 Ensure import mode tests pass
     - Run: `cd backend && uv run pytest tests/units/services/test_upload.py -v -k "mode"`
 
 **Acceptance Criteria:**
@@ -177,22 +177,22 @@
 
 **Dependencies:** Task Group 3
 
-- [ ] 6.0 Complete upload endpoint
-  - [ ] 6.1 Write 3 focused tests for upload endpoint
+- [x] 6.0 Complete upload endpoint
+  - [x] 6.1 Write 3 focused tests for upload endpoint
     - Test: Valid CSV returns 200 with month summaries
     - Test: Invalid CSV format returns 400
     - Test: Empty file returns 400
-  - [ ] 6.2 Create `backend/app/routers/__init__.py` (empty package marker)
-  - [ ] 6.3 Create `backend/app/routers/upload.py` with router skeleton
+  - [x] 6.2 Create `backend/app/routers/__init__.py` (empty package marker)
+  - [x] 6.3 Create `backend/app/routers/upload.py` with router skeleton
     - Create `APIRouter(prefix="/api", tags=["upload"])`
     - Import schemas, services, and exceptions
-  - [ ] 6.4 Implement `POST /api/upload` endpoint
+  - [x] 6.4 Implement `POST /api/upload` endpoint
     - Accept `file: UploadFile = File(...)`
     - Read file content as bytes: `await file.read()`
     - Call `UploadService.get_upload_preview()`
     - Map `CSVParseError` to `HTTPException(400)`
     - Return `UploadResponse`
-  - [ ] 6.5 Ensure upload endpoint tests pass
+  - [x] 6.5 Ensure upload endpoint tests pass
     - Run: `cd backend && uv run pytest tests/units/routers/test_upload.py -v -k "upload"`
 
 **Acceptance Criteria:**
@@ -207,13 +207,13 @@
 
 **Dependencies:** Task Group 5, Task Group 6
 
-- [ ] 7.0 Complete categorize endpoint
-  - [ ] 7.1 Write 4 focused tests for categorize endpoint
+- [x] 7.0 Complete categorize endpoint
+  - [x] 7.1 Write 4 focused tests for categorize endpoint
     - Test: Valid request returns 200 with month results
     - Test: Invalid month format returns 400
     - Test: Invalid import mode returns 400 (via Pydantic validation)
     - Test: Claude API error returns 502
-  - [ ] 7.2 Implement `POST /api/categorize` endpoint
+  - [x] 7.2 Implement `POST /api/categorize` endpoint
     - Accept `file: UploadFile`, `months_to_process: list[str]`, `import_mode: str`
     - Inject database session: `db: Session = Depends(get_db)`
     - Validate import_mode is "replace" or "merge"
@@ -223,7 +223,7 @@
       - `InvalidMonthFormatError` → 400
       - `CategorizationError` → 502
     - Return `CategorizeResponse`
-  - [ ] 7.3 Ensure categorize endpoint tests pass
+  - [x] 7.3 Ensure categorize endpoint tests pass
     - Run: `cd backend && uv run pytest tests/units/routers/test_upload.py -v -k "categorize"`
 
 **Acceptance Criteria:**
