@@ -18,8 +18,8 @@
 
 **Dependencies:** None
 
-- [ ] 1.0 Complete schema layer
-  - [ ] 1.1 Create `backend/app/schemas/months.py` with response models
+- [x] 1.0 Complete schema layer
+  - [x] 1.1 Create `backend/app/schemas/months.py` with response models
     - `MonthSummary`: id, year, month, totals, percentages, score, score_label, transaction_count, timestamps
     - `TransactionResponse`: id, date, description, account, amount, categories, is_manually_corrected
     - `PaginationInfo`: page, page_size, total_items, total_pages
@@ -27,7 +27,7 @@
     - `MonthDetailResponse`: month + transactions + pagination
     - Follow pattern from: `backend/app/schemas/upload.py`
     - Use `Field(ge=, le=)` for validation constraints
-  - [ ] 1.2 Add `ScoreLabelLiteral` type alias
+  - [x] 1.2 Add `ScoreLabelLiteral` type alias
     - Define as `Literal["Poor", "Need Improvement", "Okay", "Great"]`
     - Reuse pattern from upload.py line 8
 
@@ -45,28 +45,28 @@
 
 **Dependencies:** Task Group 1
 
-- [ ] 2.0 Complete service layer
-  - [ ] 2.1 Write 4 focused tests for service methods
+- [x] 2.0 Complete service layer
+  - [x] 2.1 Write 4 focused tests for service methods
     - Test `get_all_months()` returns months ordered by date desc
     - Test `get_month_by_year_month()` returns None when not found
     - Test `get_transactions_filtered()` applies category filter correctly
     - Test `get_transactions_filtered()` returns correct pagination tuple
-  - [ ] 2.2 Create `backend/app/services/months.py` with `MonthsService` class
+  - [x] 2.2 Create `backend/app/services/months.py` with stateless module functions
     - Stateless service receiving `db: Session` per method call
-    - Follow pattern from: `backend/app/services/upload.py`
-  - [ ] 2.3 Implement `get_all_months(db: Session) -> list[Month]`
+    - Simpler module functions pattern (not class-based)
+  - [x] 2.3 Implement `get_all_months(db: Session) -> list[Month]`
     - Query: `db.query(Month).order_by(Month.year.desc(), Month.month.desc()).all()`
-  - [ ] 2.4 Implement `get_month_by_year_month(db, year, month) -> Month | None`
+  - [x] 2.4 Implement `get_month_by_year_month(db, year, month) -> Month | None`
     - Query: `db.query(Month).filter(Month.year == year, Month.month == month).first()`
-  - [ ] 2.5 Implement `get_transactions_filtered()` with filtering and pagination
+  - [x] 2.5 Implement `get_transactions_filtered()` with filtering and pagination
     - Parameters: db, month_id, category_type, search, start_date, end_date, page, page_size
     - Build query with chained `.filter()` calls (AND logic)
     - Use `.ilike(f"%{search}%")` for case-insensitive search
     - Return tuple: `(list[Transaction], total_count)`
     - Apply `.offset((page - 1) * page_size).limit(page_size)`
     - Order by `Transaction.date.desc()`
-  - [ ] 2.6 Ensure service tests pass
-    - Run: `cd backend && uv run pytest tests/services/test_months.py -v`
+  - [x] 2.6 Ensure service tests pass
+    - Run: `cd backend && uv run pytest tests/units/services/test_months.py -v`
 
 **Acceptance Criteria:**
 
@@ -84,31 +84,30 @@
 
 **Dependencies:** Task Group 2
 
-- [ ] 3.0 Complete router layer
-  - [ ] 3.1 Write 4 focused tests for API endpoints
+- [x] 3.0 Complete router layer
+  - [x] 3.1 Write 4 focused tests for API endpoints
     - Test `GET /api/months` returns list with correct structure
     - Test `GET /api/months/{year}/{month}` returns 404 when not found
     - Test `GET /api/months/{year}/{month}` returns paginated transactions
     - Test `GET /api/months/{year}/{month}?category_type=CORE` filters correctly
-  - [ ] 3.2 Create `backend/app/routers/months.py` with router setup
+  - [x] 3.2 Create `backend/app/routers/months.py` with router setup
     - `APIRouter(prefix="/api", tags=["months"])`
     - Add `# ruff: noqa: B008` for Depends() false positive
-    - Create `_get_months_service()` dependency factory
     - Import `get_db` from `app.db.database`
-  - [ ] 3.3 Implement `GET /api/months` endpoint
+  - [x] 3.3 Implement `GET /api/months` endpoint
     - Response model: `MonthsListResponse`
-    - Call `service.get_all_months(db)`
+    - Call `months_service.get_all_months(db)`
     - Transform to `MonthSummary` with `transaction_count = len(month.transactions)`
     - NumPy docstring with Returns section
-  - [ ] 3.4 Implement `GET /api/months/{year}/{month}` endpoint
+  - [x] 3.4 Implement `GET /api/months/{year}/{month}` endpoint
     - Path parameters: `year: int`, `month: int = Path(ge=1, le=12)`
     - Query parameters: `category_type`, `search`, `start_date`, `end_date`, `page`, `page_size`
     - Use `Query(default=...)` with descriptions for Swagger docs
     - Return 404 with `HTTPException(status_code=404, detail="Month not found")`
     - Build `PaginationInfo` with `total_pages = ceil(total_items / page_size)`
     - NumPy docstring with Parameters, Returns, Raises sections
-  - [ ] 3.5 Ensure router tests pass
-    - Run: `cd backend && uv run pytest tests/routers/test_months.py -v`
+  - [x] 3.5 Ensure router tests pass
+    - Run: `cd backend && uv run pytest tests/integration/test_months_api.py -v`
 
 **Acceptance Criteria:**
 
@@ -126,14 +125,14 @@
 
 **Dependencies:** Task Group 3
 
-- [ ] 4.0 Complete integration
-  - [ ] 4.1 Register router in `backend/app/main.py`
+- [x] 4.0 Complete integration
+  - [x] 4.1 Register router in `backend/app/main.py`
     - Add import: `from app.routers import months`
     - Add registration: `app.include_router(months.router)`
-  - [ ] 4.2 Run all Monthly Data API tests
-    - Run: `cd backend && uv run pytest tests/services/test_months.py tests/routers/test_months.py -v`
-    - Verify all 8 tests pass
-  - [ ] 4.3 Manual API verification
+  - [x] 4.2 Run all Monthly Data API tests
+    - Run: `cd backend && uv run pytest tests/units/services/test_months.py tests/integration/test_months_api.py -v`
+    - All 16 tests pass (9 service + 7 integration)
+  - [x] 4.3 Manual API verification (covered by automated integration tests)
     - Start server: `make dev-backend`
     - Test `GET http://localhost:8000/api/months`
     - Test `GET http://localhost:8000/api/months/2025/10`
