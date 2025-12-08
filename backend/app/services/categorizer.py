@@ -16,7 +16,7 @@ from app.services.exceptions import (
     CategorizationError,
     InvalidResponseError,
 )
-from app.services.schemas import CategorizationResult, TransactionInput
+from app.services.schemas.categorization import CategorizationResult, TransactionInput
 
 logger = logging.getLogger(__name__)
 

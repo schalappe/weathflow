@@ -9,7 +9,7 @@ from io import StringIO
 from typing import ClassVar
 
 from app.services.exceptions import InvalidFormatError, MissingColumnsError, RowParseError
-from app.services.schemas import MonthData, MonthSummary, ParsedTransaction, ParseResult
+from app.services.schemas.parsing import MonthData, MonthSummary, ParsedTransaction, ParseResult
 
 
 class BankinCSVParser:
