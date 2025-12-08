@@ -4,7 +4,7 @@
 
 2. [x] CSV Parser Service — Build a service that parses Bankin' CSV exports, detects all months present, groups transactions by month, and returns structured data with summaries `M`
 
-3. [ ] Transaction Categorization Service — Implement Claude API integration that categorizes transactions into Money Map categories (Core/Choice/Compound/Excluded) with batch processing for cost efficiency `M`
+3. [x] Transaction Categorization Service — Implement Claude API integration that categorizes transactions into Money Map categories (Core/Choice/Compound/Excluded) with batch processing for cost efficiency `M`
 
 4. [ ] Score Calculation Service — Create a service that calculates Money Map percentages and scores (0-3) based on categorized transactions and the 50/30/20 thresholds `S`
 
