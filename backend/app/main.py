@@ -1,15 +1,27 @@
 """FastAPI application entry point for Money Map Manager API."""
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.database import init_db
 from app.routers import upload
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage application lifecycle: initialize database on startup."""
+    init_db()
+    yield
+
+
 app = FastAPI(
     title="Money Map Manager API",
     description="API for uploading Bankin' CSV exports and categorizing transactions",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # ##>: Configure CORS for local development with Next.js frontend.
@@ -22,12 +34,6 @@ app.add_middleware(
 )
 
 app.include_router(upload.router)
-
-
-@app.on_event("startup")
-def startup() -> None:
-    """Initialize database tables on application startup."""
-    init_db()
 
 
 @app.get("/health")
