@@ -6,7 +6,7 @@
 
 3. [x] Transaction Categorization Service — Implement Claude API integration that categorizes transactions into Money Map categories (Core/Choice/Compound/Excluded) with batch processing for cost efficiency `M`
 
-4. [ ] Score Calculation Service — Create a service that calculates Money Map percentages and scores (0-3) based on categorized transactions and the 50/30/20 thresholds `S`
+4. [x] Score Calculation Service — Create a service that calculates Money Map percentages and scores (0-3) based on categorized transactions and the 50/30/20 thresholds `S`
 
 5. [ ] Upload and Categorize API — Build FastAPI endpoints for CSV upload, parsing preview, and triggering categorization with support for replace/merge import modes `M`
 
