@@ -15,11 +15,11 @@ This is a backend-only service. No UI components required.
 **Dependencies:** None
 **Estimated Time:** 30-45 minutes
 
-- [ ] 1.0 Complete exception hierarchy and package setup
-  - [ ] 1.1 Create services package structure
+- [x] 1.0 Complete exception hierarchy and package setup
+  - [x] 1.1 Create services package structure
     - Create `backend/app/services/__init__.py` (empty)
     - Create `backend/tests/units/services/__init__.py` (empty)
-  - [ ] 1.2 Create exception hierarchy in `backend/app/services/exceptions.py`
+  - [x] 1.2 Create exception hierarchy in `backend/app/services/exceptions.py`
     - `CSVParseError`: Base exception for all CSV parsing errors
     - `InvalidFormatError`: Empty file or no header
     - `MissingColumnsError`: Store `missing: list[str]` attribute, message lists missing columns
@@ -42,18 +42,18 @@ This is a backend-only service. No UI components required.
 **Dependencies:** None (can run parallel with Task Group 1)
 **Estimated Time:** 30-45 minutes
 
-- [ ] 2.0 Complete Pydantic models
-  - [ ] 2.1 Create `ParsedTransaction` model in `backend/app/services/csv_parser.py`
+- [x] 2.0 Complete Pydantic models
+  - [x] 2.1 Create `ParsedTransaction` model in `backend/app/services/schemas.py`
     - Fields: `date`, `description`, `account`, `amount` (Decimal), `bankin_category`, `bankin_subcategory`, `note` (optional), `is_pointed`
     - Use `ConfigDict(frozen=True)` for immutability
     - Field names align with Transaction SQLAlchemy model
-  - [ ] 2.2 Create `MonthSummary` model
+  - [x] 2.2 Create `MonthSummary` model
     - Fields: `year`, `month`, `transaction_count`, `total_income` (Decimal), `total_expenses` (Decimal)
     - Use `ConfigDict(frozen=True)`
-  - [ ] 2.3 Create `MonthData` model
+  - [x] 2.3 Create `MonthData` model
     - Fields: `year`, `month`, `transactions: list[ParsedTransaction]`, `summary: MonthSummary`
     - Use `ConfigDict(frozen=True)`
-  - [ ] 2.4 Create `ParseResult` model
+  - [x] 2.4 Create `ParseResult` model
     - Fields: `total_transactions: int`, `months: dict[str, MonthData]`
     - Use `ConfigDict(frozen=True)`
 
@@ -208,8 +208,11 @@ This is a backend-only service. No UI components required.
 | ------------------------------------------------- | -------------- | ---------- |
 | `backend/app/services/__init__.py`                | Create (empty) | 1          |
 | `backend/app/services/exceptions.py`              | Create         | 1          |
-| `backend/app/services/csv_parser.py`              | Create         | 2, 3       |
+| `backend/app/services/schemas.py`                 | Create         | 2          |
+| `backend/app/services/csv_parser.py`              | Create         | 3          |
 | `backend/tests/units/services/__init__.py`        | Create (empty) | 1          |
+| `backend/tests/units/services/test_exceptions.py` | Create         | 1          |
+| `backend/tests/units/services/test_schemas.py`    | Create         | 2          |
 | `backend/tests/units/services/test_csv_parser.py` | Create         | 3, 4       |
 
 ---
