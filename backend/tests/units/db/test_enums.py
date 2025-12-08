@@ -1,34 +1,49 @@
 """Tests for Money Map enums."""
 
+import unittest
 from enum import Enum
 
 from app.db.enums import MoneyMapType, ScoreLabel
 
 
-def test_money_map_type_values_are_correct_strings() -> None:
-    """MoneyMapType should have the expected string values."""
-    assert MoneyMapType.INCOME.value == "INCOME"
-    assert MoneyMapType.CORE.value == "CORE"
-    assert MoneyMapType.CHOICE.value == "CHOICE"
-    assert MoneyMapType.COMPOUND.value == "COMPOUND"
-    assert MoneyMapType.EXCLUDED.value == "EXCLUDED"
+class TestMoneyMapType(unittest.TestCase):
+    """Tests for the MoneyMapType enum."""
+
+    def test_values_are_correct_strings(self) -> None:
+        """MoneyMapType should have the expected string values."""
+        self.assertEqual(MoneyMapType.INCOME.value, "INCOME")
+        self.assertEqual(MoneyMapType.CORE.value, "CORE")
+        self.assertEqual(MoneyMapType.CHOICE.value, "CHOICE")
+        self.assertEqual(MoneyMapType.COMPOUND.value, "COMPOUND")
+        self.assertEqual(MoneyMapType.EXCLUDED.value, "EXCLUDED")
+
+    def test_inherits_from_str_and_enum(self) -> None:
+        """MoneyMapType should inherit from str and Enum for SQLite compatibility."""
+        self.assertTrue(issubclass(MoneyMapType, str))
+        self.assertTrue(issubclass(MoneyMapType, Enum))
+
+        # ##>: String inheritance allows direct string comparison without .value.
+        self.assertEqual(MoneyMapType.INCOME, "INCOME")
 
 
-def test_score_label_values_match_expected_labels() -> None:
-    """ScoreLabel should have human-readable string values."""
-    assert ScoreLabel.POOR.value == "Poor"
-    assert ScoreLabel.NEED_IMPROVEMENT.value == "Need Improvement"
-    assert ScoreLabel.OKAY.value == "Okay"
-    assert ScoreLabel.GREAT.value == "Great"
+class TestScoreLabel(unittest.TestCase):
+    """Tests for the ScoreLabel enum."""
+
+    def test_values_match_expected_labels(self) -> None:
+        """ScoreLabel should have human-readable string values."""
+        self.assertEqual(ScoreLabel.POOR.value, "Poor")
+        self.assertEqual(ScoreLabel.NEED_IMPROVEMENT.value, "Need Improvement")
+        self.assertEqual(ScoreLabel.OKAY.value, "Okay")
+        self.assertEqual(ScoreLabel.GREAT.value, "Great")
+
+    def test_inherits_from_str_and_enum(self) -> None:
+        """ScoreLabel should inherit from str and Enum for SQLite compatibility."""
+        self.assertTrue(issubclass(ScoreLabel, str))
+        self.assertTrue(issubclass(ScoreLabel, Enum))
+
+        # ##>: String inheritance allows direct string comparison without .value.
+        self.assertEqual(ScoreLabel.GREAT, "Great")
 
 
-def test_enums_inherit_from_str_and_enum() -> None:
-    """Both enums should inherit from str and Enum for SQLite compatibility."""
-    assert issubclass(MoneyMapType, str)
-    assert issubclass(MoneyMapType, Enum)
-    assert issubclass(ScoreLabel, str)
-    assert issubclass(ScoreLabel, Enum)
-
-    # ##>: String inheritance allows direct string comparison without .value.
-    assert MoneyMapType.INCOME == "INCOME"
-    assert ScoreLabel.GREAT == "Great"
+if __name__ == "__main__":
+    unittest.main()

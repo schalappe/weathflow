@@ -5,92 +5,93 @@ from datetime import date
 from app.db.models.advice import Advice
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
+from tests.conftest import DatabaseTestCase
 
 
-def test_month_transactions_returns_list(test_db_session) -> None:
-    """Month.transactions should return a list of transactions."""
-    month = Month(year=2025, month=10)
-    test_db_session.add(month)
-    test_db_session.commit()
+class TestModelRelationships(DatabaseTestCase):
+    """Tests for foreign key relationships and cascade behavior."""
 
-    tx1 = Transaction(
-        month_id=month.id,
-        date=date(2025, 10, 15),
-        description="Transaction 1",
-        amount=-50.0,
-    )
-    tx2 = Transaction(
-        month_id=month.id,
-        date=date(2025, 10, 16),
-        description="Transaction 2",
-        amount=-30.0,
-    )
-    test_db_session.add_all([tx1, tx2])
-    test_db_session.commit()
+    def test_month_transactions_returns_list(self) -> None:
+        """Month.transactions should return a list of transactions."""
+        month = Month(year=2025, month=10)
+        self.session.add(month)
+        self.session.commit()
 
-    test_db_session.refresh(month)
-    assert len(month.transactions) == 2
-    assert tx1 in month.transactions
-    assert tx2 in month.transactions
+        tx1 = Transaction(
+            month_id=month.id,
+            date=date(2025, 10, 15),
+            description="Transaction 1",
+            amount=-50.0,
+        )
+        tx2 = Transaction(
+            month_id=month.id,
+            date=date(2025, 10, 16),
+            description="Transaction 2",
+            amount=-30.0,
+        )
+        self.session.add_all([tx1, tx2])
+        self.session.commit()
 
+        self.session.refresh(month)
+        self.assertEqual(len(month.transactions), 2)
+        self.assertIn(tx1, month.transactions)
+        self.assertIn(tx2, month.transactions)
 
-def test_month_advice_records_returns_list(test_db_session) -> None:
-    """Month.advice_records should return a list of advice records."""
-    month = Month(year=2025, month=10)
-    test_db_session.add(month)
-    test_db_session.commit()
+    def test_month_advice_records_returns_list(self) -> None:
+        """Month.advice_records should return a list of advice records."""
+        month = Month(year=2025, month=10)
+        self.session.add(month)
+        self.session.commit()
 
-    advice = Advice(month_id=month.id, advice_text="Great job!")
-    test_db_session.add(advice)
-    test_db_session.commit()
+        advice = Advice(month_id=month.id, advice_text="Great job!")
+        self.session.add(advice)
+        self.session.commit()
 
-    test_db_session.refresh(month)
-    assert len(month.advice_records) == 1
-    assert advice in month.advice_records
+        self.session.refresh(month)
+        self.assertEqual(len(month.advice_records), 1)
+        self.assertIn(advice, month.advice_records)
 
+    def test_transaction_month_back_reference(self) -> None:
+        """Transaction.month should reference the parent Month."""
+        month = Month(year=2025, month=10)
+        self.session.add(month)
+        self.session.commit()
 
-def test_transaction_month_back_reference(test_db_session) -> None:
-    """Transaction.month should reference the parent Month."""
-    month = Month(year=2025, month=10)
-    test_db_session.add(month)
-    test_db_session.commit()
+        transaction = Transaction(
+            month_id=month.id,
+            date=date(2025, 10, 15),
+            description="Test transaction",
+            amount=-50.0,
+        )
+        self.session.add(transaction)
+        self.session.commit()
 
-    transaction = Transaction(
-        month_id=month.id,
-        date=date(2025, 10, 15),
-        description="Test transaction",
-        amount=-50.0,
-    )
-    test_db_session.add(transaction)
-    test_db_session.commit()
+        self.assertIs(transaction.month, month)
+        self.assertEqual(transaction.month.year, 2025)
+        self.assertEqual(transaction.month.month, 10)
 
-    assert transaction.month is month
-    assert transaction.month.year == 2025
-    assert transaction.month.month == 10
+    def test_cascade_delete_removes_transactions(self) -> None:
+        """Deleting a Month should cascade delete its transactions."""
+        month = Month(year=2025, month=10)
+        self.session.add(month)
+        self.session.commit()
 
+        tx = Transaction(
+            month_id=month.id,
+            date=date(2025, 10, 15),
+            description="Test transaction",
+            amount=-50.0,
+        )
+        advice = Advice(month_id=month.id, advice_text="Great job!")
+        self.session.add_all([tx, advice])
+        self.session.commit()
 
-def test_cascade_delete_removes_transactions(test_db_session) -> None:
-    """Deleting a Month should cascade delete its transactions."""
-    month = Month(year=2025, month=10)
-    test_db_session.add(month)
-    test_db_session.commit()
+        tx_id = tx.id
+        advice_id = advice.id
 
-    tx = Transaction(
-        month_id=month.id,
-        date=date(2025, 10, 15),
-        description="Test transaction",
-        amount=-50.0,
-    )
-    advice = Advice(month_id=month.id, advice_text="Great job!")
-    test_db_session.add_all([tx, advice])
-    test_db_session.commit()
+        self.session.delete(month)
+        self.session.commit()
 
-    tx_id = tx.id
-    advice_id = advice.id
-
-    test_db_session.delete(month)
-    test_db_session.commit()
-
-    # ##>: Verify cascade deleted the child records.
-    assert test_db_session.get(Transaction, tx_id) is None
-    assert test_db_session.get(Advice, advice_id) is None
+        # ##>: Verify cascade deleted the child records.
+        self.assertIsNone(self.session.get(Transaction, tx_id))
+        self.assertIsNone(self.session.get(Advice, advice_id))
