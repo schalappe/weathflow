@@ -388,6 +388,7 @@ class TestUploadServiceImportModes(DatabaseTestCase):
         new_month = self.session.query(Month).filter(Month.year == 2025, Month.month == 5).first()
         self.assertIsNotNone(new_month)
         # ##>: The key verification: only 1 transaction (the new one), not 2.
+        assert new_month is not None
         self.assertEqual(len(new_month.transactions), 1)
         self.assertEqual(new_month.transactions[0].description, "New transaction")
         # ##>: The old transaction should no longer exist.
@@ -477,6 +478,7 @@ class TestUploadServiceImportModes(DatabaseTestCase):
 
         # ##>: Month should have 2 total transactions.
         month = self.session.query(Month).filter(Month.year == 2025, Month.month == 6).first()
+        assert month is not None
         self.assertEqual(len(month.transactions), 2)
 
     @patch("app.services.upload.TransactionCategorizer")

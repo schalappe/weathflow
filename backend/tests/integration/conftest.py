@@ -1,5 +1,7 @@
 """Integration test fixtures for FastAPI with database."""
 
+from collections.abc import Generator
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -17,7 +19,7 @@ from app.main import app
 
 
 @pytest.fixture
-def db_engine() -> Engine:
+def db_engine() -> Generator[Engine, None, None]:
     """
     Create in-memory SQLite engine with all tables.
 
@@ -41,7 +43,7 @@ def db_engine() -> Engine:
 
 
 @pytest.fixture
-def db_session(db_engine: Engine) -> Session:
+def db_session(db_engine: Engine) -> Generator[Session, None, None]:
     """
     Provide database session for direct assertions.
 
@@ -65,7 +67,7 @@ def db_session(db_engine: Engine) -> Session:
 
 
 @pytest.fixture
-def client(db_session: Session) -> TestClient:
+def client(db_session: Session) -> Generator[TestClient, None, None]:
     """
     Test client with database dependency override.
 
@@ -84,7 +86,7 @@ def client(db_session: Session) -> TestClient:
         FastAPI test client configured for integration testing.
     """
 
-    def override_get_db():
+    def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db

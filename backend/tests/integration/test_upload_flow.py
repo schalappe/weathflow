@@ -1,5 +1,6 @@
 """Integration tests for upload and categorize API endpoints."""
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -28,7 +29,7 @@ def _create_mock_categorizer(money_map_types: list[MoneyMapType] | None = None) 
     """
     mock_categorizer = MagicMock()
 
-    def categorize_side_effect(inputs):
+    def categorize_side_effect(inputs: list[Any]) -> list[CategorizationResult]:
         types = money_map_types or [MoneyMapType.INCOME] * len(inputs)
         return [
             CategorizationResult(
@@ -49,7 +50,7 @@ class TestCategorizeReplaceMode:
 
     @patch("app.services.upload.TransactionCategorizer")
     def test_upload_categorize_creates_month_with_transactions(
-        self, mock_categorizer_class, client: TestClient, db_session: Session
+        self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
     ) -> None:
         """
         Full upload → categorize → verify database flow in replace mode.
@@ -100,7 +101,7 @@ class TestCategorizeReplaceMode:
 
     @patch("app.services.upload.TransactionCategorizer")
     def test_replace_mode_deletes_existing_data(
-        self, mock_categorizer_class, client: TestClient, db_session: Session
+        self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
     ) -> None:
         """Replace mode deletes existing month data before import."""
         mock_categorizer_class.return_value = _create_mock_categorizer([MoneyMapType.INCOME])
@@ -125,6 +126,7 @@ class TestCategorizeReplaceMode:
         assert response.status_code == 200
         db_session.expire_all()
         month = db_session.query(Month).filter_by(year=2025, month=2).first()
+        assert month is not None
         assert month.total_income == 3500.0
         assert len(month.transactions) == 1
 
@@ -134,7 +136,7 @@ class TestCategorizeMergeMode:
 
     @patch("app.services.upload.TransactionCategorizer")
     def test_merge_mode_skips_duplicate_transactions(
-        self, mock_categorizer_class, client: TestClient, db_session: Session
+        self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
     ) -> None:
         """
         Full upload → categorize → verify database flow in merge mode.
@@ -168,11 +170,12 @@ class TestCategorizeMergeMode:
 
         db_session.expire_all()
         month = db_session.query(Month).filter_by(year=2025, month=3).first()
+        assert month is not None
         assert len(month.transactions) == 2
 
     @patch("app.services.upload.TransactionCategorizer")
     def test_merge_mode_adds_new_transactions(
-        self, mock_categorizer_class, client: TestClient, db_session: Session
+        self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
     ) -> None:
         """Merge mode adds new transactions while preserving existing ones."""
         mock_categorizer_class.return_value = _create_mock_categorizer([MoneyMapType.INCOME])
@@ -202,6 +205,7 @@ class TestCategorizeMergeMode:
 
         db_session.expire_all()
         month = db_session.query(Month).filter_by(year=2025, month=4).first()
+        assert month is not None
         assert len(month.transactions) == 2
         assert month.total_income == 3000.0
         assert month.total_core == 120.0
@@ -212,7 +216,7 @@ class TestMultiMonthProcessing:
 
     @patch("app.services.upload.TransactionCategorizer")
     def test_processes_all_months_in_csv(
-        self, mock_categorizer_class, client: TestClient, db_session: Session
+        self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
     ) -> None:
         """
         Multi-month file processing end-to-end.
@@ -252,7 +256,9 @@ class TestPartialFailure:
     """Integration tests for partial success scenarios."""
 
     @patch("app.services.upload.TransactionCategorizer")
-    def test_api_error_mid_processing(self, mock_categorizer_class, client: TestClient, db_session: Session) -> None:
+    def test_api_error_mid_processing(
+        self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
+    ) -> None:
         """
         Partial success: API error on second month while first succeeds.
 
@@ -263,7 +269,7 @@ class TestPartialFailure:
         mock_categorizer_class.return_value = mock_categorizer
         call_count = [0]
 
-        def categorize_side_effect(inputs):
+        def categorize_side_effect(inputs: list[Any]) -> list[CategorizationResult]:
             call_count[0] += 1
             if call_count[0] == 1:
                 # ##>: First month succeeds.
@@ -303,7 +309,7 @@ class TestErrorHandling:
 
     @patch("app.services.upload.TransactionCategorizer")
     def test_claude_api_failure_returns_502(
-        self, mock_categorizer_class, client: TestClient, db_session: Session
+        self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
     ) -> None:
         """
         Claude API mock failure handling.

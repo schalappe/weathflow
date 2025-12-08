@@ -3,7 +3,7 @@
 import os
 import re
 from math import ceil
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy.orm import Session
 
@@ -41,7 +41,7 @@ class UploadService:
         self._categorizer = TransactionCategorizer(api_key=api_key)
         self._api_call_count = 0
 
-    def get_upload_preview(self, file_content: bytes) -> dict:
+    def get_upload_preview(self, file_content: bytes) -> dict[str, Any]:
         """
         Parse CSV and return preview of detected months.
 
@@ -68,7 +68,7 @@ class UploadService:
             raise NoTransactionsFoundError()
 
         months_detected = []
-        preview_by_month: dict[str, list[dict]] = {}
+        preview_by_month: dict[str, list[dict[str, Any]]] = {}
 
         for month_key, month_data in result.months.items():
             months_detected.append(
@@ -103,7 +103,7 @@ class UploadService:
         months_to_process: list[str],
         import_mode: Literal["replace", "merge"],
         db: Session,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Parse, categorize, and persist transactions for selected months.
 
@@ -171,7 +171,7 @@ class UploadService:
         db: Session,
         month_data: MonthData,
         import_mode: Literal["replace", "merge"],
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Process categorization and persistence for a single month."""
         year, month = month_data.year, month_data.month
 
@@ -227,7 +227,7 @@ class UploadService:
             for i, t in enumerate(transactions)
         ]
 
-    def _count_low_confidence(self, results: list) -> int:
+    def _count_low_confidence(self, results: list[CategorizationResult]) -> int:
         """Count results with confidence below threshold."""
         return sum(1 for r in results if r.confidence < LOW_CONFIDENCE_THRESHOLD)
 
