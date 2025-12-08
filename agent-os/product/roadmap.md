@@ -8,7 +8,7 @@
 
 4. [x] Score Calculation Service — Create a service that calculates Money Map percentages and scores (0-3) based on categorized transactions and the 50/30/20 thresholds `S`
 
-5. [ ] Upload and Categorize API — Build FastAPI endpoints for CSV upload, parsing preview, and triggering categorization with support for replace/merge import modes `M`
+5. [x] Upload and Categorize API — Build FastAPI endpoints for CSV upload, parsing preview, and triggering categorization with support for replace/merge import modes `M`
 
 6. [ ] Monthly Data API — Create endpoints to retrieve month data including totals, percentages, score, and transaction list with filtering capabilities `S`
 
