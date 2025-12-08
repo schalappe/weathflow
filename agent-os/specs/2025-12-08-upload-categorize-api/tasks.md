@@ -241,11 +241,11 @@
 
 **Dependencies:** Task Group 6, Task Group 7
 
-- [ ] 8.0 Complete app integration
-  - [ ] 8.1 Register router in main app
+- [x] 8.0 Complete app integration
+  - [x] 8.1 Register router in main app
     - Add `from app.routers import upload` to `main.py`
     - Add `app.include_router(upload.router)`
-  - [ ] 8.2 Verify endpoints are accessible
+  - [x] 8.2 Verify endpoints are accessible
     - Run: `cd backend && uv run uvicorn app.main:app --reload`
     - Check: `curl -X POST http://localhost:8000/api/upload` returns 422 (missing file)
     - Check: `curl http://localhost:8000/docs` shows upload endpoints
@@ -264,18 +264,18 @@
 
 **Dependencies:** Task Groups 1-8
 
-- [ ] 9.0 Complete test review and integration tests
-  - [ ] 9.1 Review existing tests from Task Groups 3-7
+- [x] 9.0 Complete test review and integration tests
+  - [x] 9.1 Review existing tests from Task Groups 3-7
     - Service tests: ~10 tests from groups 3, 4, 5
     - Router tests: ~7 tests from groups 6, 7
     - Total: ~17 tests
-  - [ ] 9.2 Write up to 5 integration tests
+  - [x] 9.2 Write up to 5 integration tests
     - Test: Full upload → categorize → verify database (replace mode)
     - Test: Full upload → categorize → verify database (merge mode)
     - Test: Multi-month file processing end-to-end
     - Test: Partial success (some months fail categorization)
     - Test: Claude API mock failure handling
-  - [ ] 9.3 Run all feature tests
+  - [x] 9.3 Run all feature tests
     - Run: `cd backend && uv run pytest tests/units/services/test_upload.py tests/units/routers/test_upload.py tests/integration/test_upload_flow.py -v`
     - Expected: ~22 tests pass
 
