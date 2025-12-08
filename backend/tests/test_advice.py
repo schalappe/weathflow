@@ -14,7 +14,7 @@ def test_create_advice_linked_to_month(test_db_session) -> None:
 
     advice = Advice(
         month_id=month.id,
-        advice_text='Consider reducing dining out expenses to improve your score.',
+        advice_text="Consider reducing dining out expenses to improve your score.",
     )
     test_db_session.add(advice)
     test_db_session.commit()
@@ -44,7 +44,7 @@ def test_generated_at_auto_sets_on_creation(test_db_session) -> None:
 
     advice = Advice(
         month_id=month.id,
-        advice_text='Your spending habits are excellent!',
+        advice_text="Your spending habits are excellent!",
     )
     test_db_session.add(advice)
     test_db_session.commit()

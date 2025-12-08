@@ -17,7 +17,7 @@ def test_create_transaction_linked_to_month(test_db_session) -> None:
     transaction = Transaction(
         month_id=month.id,
         date=date(2025, 10, 15),
-        description='Test transaction',
+        description="Test transaction",
         amount=-50.0,
     )
     test_db_session.add(transaction)
@@ -36,9 +36,9 @@ def test_check_constraint_rejects_invalid_money_map_type(test_db_session) -> Non
     transaction = Transaction(
         month_id=month.id,
         date=date(2025, 10, 15),
-        description='Test transaction',
+        description="Test transaction",
         amount=-50.0,
-        money_map_type='INVALID_TYPE',
+        money_map_type="INVALID_TYPE",
     )
     test_db_session.add(transaction)
 
@@ -55,9 +55,9 @@ def test_foreign_key_relationship_works(test_db_session) -> None:
     transaction = Transaction(
         month_id=month.id,
         date=date(2025, 10, 15),
-        description='Test transaction',
+        description="Test transaction",
         amount=-50.0,
-        money_map_type='CORE',
+        money_map_type="CORE",
     )
     test_db_session.add(transaction)
     test_db_session.commit()
@@ -75,7 +75,7 @@ def test_is_manually_corrected_defaults_to_false(test_db_session) -> None:
     transaction = Transaction(
         month_id=month.id,
         date=date(2025, 10, 15),
-        description='Test transaction',
+        description="Test transaction",
         amount=-50.0,
     )
     test_db_session.add(transaction)

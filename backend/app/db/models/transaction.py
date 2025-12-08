@@ -24,15 +24,15 @@ _MONEY_MAP_CHECK = f"money_map_type IS NULL OR money_map_type IN ('{_MONEY_MAP_V
 class Transaction(Base):
     """Individual financial transaction linked to a month."""
 
-    __tablename__ = 'transactions'
+    __tablename__ = "transactions"
     __table_args__ = (
-        CheckConstraint(_MONEY_MAP_CHECK, name='ck_valid_money_map_type'),
-        Index('idx_transactions_month', 'month_id'),
-        Index('idx_transactions_date', 'date'),
+        CheckConstraint(_MONEY_MAP_CHECK, name="ck_valid_money_map_type"),
+        Index("idx_transactions_month", "month_id"),
+        Index("idx_transactions_date", "date"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    month_id: Mapped[int] = mapped_column(ForeignKey('months.id'), nullable=False)
+    month_id: Mapped[int] = mapped_column(ForeignKey("months.id"), nullable=False)
 
     date: Mapped[date] = mapped_column(Date, nullable=False)
     description: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -48,7 +48,7 @@ class Transaction(Base):
     is_manually_corrected: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
-    month: Mapped[Month] = relationship(back_populates='transactions')
+    month: Mapped[Month] = relationship(back_populates="transactions")
 
     def __repr__(self) -> str:
-        return f'<Transaction(id={self.id}, date={self.date}, amount={self.amount})>'
+        return f"<Transaction(id={self.id}, date={self.date}, amount={self.amount})>"

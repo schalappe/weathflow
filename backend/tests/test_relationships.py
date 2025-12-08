@@ -14,13 +14,13 @@ def test_month_transactions_returns_list(test_db_session) -> None:
     tx1 = Transaction(
         month_id=month.id,
         date=date(2025, 10, 15),
-        description='Transaction 1',
+        description="Transaction 1",
         amount=-50.0,
     )
     tx2 = Transaction(
         month_id=month.id,
         date=date(2025, 10, 16),
-        description='Transaction 2',
+        description="Transaction 2",
         amount=-30.0,
     )
     test_db_session.add_all([tx1, tx2])
@@ -38,7 +38,7 @@ def test_month_advice_records_returns_list(test_db_session) -> None:
     test_db_session.add(month)
     test_db_session.commit()
 
-    advice = Advice(month_id=month.id, advice_text='Great job!')
+    advice = Advice(month_id=month.id, advice_text="Great job!")
     test_db_session.add(advice)
     test_db_session.commit()
 
@@ -56,7 +56,7 @@ def test_transaction_month_back_reference(test_db_session) -> None:
     transaction = Transaction(
         month_id=month.id,
         date=date(2025, 10, 15),
-        description='Test transaction',
+        description="Test transaction",
         amount=-50.0,
     )
     test_db_session.add(transaction)
@@ -76,10 +76,10 @@ def test_cascade_delete_removes_transactions(test_db_session) -> None:
     tx = Transaction(
         month_id=month.id,
         date=date(2025, 10, 15),
-        description='Test transaction',
+        description="Test transaction",
         amount=-50.0,
     )
-    advice = Advice(month_id=month.id, advice_text='Great job!')
+    advice = Advice(month_id=month.id, advice_text="Great job!")
     test_db_session.add_all([tx, advice])
     test_db_session.commit()
 

@@ -15,11 +15,11 @@ class MoneyMapType(str, Enum):
         EXCLUDED: Internal transfers not counted in budget calculations.
     """
 
-    INCOME = 'INCOME'
-    CORE = 'CORE'
-    CHOICE = 'CHOICE'
-    COMPOUND = 'COMPOUND'
-    EXCLUDED = 'EXCLUDED'
+    INCOME = "INCOME"
+    CORE = "CORE"
+    CHOICE = "CHOICE"
+    COMPOUND = "COMPOUND"
+    EXCLUDED = "EXCLUDED"
 
 
 class ScoreLabel(str, Enum):
@@ -33,7 +33,7 @@ class ScoreLabel(str, Enum):
         GREAT (3): All three thresholds met.
     """
 
-    POOR = 'Poor'
-    NEED_IMPROVEMENT = 'Need Improvement'
-    OKAY = 'Okay'
-    GREAT = 'Great'
+    POOR = "Poor"
+    NEED_IMPROVEMENT = "Need Improvement"
+    OKAY = "Okay"
+    GREAT = "Great"

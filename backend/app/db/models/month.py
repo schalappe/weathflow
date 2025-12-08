@@ -19,11 +19,11 @@ if TYPE_CHECKING:
 class Month(Base):
     """Monthly financial summary with Money Map score."""
 
-    __tablename__ = 'months'
+    __tablename__ = "months"
     __table_args__ = (
-        UniqueConstraint('year', 'month', name='uq_year_month'),
-        CheckConstraint('month >= 1 AND month <= 12', name='ck_valid_month'),
-        Index('idx_months_year_month', 'year', 'month'),
+        UniqueConstraint("year", "month", name="uq_year_month"),
+        CheckConstraint("month >= 1 AND month <= 12", name="ck_valid_month"),
+        Index("idx_months_year_month", "year", "month"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -46,13 +46,13 @@ class Month(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     transactions: Mapped[list[Transaction]] = relationship(
-        back_populates='month',
-        cascade='all, delete-orphan',
+        back_populates="month",
+        cascade="all, delete-orphan",
     )
     advice_records: Mapped[list[Advice]] = relationship(
-        back_populates='month',
-        cascade='all, delete-orphan',
+        back_populates="month",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
-        return f'<Month(id={self.id}, year={self.year}, month={self.month}, score={self.score})>'
+        return f"<Month(id={self.id}, year={self.year}, month={self.month}, score={self.score})>"

@@ -5,7 +5,7 @@ from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 
 __all__ = [
-    'Advice',
-    'Month',
-    'Transaction',
+    "Advice",
+    "Month",
+    "Transaction",
 ]

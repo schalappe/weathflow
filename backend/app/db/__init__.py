@@ -9,16 +9,16 @@ from app.db.models import Advice, Month, Transaction
 
 __all__ = [
     # Core database infrastructure
-    'Base',
-    'SessionLocal',
-    'engine',
-    'get_db',
-    'init_db',
+    "Base",
+    "SessionLocal",
+    "engine",
+    "get_db",
+    "init_db",
     # Domain enums
-    'MoneyMapType',
-    'ScoreLabel',
+    "MoneyMapType",
+    "ScoreLabel",
     # Models
-    'Advice',
-    'Month',
-    'Transaction',
+    "Advice",
+    "Month",
+    "Transaction",
 ]
