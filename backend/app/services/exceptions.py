@@ -1,4 +1,4 @@
-"""Custom exceptions for CSV parsing and transaction categorization operations."""
+"""Custom exceptions for CSV parsing, transaction categorization, and score calculation operations."""
 
 from typing import Any
 
@@ -165,3 +165,48 @@ class MonthNotFoundError(ScoreCalculationError):
     def __init__(self, month_id: int) -> None:
         self.month_id = month_id
         super().__init__(f"Month with id={month_id} not found")
+
+
+class TransactionAggregationError(ScoreCalculationError):
+    """
+    Raised when transaction aggregation query fails.
+
+    Parameters
+    ----------
+    month_id : int
+        The ID of the month being aggregated.
+    reason : str
+        Description of the failure.
+
+    Attributes
+    ----------
+    month_id : int
+        The month ID for programmatic access.
+    reason : str
+        The failure reason for debugging.
+    """
+
+    def __init__(self, month_id: int, reason: str) -> None:
+        self.month_id = month_id
+        self.reason = reason
+        super().__init__(f"Failed to aggregate transactions for month {month_id}: {reason}")
+
+
+class ScorePersistenceError(ScoreCalculationError):
+    """
+    Raised when score calculation succeeds but database update fails.
+
+    Parameters
+    ----------
+    month_id : int
+        The ID of the month that could not be updated.
+
+    Attributes
+    ----------
+    month_id : int
+        The month ID for programmatic access.
+    """
+
+    def __init__(self, month_id: int) -> None:
+        self.month_id = month_id
+        super().__init__(f"Failed to persist score calculation for month {month_id}")

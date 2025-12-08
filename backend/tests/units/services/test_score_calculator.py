@@ -8,7 +8,12 @@ from pydantic import ValidationError
 from app.db.enums import MoneyMapType, ScoreLabel
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
-from app.services.exceptions import MonthNotFoundError, ScoreCalculationError
+from app.services.exceptions import (
+    MonthNotFoundError,
+    ScoreCalculationError,
+    ScorePersistenceError,
+    TransactionAggregationError,
+)
 from app.services.schemas import MonthStats
 from tests.conftest import DatabaseTestCase
 
@@ -90,6 +95,24 @@ class TestMonthStatsSchema(unittest.TestCase):
                 score_label=ScoreLabel.GREAT,
             )
 
+    def test_month_stats_rejects_score_label_mismatch(self) -> None:
+        """Should raise ValidationError when score and score_label don't match."""
+        # ##>: Score 3 should have GREAT label, not POOR.
+        with self.assertRaises(ValidationError) as context:
+            MonthStats(
+                total_income=5000.0,
+                total_core=2000.0,
+                total_choice=1000.0,
+                total_compound=2000.0,
+                core_percentage=40.0,
+                choice_percentage=20.0,
+                compound_percentage=40.0,
+                score=3,
+                score_label=ScoreLabel.POOR,  # Mismatch!
+            )
+
+        self.assertIn("does not match", str(context.exception))
+
 
 class TestMonthNotFoundError(unittest.TestCase):
     """Tests for MonthNotFoundError exception."""
@@ -110,6 +133,53 @@ class TestMonthNotFoundError(unittest.TestCase):
     def test_exception_inherits_from_score_calculation_error(self) -> None:
         """Should inherit from ScoreCalculationError for catch-all handling."""
         error = MonthNotFoundError(month_id=42)
+
+        self.assertIsInstance(error, ScoreCalculationError)
+
+
+class TestTransactionAggregationError(unittest.TestCase):
+    """Tests for TransactionAggregationError exception."""
+
+    def test_exception_stores_attributes(self) -> None:
+        """Should store month_id and reason for programmatic access."""
+        error = TransactionAggregationError(month_id=42, reason="database timeout")
+
+        self.assertEqual(error.month_id, 42)
+        self.assertEqual(error.reason, "database timeout")
+
+    def test_exception_provides_readable_message(self) -> None:
+        """Should provide human-readable error message."""
+        error = TransactionAggregationError(month_id=42, reason="connection lost")
+
+        self.assertIn("42", str(error))
+        self.assertIn("connection lost", str(error))
+
+    def test_exception_inherits_from_score_calculation_error(self) -> None:
+        """Should inherit from ScoreCalculationError for catch-all handling."""
+        error = TransactionAggregationError(month_id=42, reason="test")
+
+        self.assertIsInstance(error, ScoreCalculationError)
+
+
+class TestScorePersistenceError(unittest.TestCase):
+    """Tests for ScorePersistenceError exception."""
+
+    def test_exception_stores_month_id(self) -> None:
+        """Should store month_id attribute for programmatic access."""
+        error = ScorePersistenceError(month_id=42)
+
+        self.assertEqual(error.month_id, 42)
+
+    def test_exception_provides_readable_message(self) -> None:
+        """Should provide human-readable error message."""
+        error = ScorePersistenceError(month_id=42)
+
+        self.assertIn("42", str(error))
+        self.assertIn("persist", str(error).lower())
+
+    def test_exception_inherits_from_score_calculation_error(self) -> None:
+        """Should inherit from ScoreCalculationError for catch-all handling."""
+        error = ScorePersistenceError(month_id=42)
 
         self.assertIsInstance(error, ScoreCalculationError)
 
@@ -205,6 +275,20 @@ class TestCalculateMonthStats(unittest.TestCase):
         self.assertEqual(stats.score, 0)
         self.assertEqual(stats.score_label, ScoreLabel.POOR)
 
+    def test_negative_income_edge_case(self) -> None:
+        """Should return score 0 and 'Poor' when income is negative."""
+        from app.services.calculator import calculate_month_stats
+
+        # ##>: Negative income (data error or refund-only month) handled like zero.
+        stats = calculate_month_stats(income=-500.0, core=0.0, choice=0.0)
+
+        self.assertEqual(stats.total_income, -500.0)
+        self.assertEqual(stats.core_percentage, 0.0)
+        self.assertEqual(stats.choice_percentage, 0.0)
+        self.assertEqual(stats.compound_percentage, 0.0)
+        self.assertEqual(stats.score, 0)
+        self.assertEqual(stats.score_label, ScoreLabel.POOR)
+
     def test_negative_compound_overspent(self) -> None:
         """Should calculate correctly when compound is negative (overspent)."""
         from app.services.calculator import calculate_month_stats
@@ -285,6 +369,48 @@ class TestAggregateTransactionTotals(DatabaseTestCase):
         income, core, choice = _aggregate_transaction_totals(self.session, month.id)
 
         self.assertEqual(income, 0.0)
+        self.assertEqual(core, 0.0)
+        self.assertEqual(choice, 0.0)
+
+    def test_aggregate_ignores_excluded_transactions(self) -> None:
+        """Should not include EXCLUDED transactions in totals."""
+        from app.services.calculator import _aggregate_transaction_totals
+
+        month = Month(year=2025, month=12)
+        self.session.add(month)
+        self.session.commit()
+
+        # ##>: EXCLUDED transactions (internal transfers) should be ignored.
+        transactions = [
+            Transaction(
+                month_id=month.id,
+                date=date(2025, 12, 1),
+                description="Salary",
+                amount=5000.0,
+                money_map_type=MoneyMapType.INCOME.value,
+            ),
+            Transaction(
+                month_id=month.id,
+                date=date(2025, 12, 5),
+                description="Transfer to savings",
+                amount=-1000.0,
+                money_map_type=MoneyMapType.EXCLUDED.value,
+            ),
+            Transaction(
+                month_id=month.id,
+                date=date(2025, 12, 10),
+                description="Internal transfer",
+                amount=1000.0,
+                money_map_type=MoneyMapType.EXCLUDED.value,
+            ),
+        ]
+        self.session.add_all(transactions)
+        self.session.commit()
+
+        income, core, choice = _aggregate_transaction_totals(self.session, month.id)
+
+        # ##>: EXCLUDED transactions should not appear in any total.
+        self.assertEqual(income, 5000.0)
         self.assertEqual(core, 0.0)
         self.assertEqual(choice, 0.0)
 

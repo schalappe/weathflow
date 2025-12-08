@@ -8,12 +8,13 @@ for computing monthly budget scores based on the 50/30/20 framework.
 import logging
 
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db.enums import MoneyMapType, ScoreLabel
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
-from app.services.exceptions import MonthNotFoundError
+from app.services.exceptions import MonthNotFoundError, ScorePersistenceError, TransactionAggregationError
 from app.services.schemas import MonthStats
 
 logger = logging.getLogger(__name__)
@@ -135,6 +136,7 @@ def _aggregate_transaction_totals(db: Session, month_id: int) -> tuple[float, fl
     Uses a single SQL query with conditional aggregation for efficiency.
     Income is summed from positive amounts with INCOME type.
     Core and Choice are summed as absolute values from negative amounts.
+    EXCLUDED and COMPOUND transactions are intentionally omitted.
 
     Parameters
     ----------
@@ -147,40 +149,48 @@ def _aggregate_transaction_totals(db: Session, month_id: int) -> tuple[float, fl
     -------
     tuple[float, float, float]
         Tuple of (income, core, choice) totals.
-    """
-    result = (
-        db.query(
-            func.coalesce(
-                func.sum(Transaction.amount).filter(
-                    Transaction.money_map_type == MoneyMapType.INCOME.value,
-                    Transaction.amount > 0,
-                ),
-                0.0,
-            ).label("income"),
-            func.coalesce(
-                func.abs(
-                    func.sum(Transaction.amount).filter(
-                        Transaction.money_map_type == MoneyMapType.CORE.value,
-                        Transaction.amount < 0,
-                    )
-                ),
-                0.0,
-            ).label("core"),
-            func.coalesce(
-                func.abs(
-                    func.sum(Transaction.amount).filter(
-                        Transaction.money_map_type == MoneyMapType.CHOICE.value,
-                        Transaction.amount < 0,
-                    )
-                ),
-                0.0,
-            ).label("choice"),
-        )
-        .filter(Transaction.month_id == month_id)
-        .one()
-    )
 
-    return float(result.income), float(result.core), float(result.choice)
+    Raises
+    ------
+    TransactionAggregationError
+        If database query fails.
+    """
+    try:
+        result = (
+            db.query(
+                func.coalesce(
+                    func.sum(Transaction.amount).filter(
+                        Transaction.money_map_type == MoneyMapType.INCOME.value,
+                        Transaction.amount > 0,
+                    ),
+                    0.0,
+                ).label("income"),
+                func.coalesce(
+                    func.abs(
+                        func.sum(Transaction.amount).filter(
+                            Transaction.money_map_type == MoneyMapType.CORE.value,
+                            Transaction.amount < 0,
+                        )
+                    ),
+                    0.0,
+                ).label("core"),
+                func.coalesce(
+                    func.abs(
+                        func.sum(Transaction.amount).filter(
+                            Transaction.money_map_type == MoneyMapType.CHOICE.value,
+                            Transaction.amount < 0,
+                        )
+                    ),
+                    0.0,
+                ).label("choice"),
+            )
+            .filter(Transaction.month_id == month_id)
+            .one()
+        )
+        return float(result.income), float(result.core), float(result.choice)
+    except SQLAlchemyError as error:
+        logger.error("Database error aggregating transactions for month_id=%d: %s", month_id, str(error))
+        raise TransactionAggregationError(month_id, str(error)) from error
 
 
 def calculate_and_update_month(db: Session, month_id: int) -> Month:
@@ -206,9 +216,14 @@ def calculate_and_update_month(db: Session, month_id: int) -> Month:
     ------
     MonthNotFoundError
         If no month exists with the given ID.
+    TransactionAggregationError
+        If transaction aggregation query fails.
+    ScorePersistenceError
+        If database commit fails.
     """
     month = db.get(Month, month_id)
     if month is None:
+        logger.warning("Month not found: month_id=%d", month_id)
         raise MonthNotFoundError(month_id)
 
     income, core, choice = _aggregate_transaction_totals(db, month_id)
@@ -219,7 +234,13 @@ def calculate_and_update_month(db: Session, month_id: int) -> Month:
         setattr(month, field, value)
     month.score_label = stats.score_label.value
 
-    db.commit()
+    try:
+        db.commit()
+    except SQLAlchemyError as error:
+        db.rollback()
+        logger.error("Failed to persist score for month %d: %s", month_id, str(error))
+        raise ScorePersistenceError(month_id) from error
+
     db.refresh(month)
 
     logger.info(
