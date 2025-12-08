@@ -1,10 +1,14 @@
-"""Tests for CSV parsing exceptions."""
+"""Tests for CSV parsing and categorization exceptions."""
 
 import unittest
 
 from app.services.exceptions import (
+    APIConnectionError,
+    BatchCategorizationError,
+    CategorizationError,
     CSVParseError,
     InvalidFormatError,
+    InvalidResponseError,
     MissingColumnsError,
     RowParseError,
 )
@@ -96,3 +100,49 @@ class TestInvalidFormatError(unittest.TestCase):
         error = InvalidFormatError("File is empty")
 
         self.assertEqual(str(error), "File is empty")
+
+
+class TestCategorizationExceptionHierarchy(unittest.TestCase):
+    """Tests for categorization exception inheritance structure."""
+
+    def test_api_connection_error_inherits_from_categorization_error(self) -> None:
+        """APIConnectionError should inherit from CategorizationError."""
+        self.assertTrue(issubclass(APIConnectionError, CategorizationError))
+
+    def test_invalid_response_error_inherits_from_categorization_error(self) -> None:
+        """InvalidResponseError should inherit from CategorizationError."""
+        self.assertTrue(issubclass(InvalidResponseError, CategorizationError))
+
+    def test_batch_categorization_error_inherits_from_categorization_error(self) -> None:
+        """BatchCategorizationError should inherit from CategorizationError."""
+        self.assertTrue(issubclass(BatchCategorizationError, CategorizationError))
+
+
+class TestCategorizationExceptionMessageFormatting(unittest.TestCase):
+    """Tests for exception message formatting."""
+
+    def test_api_connection_error_message_includes_retry_count(self) -> None:
+        """Should format message with retry count."""
+        error = APIConnectionError(retry_count=3)
+
+        self.assertEqual(error.retry_count, 3)
+        self.assertIn("3 retries", str(error))
+
+    def test_invalid_response_error_truncates_long_response(self) -> None:
+        """Should truncate long responses in message but store full in attribute."""
+        long_response = "x" * 200
+        error = InvalidResponseError(raw_response=long_response)
+
+        self.assertEqual(error.raw_response, long_response)
+        self.assertIn("...", str(error))
+        self.assertLess(len(str(error)), len(long_response))
+
+    def test_batch_categorization_error_stores_partial_results(self) -> None:
+        """Should store failed IDs and partial results."""
+        failed_ids = [1, 5, 10]
+        partial_results = [{"id": 2, "type": "CORE"}, {"id": 3, "type": "CHOICE"}]
+        error = BatchCategorizationError(failed_ids=failed_ids, partial_results=partial_results)  # type: [arg-type]
+
+        self.assertEqual(error.failed_ids, failed_ids)
+        self.assertEqual(error.partial_results, partial_results)
+        self.assertIn("3 transactions", str(error))

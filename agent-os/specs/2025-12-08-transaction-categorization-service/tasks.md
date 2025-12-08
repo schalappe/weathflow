@@ -17,29 +17,29 @@
 
 **Dependencies:** None
 
-- [ ] 1.0 Complete dependencies and schema layer
-  - [ ] 1.1 Add external dependencies to pyproject.toml
+- [x] 1.0 Complete dependencies and schema layer
+  - [x] 1.1 Add external dependencies to pyproject.toml
     - Add `anthropic>=0.40.0` for Claude API
     - Add `tenacity>=9.0.0` for retry logic
     - Run `uv sync` to install
-  - [ ] 1.2 Add categorization exception hierarchy to `exceptions.py`
+  - [x] 1.2 Add categorization exception hierarchy to `exceptions.py`
     - `CategorizationError`: Base exception
     - `APIConnectionError`: Stores retry_count
     - `InvalidResponseError`: Stores raw_response
     - `BatchCategorizationError`: Stores failed_ids, partial_results
     - Follow pattern from `CSVParseError` hierarchy
-  - [ ] 1.3 Add categorization Pydantic models to `schemas.py`
+  - [x] 1.3 Add categorization Pydantic models to `schemas.py`
     - `TransactionInput`: id, date, description, amount, bankin_category, bankin_subcategory
     - `CategorizationResult`: id, money_map_type, money_map_subcategory, confidence
     - `CachedCategorization`: money_map_type, money_map_subcategory, confidence, hit_count
     - Extend `FrozenModel` base class
     - Import `MoneyMapType` from `db/enums.py`
-  - [ ] 1.4 Write 4 focused tests for schema validation
+  - [x] 1.4 Write 4 focused tests for schema validation
     - Test `TransactionInput` validation with valid data
     - Test `CategorizationResult` confidence bounds (0.0-1.0)
     - Test `CachedCategorization` immutability (frozen)
     - Test exception message formatting
-  - [ ] 1.5 Ensure schema tests pass
+  - [x] 1.5 Ensure schema tests pass
     - Run ONLY the 4 tests from 1.4
     - Verify imports work correctly
 
@@ -58,23 +58,23 @@
 
 **Dependencies:** Task Group 1
 
-- [ ] 2.0 Complete supporting modules
-  - [ ] 2.1 Create `categorization_prompt.py` with system prompt constant
+- [x] 2.0 Complete supporting modules
+  - [x] 2.1 Create `categorization_prompt.py` with system prompt constant
     - Define `CATEGORIZATION_SYSTEM_PROMPT` as module-level constant
     - Copy French prompt from `docs/product-development/features/03-transaction-categorization-service.md`
     - Include Money Map categories and categorization rules
-  - [ ] 2.2 Create `category_mapping.py` with `CategoryMapping` class
+  - [x] 2.2 Create `category_mapping.py` with `CategoryMapping` class
     - `BANKIN_TO_MONEYMAP`: ClassVar dict mapping (category, subcategory) → (type, subcategory)
     - `INTERNAL_TRANSFER_KEYWORDS`: ClassVar list of keywords
     - `get_deterministic_category()`: Returns mapping or None
     - `is_internal_transfer()`: Checks description for keywords
     - Follow NumPy docstring style
-  - [ ] 2.3 Write 4 focused tests for category mapping
+  - [x] 2.3 Write 4 focused tests for category mapping
     - Test `get_deterministic_category()` returns correct mapping for known pair
     - Test `get_deterministic_category()` returns None for unknown pair
     - Test `is_internal_transfer()` detects "virement interne"
     - Test `is_internal_transfer()` returns False for regular transactions
-  - [ ] 2.4 Ensure mapping tests pass
+  - [x] 2.4 Ensure mapping tests pass
     - Run ONLY the 4 tests from 2.3
     - Verify prompt constant is non-empty string
 
@@ -91,30 +91,30 @@
 
 **Dependencies:** Task Group 1
 
-- [ ] 3.0 Complete caching module
-  - [ ] 3.1 Create `categorization_cache.py` with `CategorizationCache` class
+- [x] 3.0 Complete caching module
+  - [x] 3.1 Create `categorization_cache.py` with `CategorizationCache` class
     - `DEFAULT_CACHE_PATH`: ClassVar Path to `data/categorization_cache.json`
     - `CONFIDENCE_THRESHOLD`: ClassVar float = 0.95
     - Constructor accepts optional cache_path
     - Internal `_cache` dict for in-memory storage
-  - [ ] 3.2 Implement cache key normalization
+  - [x] 3.2 Implement cache key normalization
     - `_normalize_key()`: lowercase, strip whitespace, normalize spaces
     - Remove variable suffixes (dates like `12/05`, refs like `REF:ABC123`)
     - Use regex for pattern removal
-  - [ ] 3.3 Implement cache operations
+  - [x] 3.3 Implement cache operations
     - `get()`: Return `CachedCategorization` or None, increment hit_count
     - `put()`: Cache only if confidence >= threshold
     - `save()`: Persist to JSON, remove stale entries (180 days)
     - `clear()`: Empty cache (for testing)
     - `_load_cache()`: Load from JSON file if exists
-  - [ ] 3.4 Write 6 focused tests for cache operations
+  - [x] 3.4 Write 6 focused tests for cache operations
     - Test `_normalize_key()` handles "NETFLIX.COM 12/05" → "netflix.com"
     - Test `get()` returns None for cache miss
     - Test `put()` stores high-confidence result
     - Test `put()` rejects low-confidence result (< 0.95)
     - Test `save()` and `_load_cache()` roundtrip
     - Test `clear()` empties cache
-  - [ ] 3.5 Ensure cache tests pass
+  - [x] 3.5 Ensure cache tests pass
     - Run ONLY the 6 tests from 3.4
     - Use temp directory for cache file in tests
 
