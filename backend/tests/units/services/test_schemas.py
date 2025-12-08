@@ -1,4 +1,4 @@
-"""Tests for CSV parsing Pydantic schemas."""
+"""Tests for CSV parsing and categorization Pydantic schemas."""
 
 import unittest
 from datetime import date
@@ -6,7 +6,16 @@ from decimal import Decimal
 
 from pydantic import ValidationError
 
-from app.services.schemas import MonthData, MonthSummary, ParsedTransaction, ParseResult
+from app.db.enums import MoneyMapType
+from app.services.schemas import (
+    CachedCategorization,
+    CategorizationResult,
+    MonthData,
+    MonthSummary,
+    ParsedTransaction,
+    ParseResult,
+    TransactionInput,
+)
 
 
 class TestParsedTransaction(unittest.TestCase):
@@ -204,3 +213,83 @@ class TestParseResult(unittest.TestCase):
 
         with self.assertRaises(ValidationError):
             result.total_transactions = 10
+
+
+class TestTransactionInput(unittest.TestCase):
+    """Tests for TransactionInput model."""
+
+    def test_create_with_valid_data(self) -> None:
+        """Should create a transaction input with valid data."""
+        tx_input = TransactionInput(
+            id=1,
+            date="2025-10-15",
+            description="Netflix.com",
+            amount=-15.99,
+            bankin_category="Abonnements",
+            bankin_subcategory="Abonnements - Autres",
+        )
+
+        self.assertEqual(tx_input.id, 1)
+        self.assertEqual(tx_input.date, "2025-10-15")
+        self.assertEqual(tx_input.description, "Netflix.com")
+        self.assertEqual(tx_input.amount, -15.99)
+        self.assertEqual(tx_input.bankin_category, "Abonnements")
+        self.assertEqual(tx_input.bankin_subcategory, "Abonnements - Autres")
+
+
+class TestCategorizationResult(unittest.TestCase):
+    """Tests for CategorizationResult model."""
+
+    def test_confidence_bounds_valid(self) -> None:
+        """Should accept confidence between 0.0 and 1.0."""
+        result_low = CategorizationResult(
+            id=1,
+            money_map_type=MoneyMapType.CHOICE,
+            money_map_subcategory="Subscription services",
+            confidence=0.0,
+        )
+        result_high = CategorizationResult(
+            id=2,
+            money_map_type=MoneyMapType.CORE,
+            money_map_subcategory="Groceries",
+            confidence=1.0,
+        )
+
+        self.assertEqual(result_low.confidence, 0.0)
+        self.assertEqual(result_high.confidence, 1.0)
+
+    def test_confidence_bounds_invalid_above_one(self) -> None:
+        """Should reject confidence above 1.0."""
+        with self.assertRaises(ValidationError):
+            CategorizationResult(
+                id=1,
+                money_map_type=MoneyMapType.CHOICE,
+                money_map_subcategory="Subscription services",
+                confidence=1.5,
+            )
+
+    def test_confidence_bounds_invalid_below_zero(self) -> None:
+        """Should reject confidence below 0.0."""
+        with self.assertRaises(ValidationError):
+            CategorizationResult(
+                id=1,
+                money_map_type=MoneyMapType.CHOICE,
+                money_map_subcategory="Subscription services",
+                confidence=-0.1,
+            )
+
+
+class TestCachedCategorization(unittest.TestCase):
+    """Tests for CachedCategorization model."""
+
+    def test_immutability_frozen_model(self) -> None:
+        """Should raise error when attempting to modify frozen model."""
+        cached = CachedCategorization(
+            money_map_type=MoneyMapType.CHOICE,
+            money_map_subcategory="Subscription services",
+            confidence=0.98,
+            hit_count=5,
+        )
+
+        with self.assertRaises(ValidationError):
+            cached.hit_count = 10
