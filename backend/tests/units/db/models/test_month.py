@@ -3,7 +3,7 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.db.models import Month
+from app.db.models.month import Month
 
 
 def test_create_month_with_required_fields(test_db_session) -> None:

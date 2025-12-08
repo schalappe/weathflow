@@ -46,7 +46,7 @@ class Transaction(Base):
     is_manually_corrected: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
-    month: Mapped[Month] = relationship(back_populates="transactions")
+    month: Mapped["Month"] = relationship(back_populates="transactions")
 
     def __repr__(self) -> str:
         return f"<Transaction(id={self.id}, date={self.date}, amount={self.amount})>"

@@ -24,7 +24,7 @@ class Advice(Base):
     advice_text: Mapped[str] = mapped_column(String(5000), nullable=False)
     generated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
-    month: Mapped[Month] = relationship(back_populates="advice_records")
+    month: Mapped["Month"] = relationship(back_populates="advice_records")
 
     def __repr__(self) -> str:
         return f"<Advice(id={self.id}, month_id={self.month_id})>"

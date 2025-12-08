@@ -5,7 +5,8 @@ from datetime import date
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.db.models import Month, Transaction
+from app.db.models.month import Month
+from app.db.models.transaction import Transaction
 
 
 def test_create_transaction_linked_to_month(test_db_session) -> None:

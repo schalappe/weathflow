@@ -3,7 +3,8 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.db.models import Advice, Month
+from app.db.models.advice import Advice
+from app.db.models.month import Month
 
 
 def test_create_advice_linked_to_month(test_db_session) -> None:

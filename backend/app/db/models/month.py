@@ -43,11 +43,11 @@ class Month(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
-    transactions: Mapped[list[Transaction]] = relationship(
+    transactions: Mapped[list["Transaction"]] = relationship(
         back_populates="month",
         cascade="all, delete-orphan",
     )
-    advice_records: Mapped[list[Advice]] = relationship(
+    advice_records: Mapped[list["Advice"]] = relationship(
         back_populates="month",
         cascade="all, delete-orphan",
     )

@@ -2,7 +2,9 @@
 
 from datetime import date
 
-from app.db.models import Advice, Month, Transaction
+from app.db.models.advice import Advice
+from app.db.models.month import Month
+from app.db.models.transaction import Transaction
 
 
 def test_month_transactions_returns_list(test_db_session) -> None:
