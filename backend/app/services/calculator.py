@@ -1,4 +1,5 @@
-"""Score calculation service for Money Map budget analysis.
+"""
+Score calculation service for Money Map budget analysis.
 
 This module provides pure calculation functions and database integration
 for computing monthly budget scores based on the 50/30/20 framework.
