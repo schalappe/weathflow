@@ -44,7 +44,7 @@ class TransactionCategorizer:
     MAX_TOKENS: ClassVar[int] = 4096
     MAX_RETRIES: ClassVar[int] = 3
 
-    def __init__(self, api_key: str, cache: CategorizationCache | None = None) -> None:
+    def __init__(self, api_key: str, base_url: str | None = None, cache: CategorizationCache | None = None) -> None:
         """
         Initialize categorizer with API key and optional cache.
 
@@ -52,10 +52,12 @@ class TransactionCategorizer:
         ----------
         api_key : str
             Anthropic API key for Claude API calls.
+        base_url : str | None
+            Optional base URL for Anthropic API.
         cache : CategorizationCache | None
             Cache instance for recurring patterns. Creates default if None.
         """
-        self._client = anthropic.Anthropic(api_key=api_key, max_retries=self.MAX_RETRIES)
+        self._client = anthropic.Anthropic(api_key=api_key, base_url=base_url, max_retries=self.MAX_RETRIES)
         self._cache = cache if cache is not None else CategorizationCache()
 
     def categorize(self, transactions: list[TransactionInput]) -> list[CategorizationResult]:
