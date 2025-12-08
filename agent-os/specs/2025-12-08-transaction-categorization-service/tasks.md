@@ -133,47 +133,47 @@
 
 **Dependencies:** Task Groups 1, 2, 3
 
-- [ ] 4.0 Complete main categorizer service
-  - [ ] 4.1 Create `categorizer.py` with `TransactionCategorizer` class skeleton
+- [x] 4.0 Complete main categorizer service
+  - [x] 4.1 Create `categorizer.py` with `TransactionCategorizer` class skeleton
     - `MODEL`: ClassVar = "claude-sonnet-4-20250514"
     - `BATCH_SIZE`: ClassVar = 50
     - `MAX_TOKENS`: ClassVar = 4096
     - Constructor accepts `api_key` and optional `cache`
     - Initialize Anthropic client
     - NumPy docstrings with usage example
-  - [ ] 4.2 Implement cache lookup helper
-    - `_check_cache()`: Takes transactions, returns (cached_results, pending)
+  - [x] 4.2 Implement cache lookup helper
+    - `_check_cache()`: Takes transaction, returns CategorizationResult or None
     - Lookup by normalized description
     - Create `CategorizationResult` from cache hit
-  - [ ] 4.3 Implement deterministic rules helper
-    - `_apply_deterministic_rules()`: Takes transactions, returns (rule_results, remaining)
+  - [x] 4.3 Implement deterministic rules helper
+    - `_apply_deterministic_rules()`: Takes transaction, returns CategorizationResult or None
     - Use `CategoryMapping.get_deterministic_category()`
     - Use `CategoryMapping.is_internal_transfer()`
     - Set confidence=1.0 for deterministic results
-  - [ ] 4.4 Implement user prompt builder
+  - [x] 4.4 Implement user prompt builder
     - `_build_user_prompt()`: Format transactions as JSON for Claude
     - Include transaction id, date, description, amount, bankin_category, bankin_subcategory
     - Request JSON array response format
-  - [ ] 4.5 Implement Claude API call with tenacity retry
+  - [x] 4.5 Implement Claude API call with SDK built-in retry
     - `_call_claude_api()`: Call Anthropic API with system and user prompts
-    - Decorate with `@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=4))`
-    - Retry on `RateLimitError` and `anthropic.APIConnectionError`
-    - Return raw response text
-  - [ ] 4.6 Implement response parser
+    - Use `Anthropic(max_retries=3)` for built-in exponential backoff
+    - Catch `RateLimitError` and `anthropic.APIConnectionError`
+    - Return parsed CategorizationResult list
+  - [x] 4.6 Implement response parser
     - `_parse_response()`: Parse JSON response into `CategorizationResult` list
     - Strip markdown code blocks if present
     - Default confidence to 1.0 if missing
     - Raise `InvalidResponseError` on parse failure
-  - [ ] 4.7 Implement cache update helper
+  - [x] 4.7 Implement cache update helper
     - `_update_cache()`: Cache high-confidence results
     - Map transaction description to result
-  - [ ] 4.8 Implement main `categorize()` method
+  - [x] 4.8 Implement main `categorize()` method
     - Public entry point taking `list[TransactionInput]`
     - Pipeline: cache → deterministic rules → batch API → merge
     - Chunk remaining transactions by `BATCH_SIZE`
-    - Collect partial results on batch failure
+    - Fail-fast on batch failure
     - Raise `BatchCategorizationError` if any batch fails
-    - Sort final results by transaction ID
+    - Return results in original order
     - Call `cache.save()` at end
 
 **Acceptance Criteria:**
@@ -189,22 +189,22 @@
 
 **Dependencies:** Task Group 4
 
-- [ ] 5.0 Complete integration testing
-  - [ ] 5.1 Write 2 unit tests for cache + rules pipeline (no API)
+- [x] 5.0 Complete integration testing
+  - [x] 5.1 Write 2 unit tests for cache + rules pipeline (no API)
     - Test transactions fully resolved by cache return without API call
     - Test transactions resolved by deterministic rules return without API call
-  - [ ] 5.2 Write 3 unit tests with mocked Claude API
+  - [x] 5.2 Write 3 unit tests with mocked Claude API
     - Test successful batch categorization with mocked response
     - Test retry on simulated rate limit (verify 3 attempts)
     - Test `InvalidResponseError` on malformed JSON response
-  - [ ] 5.3 Write 2 integration tests for full pipeline
+  - [x] 5.3 Write 2 integration tests for full pipeline
     - Test mixed scenario: some cached, some rules, some API
     - Test `BatchCategorizationError` contains partial_results on failure
-  - [ ] 5.4 Run all feature tests
+  - [x] 5.4 Run all feature tests
     - Run tests from Task Groups 1-5
-    - Expected total: ~25 tests
+    - 16 tests in test_categorizer.py
     - Verify all pass
-  - [ ] 5.5 Run linting and type checking
+  - [x] 5.5 Run linting and type checking
     - Run `uv run ruff check backend/app/services/`
     - Run `uv run mypy backend/app/services/`
     - Fix any issues

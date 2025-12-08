@@ -55,8 +55,8 @@ class TestCategorizationCacheGet(unittest.TestCase):
         result = cache.get("NETFLIX.COM")
 
         self.assertIsNotNone(result)
-        self.assertEqual(result.money_map_type, MoneyMapType.CHOICE)  # type: [union-attr]
-        self.assertEqual(result.money_map_subcategory, "Subscription services")  # type: [union-attr]
+        self.assertEqual(result.money_map_type, MoneyMapType.CHOICE)
+        self.assertEqual(result.money_map_subcategory, "Subscription services")
 
     def test_get_increments_hit_count(self) -> None:
         """Should increment hit_count on each get."""
@@ -66,7 +66,7 @@ class TestCategorizationCacheGet(unittest.TestCase):
         cache.get("NETFLIX.COM")
         result = cache.get("NETFLIX.COM")
 
-        self.assertEqual(result.hit_count, 2)  # type: [union-attr]
+        self.assertEqual(result.hit_count, 2)
 
 
 class TestCategorizationCachePut(unittest.TestCase):
@@ -109,7 +109,7 @@ class TestCategorizationCachePersistence(unittest.TestCase):
             result = cache2.get("NETFLIX.COM")
 
             self.assertIsNotNone(result)
-            self.assertEqual(result.money_map_type, MoneyMapType.CHOICE)  # type: [union-attr]
+            self.assertEqual(result.money_map_type, MoneyMapType.CHOICE)
 
 
 class TestCategorizationCacheClear(unittest.TestCase):
