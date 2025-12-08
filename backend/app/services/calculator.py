@@ -86,6 +86,7 @@ def calculate_month_stats(income: float, core: float, choice: float) -> MonthSta
     MonthStats
         Complete statistics including totals, percentages, and score.
     """
+    # ##>: Compound is derived, not aggregated—it represents what remains after spending.
     compound = income - core - choice
 
     # ##>: Handle zero income edge case to avoid division by zero.
