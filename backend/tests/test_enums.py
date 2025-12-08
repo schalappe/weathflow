@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from app.db.models import MoneyMapType, ScoreLabel
+from app.db.enums import MoneyMapType, ScoreLabel
 
 
 def test_money_map_type_values_are_correct_strings() -> None:

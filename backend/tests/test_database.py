@@ -30,9 +30,11 @@ def test_init_db_creates_data_directory() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         test_db_path = Path(tmpdir) / 'data' / 'test.db'
 
-        with patch('app.db.database.DATABASE_PATH', test_db_path):
-            with patch('app.db.database.Base.metadata.create_all'):
-                init_db()
+        with (
+            patch('app.db.database.DATABASE_PATH', test_db_path),
+            patch('app.db.database.Base.metadata.create_all'),
+        ):
+            init_db()
 
         assert test_db_path.parent.exists()
 
@@ -42,9 +44,11 @@ def test_init_db_is_idempotent() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         test_db_path = Path(tmpdir) / 'data' / 'test.db'
 
-        with patch('app.db.database.DATABASE_PATH', test_db_path):
-            with patch('app.db.database.Base.metadata.create_all'):
-                init_db()
-                init_db()
+        with (
+            patch('app.db.database.DATABASE_PATH', test_db_path),
+            patch('app.db.database.Base.metadata.create_all'),
+        ):
+            init_db()
+            init_db()
 
         assert test_db_path.parent.exists()
