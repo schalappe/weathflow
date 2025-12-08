@@ -136,3 +136,32 @@ class BatchCategorizationError(CategorizationError):
         self.failed_ids = failed_ids
         self.partial_results = partial_results
         super().__init__(f"Failed to categorize {len(failed_ids)} transactions")
+
+
+class ScoreCalculationError(Exception):
+    """
+    Base exception for all score calculation errors.
+
+    All score calculation-specific exceptions inherit from this class, allowing
+    callers to catch all score calculation errors with a single except clause.
+    """
+
+
+class MonthNotFoundError(ScoreCalculationError):
+    """
+    Raised when a month record is not found in the database.
+
+    Parameters
+    ----------
+    month_id : int
+        The ID of the month that was not found.
+
+    Attributes
+    ----------
+    month_id : int
+        The month ID for programmatic access.
+    """
+
+    def __init__(self, month_id: int) -> None:
+        self.month_id = month_id
+        super().__init__(f"Month with id={month_id} not found")
