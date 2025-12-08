@@ -54,7 +54,7 @@ class TestCategorizationCacheGet(unittest.TestCase):
 
         result = cache.get("NETFLIX.COM")
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertEqual(result.money_map_type, MoneyMapType.CHOICE)
         self.assertEqual(result.money_map_subcategory, "Subscription services")
 
@@ -66,6 +66,7 @@ class TestCategorizationCacheGet(unittest.TestCase):
         cache.get("NETFLIX.COM")
         result = cache.get("NETFLIX.COM")
 
+        assert result is not None
         self.assertEqual(result.hit_count, 2)
 
 
@@ -108,7 +109,7 @@ class TestCategorizationCachePersistence(unittest.TestCase):
             cache2 = CategorizationCache(cache_path=cache_path)
             result = cache2.get("NETFLIX.COM")
 
-            self.assertIsNotNone(result)
+            assert result is not None
             self.assertEqual(result.money_map_type, MoneyMapType.CHOICE)
 
 

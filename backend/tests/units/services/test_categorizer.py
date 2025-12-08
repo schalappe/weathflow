@@ -3,7 +3,8 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock
+from typing import cast
+from unittest.mock import MagicMock, Mock
 
 import anthropic
 
@@ -56,7 +57,7 @@ class TestTransactionCategorizerCache(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].money_map_type, MoneyMapType.CHOICE)
         self.assertEqual(results[0].money_map_subcategory, "Subscription services")
-        self.categorizer._client.messages.create.assert_not_called()
+        cast(Mock, self.categorizer._client.messages.create).assert_not_called()
 
     def test_cache_hit_preserves_transaction_id(self) -> None:
         """Should preserve original transaction ID in result."""
@@ -86,7 +87,7 @@ class TestTransactionCategorizerDeterministicRules(unittest.TestCase):
 
         self.assertEqual(results[0].money_map_type, MoneyMapType.EXCLUDED)
         self.assertEqual(results[0].confidence, 1.0)
-        self.categorizer._client.messages.create.assert_not_called()
+        cast(Mock, self.categorizer._client.messages.create).assert_not_called()
 
     def test_deterministic_mapping_returns_correct_category(self) -> None:
         """Should return correct category for known Bankin' mapping."""
@@ -101,7 +102,7 @@ class TestTransactionCategorizerDeterministicRules(unittest.TestCase):
 
         self.assertEqual(results[0].money_map_type, MoneyMapType.CORE)
         self.assertEqual(results[0].money_map_subcategory, "Groceries")
-        self.categorizer._client.messages.create.assert_not_called()
+        cast(Mock, self.categorizer._client.messages.create).assert_not_called()
 
 
 class TestTransactionCategorizerAPI(unittest.TestCase):
@@ -327,7 +328,7 @@ class TestTransactionCategorizerEmptyInput(unittest.TestCase):
         results = self.categorizer.categorize([])
 
         self.assertEqual(results, [])
-        self.categorizer._client.messages.create.assert_not_called()
+        cast(Mock, self.categorizer._client.messages.create).assert_not_called()
 
 
 class TestTransactionCategorizerCachePersistence(unittest.TestCase):
@@ -358,7 +359,7 @@ class TestTransactionCategorizerCachePersistence(unittest.TestCase):
 
         # Verify cache was updated
         cached = self.cache.get("NEW MERCHANT ABC")
-        self.assertIsNotNone(cached)
+        assert cached is not None
         self.assertEqual(cached.money_map_type, MoneyMapType.CHOICE)
 
     def test_low_confidence_results_not_cached(self) -> None:

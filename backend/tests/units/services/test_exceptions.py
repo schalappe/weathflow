@@ -140,8 +140,8 @@ class TestCategorizationExceptionMessageFormatting(unittest.TestCase):
     def test_batch_categorization_error_stores_partial_results(self) -> None:
         """Should store failed IDs and partial results."""
         failed_ids = [1, 5, 10]
-        partial_results = [{"id": 2, "type": "CORE"}, {"id": 3, "type": "CHOICE"}]
-        error = BatchCategorizationError(failed_ids=failed_ids, partial_results=partial_results)  # type: [arg-type]
+        partial_results: list[dict[str, str]] = [{"id": "2", "type": "CORE"}, {"id": "3", "type": "CHOICE"}]
+        error = BatchCategorizationError(failed_ids=failed_ids, partial_results=partial_results)
 
         self.assertEqual(error.failed_ids, failed_ids)
         self.assertEqual(error.partial_results, partial_results)
