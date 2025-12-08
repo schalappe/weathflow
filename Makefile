@@ -85,7 +85,7 @@ lint: lint-backend lint-frontend ## Run linters on all code.
 
 lint-backend: ## Run ruff linter on backend.
 	@echo "$(CYAN)🔍 Linting backend code...$(RESET)"
-	cd backend && uv run ruff check .
+	cd backend && uv run ruff check --fix .
 	@echo "$(GREEN)✓ Backend linting passed$(RESET)"
 
 lint-frontend: ## Run ESLint on frontend.

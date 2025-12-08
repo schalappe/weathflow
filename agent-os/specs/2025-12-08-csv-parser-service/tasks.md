@@ -73,8 +73,8 @@ This is a backend-only service. No UI components required.
 **Dependencies:** Task Groups 1 and 2
 **Estimated Time:** 1.5-2 hours
 
-- [ ] 3.0 Complete BankinCSVParser implementation
-  - [ ] 3.1 Write 6-8 focused unit tests in `backend/tests/units/services/test_csv_parser.py`
+- [x] 3.0 Complete BankinCSVParser implementation
+  - [x] 3.1 Write 6-8 focused unit tests in `backend/tests/units/services/test_csv_parser.py`
     - Test valid CSV parsing with single transaction
     - Test valid CSV parsing with multiple months
     - Test empty file raises `InvalidFormatError`
@@ -83,48 +83,48 @@ This is a backend-only service. No UI components required.
     - Test invalid amount raises `RowParseError` with line number
     - Test French decimal format (comma) parsed correctly
     - Test month grouping and chronological sorting
-  - [ ] 3.2 Create `BankinCSVParser` class skeleton
+  - [x] 3.2 Create `BankinCSVParser` class skeleton
     - Define `EXPECTED_COLUMNS` class variable with all 8 column names
     - Add class docstring with usage example
     - Define public `parse()` method signature
-  - [ ] 3.3 Implement `_normalize_content()` method
+  - [x] 3.3 Implement `_normalize_content()` method
     - Convert `bytes` to `str` using UTF-8 decoding
     - Return string unchanged if already string
-  - [ ] 3.4 Implement `_validate_columns()` method
+  - [x] 3.4 Implement `_validate_columns()` method
     - Check if `fieldnames` is None → raise `InvalidFormatError`
     - Find missing columns → raise `MissingColumnsError(missing)`
-  - [ ] 3.5 Implement `_parse_date()` method
+  - [x] 3.5 Implement `_parse_date()` method
     - Split DD/MM/YYYY by `/`
     - Create `date(year, month, day)` object
     - Wrap in try/except → raise `RowParseError` with line number
-  - [ ] 3.6 Implement `_parse_amount()` method
+  - [x] 3.6 Implement `_parse_amount()` method
     - Replace comma with period for French decimal
     - Convert to `Decimal` and quantize to 2 places
     - Wrap in try/except → raise `RowParseError` with line number
-  - [ ] 3.7 Implement `_parse_pointed()` method
+  - [x] 3.7 Implement `_parse_pointed()` method
     - Case-insensitive check for "oui" → return `True`
     - All other values → return `False`
-  - [ ] 3.8 Implement `_parse_row()` method
+  - [x] 3.8 Implement `_parse_row()` method
     - Call `_parse_date()`, `_parse_amount()`, `_parse_pointed()`
     - Map CSV columns to `ParsedTransaction` fields
     - Handle empty `Note` field as `None`
-  - [ ] 3.9 Implement `_calculate_summary()` method
+  - [x] 3.9 Implement `_calculate_summary()` method
     - Sum positive amounts as `total_income`
     - Sum absolute negative amounts as `total_expenses`
     - Count transactions
     - Quantize sums to 2 decimal places
-  - [ ] 3.10 Implement `_group_by_month()` method
+  - [x] 3.10 Implement `_group_by_month()` method
     - Group transactions by "YYYY-MM" key
     - Sort keys chronologically
     - Create `MonthData` with summary for each month
-  - [ ] 3.11 Implement `parse()` method (main entry point)
+  - [x] 3.11 Implement `parse()` method (main entry point)
     - Call `_normalize_content()`
     - Create `csv.DictReader` with semicolon delimiter
     - Call `_validate_columns()`
     - Loop rows calling `_parse_row()` (line numbers start at 2)
     - Call `_group_by_month()`
     - Return `ParseResult`
-  - [ ] 3.12 Run tests and verify all pass
+  - [x] 3.12 Run tests and verify all pass
     - Run only the 6-8 tests from step 3.1
     - Fix any failing tests
     - Do NOT run entire test suite yet
@@ -146,16 +146,16 @@ This is a backend-only service. No UI components required.
 **Dependencies:** Task Group 3
 **Estimated Time:** 30-45 minutes
 
-- [ ] 4.0 Complete quality assurance
-  - [ ] 4.1 Run linting and fix issues
+- [x] 4.0 Complete quality assurance
+  - [x] 4.1 Run linting and fix issues
     - Run `uv run ruff check backend/app/services/`
     - Run `uv run ruff format backend/app/services/`
     - Fix any linting errors
-  - [ ] 4.2 Run type checking and fix issues
+  - [x] 4.2 Run type checking and fix issues
     - Run `uv run mypy backend/app/services/`
     - Fix any type errors
     - Ensure all functions have complete type annotations
-  - [ ] 4.3 Review test coverage and add up to 4 additional tests if needed
+  - [x] 4.3 Review test coverage and add up to 4 additional tests if needed
     - Review existing 6-8 tests for gaps
     - Add tests for edge cases only if critical:
       - Multi-year file spanning (e.g., Dec 2024 + Jan 2025)
@@ -163,7 +163,7 @@ This is a backend-only service. No UI components required.
       - Period decimal format (robustness check)
       - Empty optional fields (Note column)
     - Maximum 4 additional tests
-  - [ ] 4.4 Run full feature test suite
+  - [x] 4.4 Run full feature test suite
     - Run `uv run pytest backend/tests/units/services/ -v`
     - Verify all tests pass (expected: 10-12 tests total)
     - Check test output for any warnings
