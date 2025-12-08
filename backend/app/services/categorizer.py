@@ -5,6 +5,7 @@ import logging
 from typing import ClassVar
 
 import anthropic
+from anthropic import Anthropic
 
 from app.db.enums import MoneyMapType
 from app.services.categorization_cache import CategorizationCache
@@ -41,7 +42,7 @@ class TransactionCategorizer:
 
     MODEL: ClassVar[str] = "claude-sonnet-4-20250514"
     BATCH_SIZE: ClassVar[int] = 50
-    MAX_TOKENS: ClassVar[int] = 4096
+    MAX_TOKENS: ClassVar[int] = 8192
     MAX_RETRIES: ClassVar[int] = 3
 
     def __init__(self, api_key: str, base_url: str | None = None, cache: CategorizationCache | None = None) -> None:
@@ -57,7 +58,7 @@ class TransactionCategorizer:
         cache : CategorizationCache | None
             Cache instance for recurring patterns. Creates default if None.
         """
-        self._client = anthropic.Anthropic(api_key=api_key, base_url=base_url, max_retries=self.MAX_RETRIES)
+        self._client = Anthropic(api_key=api_key, base_url=base_url, max_retries=self.MAX_RETRIES)
         self._cache = cache if cache is not None else CategorizationCache()
 
     def categorize(self, transactions: list[TransactionInput]) -> list[CategorizationResult]:

@@ -1,18 +1,18 @@
 """Upload service for CSV processing and transaction categorization."""
 
-import os
 import re
 from math import ceil
 from typing import Any, Literal
 
 from sqlalchemy.orm import Session
 
+from app.config.settings import get_settings
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.services.calculator import calculate_and_update_month
 from app.services.categorizer import TransactionCategorizer
 from app.services.csv_parser import BankinCSVParser
-from app.services.exceptions import CategorizationError, InvalidMonthFormatError, NoTransactionsFoundError
+from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError
 from app.services.schemas.categorization import CategorizationResult, TransactionInput
 from app.services.schemas.parsing import MonthData, ParsedTransaction
 
@@ -47,16 +47,13 @@ class UploadService:
         Raises
         ------
         CategorizationError
-            If ANTHROPIC_API_KEY environment variable is not set.
+            If ANTHROPIC_API_KEY is not configured in settings.
         """
         if self._categorizer is None:
-            api_key = os.environ.get("ANTHROPIC_API_KEY")
-            if not api_key:
-                raise CategorizationError(
-                    "ANTHROPIC_API_KEY environment variable is not set. "
-                    "Please configure it before using the categorization service."
-                )
-            self._categorizer = TransactionCategorizer(api_key=api_key)
+            settings = get_settings()
+            api_key = settings.anthropic_api_key.get_secret_value()
+            base_url = settings.anthropic_base_url
+            self._categorizer = TransactionCategorizer(api_key=api_key, base_url=base_url)
         return self._categorizer
 
     def get_upload_preview(self, file_content: bytes) -> dict[str, Any]:

@@ -6,9 +6,12 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-# ##>: Navigate from backend/app/db/ up to project root, then into data/.
-DATABASE_PATH = Path(__file__).parent.parent.parent.parent / "data" / "moneymap.db"
-DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+from app.config.settings import get_settings
+
+# ##>: Get database URL from settings. Fallback to local path for default.
+settings = get_settings()
+DATABASE_URL = settings.database_url
+DATABASE_PATH = Path(DATABASE_URL.replace("sqlite:///", ""))
 
 # ##&: SQLite requires check_same_thread=False for FastAPI's multi-threaded request handling.
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
@@ -44,5 +47,9 @@ def init_db() -> None:
     Creates the data directory if it does not exist, then creates all tables
     defined in the SQLAlchemy models. Safe to call multiple times.
     """
+    # ##>: Import all models to register them with SQLAlchemy before creating tables.
+    # This ensures relationships like Month.advice_records can resolve the Advice class.
+    from app.db.models import advice, month, transaction  # noqa: F401
+
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
