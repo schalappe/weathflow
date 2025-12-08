@@ -1,6 +1,6 @@
 """Base test class providing database fixtures for unit tests."""
 
-import unittest
+from unittest import TestCase
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -14,7 +14,7 @@ from app.db.models.month import Month  # noqa: F401
 from app.db.models.transaction import Transaction  # noqa: F401
 
 
-class DatabaseTestCase(unittest.TestCase):
+class DatabaseTestCase(TestCase):
     """
     Base test class providing an in-memory SQLite database for testing.
 
