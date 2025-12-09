@@ -47,10 +47,10 @@ install-frontend: ## Install frontend dependencies only.
 # DEVELOPMENT
 # ============================================
 
-dev: ## Start both servers (backend:8000, frontend:3000).
+dev: ## Start both servers (backend:8000, frontend:4000).
 	@echo "$(CYAN)🚀 Starting development servers...$(RESET)"
 	@echo "$(BLUE)→ Backend:  http://localhost:8000$(RESET)"
-	@echo "$(BLUE)→ Frontend: http://localhost:3000$(RESET)"
+	@echo "$(BLUE)→ Frontend: http://localhost:4000$(RESET)"
 	@make -j2 dev-backend dev-frontend
 
 dev-backend: ## Start backend server only.
@@ -58,7 +58,7 @@ dev-backend: ## Start backend server only.
 	cd backend && uv run uvicorn app.main:app --reload --port 8000
 
 dev-frontend: ## Start frontend server only.
-	@echo "$(CYAN)⚡ Starting frontend server on http://localhost:3000...$(RESET)"
+	@echo "$(CYAN)⚡ Starting frontend server on http://localhost:4000...$(RESET)"
 	cd frontend && bun dev
 
 # ============================================
