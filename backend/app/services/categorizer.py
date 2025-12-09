@@ -61,7 +61,7 @@ class TransactionCategorizer:
         self._client = Anthropic(api_key=api_key, base_url=base_url, max_retries=self.MAX_RETRIES)
         self._cache = cache if cache is not None else CategorizationCache()
 
-    def categorize(self, transactions: list[TransactionInput]) -> list[CategorizationResult]:
+    def categorize(self, transactions: list[TransactionInput]) -> tuple[list[CategorizationResult], int]:
         """
         Categorize a list of transactions into Money Map types.
 
@@ -75,8 +75,8 @@ class TransactionCategorizer:
 
         Returns
         -------
-        list[CategorizationResult]
-            Categorization results matching input order.
+        tuple[list[CategorizationResult], int]
+            Tuple of (categorization results matching input order, actual API call count).
 
         Raises
         ------
@@ -88,10 +88,11 @@ class TransactionCategorizer:
             If some transactions fail to categorize.
         """
         if not transactions:
-            return []
+            return [], 0
 
         results: dict[int, CategorizationResult] = {}
         pending: list[TransactionInput] = []
+        api_call_count = 0
 
         # ##>: Phase 1: Try cache and deterministic rules first.
         for tx in transactions:
@@ -109,6 +110,9 @@ class TransactionCategorizer:
 
         # ##>: Phase 2: Call Claude API for remaining transactions.
         if pending:
+            from math import ceil
+
+            api_call_count = ceil(len(pending) / self.BATCH_SIZE)
             api_results = self._categorize_with_api(pending)
             for result in api_results:
                 results[result.id] = result
@@ -116,8 +120,8 @@ class TransactionCategorizer:
             self._update_cache(pending, api_results)
             self._cache.save()
 
-        # ##>: Phase 3: Return results in original order.
-        return [results[tx.id] for tx in transactions]
+        # ##>: Phase 3: Return results in original order with actual API call count.
+        return [results[tx.id] for tx in transactions], api_call_count
 
     def _check_cache(self, transaction: TransactionInput) -> CategorizationResult | None:
         """

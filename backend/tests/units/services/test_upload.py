@@ -169,14 +169,18 @@ class TestUploadServiceCategorization(DatabaseTestCase):
 
         mock_categorizer = MagicMock()
         mock_categorizer_class.return_value = mock_categorizer
-        mock_categorizer.categorize.return_value = [
-            CategorizationResult(
-                id=1,
-                money_map_type=MoneyMapType.INCOME,
-                money_map_subcategory="Salary",
-                confidence=0.95,
-            ),
-        ]
+        # ##>: Return tuple (results, api_call_count) matching new signature.
+        mock_categorizer.categorize.return_value = (
+            [
+                CategorizationResult(
+                    id=1,
+                    money_map_type=MoneyMapType.INCOME,
+                    money_map_subcategory="Salary",
+                    confidence=0.95,
+                ),
+            ],
+            1,
+        )
 
         service = UploadService()
         result = service.process_categorization(
@@ -250,9 +254,11 @@ class TestUploadServiceCategorization(DatabaseTestCase):
 
         mock_categorizer = MagicMock()
         mock_categorizer_class.return_value = mock_categorizer
-        mock_categorizer.categorize.return_value = [
-            CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0),
-        ]
+        # ##>: Return tuple (results, api_call_count) matching new signature.
+        mock_categorizer.categorize.return_value = (
+            [CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0)],
+            1,
+        )
 
         service = UploadService()
         result = service.process_categorization(
@@ -301,9 +307,11 @@ class TestUploadServiceCategorization(DatabaseTestCase):
 
         mock_categorizer = MagicMock()
         mock_categorizer_class.return_value = mock_categorizer
-        mock_categorizer.categorize.return_value = [
-            CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0),
-        ]
+        # ##>: Return tuple (results, api_call_count) matching new signature.
+        mock_categorizer.categorize.return_value = (
+            [CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0)],
+            2,  # Simulate 2 API calls
+        )
 
         service = UploadService()
         result = service.process_categorization(
@@ -314,7 +322,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
         )
 
         self.assertIn("total_api_calls", result)
-        self.assertGreaterEqual(result["total_api_calls"], 1)
+        self.assertEqual(result["total_api_calls"], 2)
 
 
 @patch.dict(os.environ, MOCK_API_KEY_ENV)
@@ -375,9 +383,11 @@ class TestUploadServiceImportModes(DatabaseTestCase):
 
         mock_categorizer = MagicMock()
         mock_categorizer_class.return_value = mock_categorizer
-        mock_categorizer.categorize.return_value = [
-            CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0),
-        ]
+        # ##>: Return tuple (results, api_call_count) matching new signature.
+        mock_categorizer.categorize.return_value = (
+            [CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0)],
+            1,
+        )
 
         service = UploadService()
         service.process_categorization(
@@ -466,10 +476,14 @@ class TestUploadServiceImportModes(DatabaseTestCase):
 
         mock_categorizer = MagicMock()
         mock_categorizer_class.return_value = mock_categorizer
-        mock_categorizer.categorize.return_value = [
-            CategorizationResult(id=1, money_map_type=MoneyMapType.CORE, money_map_subcategory="", confidence=1.0),
-            CategorizationResult(id=2, money_map_type=MoneyMapType.CORE, money_map_subcategory="", confidence=1.0),
-        ]
+        # ##>: Return tuple (results, api_call_count) matching new signature.
+        mock_categorizer.categorize.return_value = (
+            [
+                CategorizationResult(id=1, money_map_type=MoneyMapType.CORE, money_map_subcategory="", confidence=1.0),
+                CategorizationResult(id=2, money_map_type=MoneyMapType.CORE, money_map_subcategory="", confidence=1.0),
+            ],
+            1,
+        )
 
         service = UploadService()
         result = service.process_categorization(
@@ -531,9 +545,11 @@ class TestUploadServiceImportModes(DatabaseTestCase):
 
         mock_categorizer = MagicMock()
         mock_categorizer_class.return_value = mock_categorizer
-        mock_categorizer.categorize.return_value = [
-            CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0),
-        ]
+        # ##>: Return tuple (results, api_call_count) matching new signature.
+        mock_categorizer.categorize.return_value = (
+            [CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0)],
+            1,
+        )
 
         service = UploadService()
         result = service.process_categorization(

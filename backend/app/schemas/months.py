@@ -1,9 +1,12 @@
 """Pydantic models for Monthly Data API endpoints."""
 
 from datetime import date, datetime
-from typing import Literal
+from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from app.db.models.month import Month
 
 # ##>: Valid score labels matching the ScoreLabel enum in db/enums.py.
 ScoreLabelLiteral = Literal["Poor", "Need Improvement", "Okay", "Great"]
@@ -26,10 +29,45 @@ class MonthSummary(BaseModel):
     choice_percentage: float = Field(ge=0, le=100)
     compound_percentage: float = Field(ge=0, le=100)
     score: int = Field(ge=0, le=3)
-    score_label: ScoreLabelLiteral | None
+    score_label: str | None
     transaction_count: int = Field(ge=0)
     created_at: datetime
     updated_at: datetime
+
+    @classmethod
+    def from_model(cls, month: "Month", transaction_count: int) -> Self:
+        """
+        Create a MonthSummary from a database Month model.
+
+        Parameters
+        ----------
+        month : Month
+            Database month record.
+        transaction_count : int
+            Number of transactions for this month.
+
+        Returns
+        -------
+        MonthSummary
+            Pydantic model instance.
+        """
+        return cls(
+            id=month.id,
+            year=month.year,
+            month=month.month,
+            total_income=month.total_income,
+            total_core=month.total_core,
+            total_choice=month.total_choice,
+            total_compound=month.total_compound,
+            core_percentage=month.core_percentage,
+            choice_percentage=month.choice_percentage,
+            compound_percentage=month.compound_percentage,
+            score=month.score,
+            score_label=month.score_label,
+            transaction_count=transaction_count,
+            created_at=month.created_at,
+            updated_at=month.updated_at,
+        )
 
 
 class TransactionResponse(BaseModel):
@@ -42,7 +80,7 @@ class TransactionResponse(BaseModel):
     amount: float
     bankin_category: str | None
     bankin_subcategory: str | None
-    money_map_type: MoneyMapTypeLiteral | None
+    money_map_type: str | None
     money_map_subcategory: str | None
     is_manually_corrected: bool
 
