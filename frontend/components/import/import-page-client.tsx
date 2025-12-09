@@ -215,7 +215,9 @@ export function ImportPageClient() {
     <div className="mx-auto max-w-4xl space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Import Transactions</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Import Transactions
+        </h1>
         <p className="text-muted-foreground">
           Upload your Bankin' CSV export to categorize transactions
         </p>

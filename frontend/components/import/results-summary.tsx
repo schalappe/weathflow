@@ -57,7 +57,10 @@ export function ResultsSummary({
       {/* Month results grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {sortedResults.map((result) => (
-          <MonthResultCard key={`${result.year}-${result.month}`} result={result} />
+          <MonthResultCard
+            key={`${result.year}-${result.month}`}
+            result={result}
+          />
         ))}
       </div>
 

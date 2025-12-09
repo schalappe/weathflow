@@ -51,7 +51,9 @@ describe("Additional Strategic Tests", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/csv file is empty or contains no valid transactions/i),
+        screen.getByText(
+          /csv file is empty or contains no valid transactions/i,
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -70,7 +72,9 @@ describe("Additional Strategic Tests", () => {
     fireEvent.change(input, { target: { files: [csvFile] } });
 
     await waitFor(() => {
-      expect(screen.getByText(/unable to connect to server/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/unable to connect to server/i),
+      ).toBeInTheDocument();
     });
 
     // [>]: Should show retry button.
@@ -159,7 +163,9 @@ describe("Additional Strategic Tests", () => {
       />,
     );
 
-    expect(screen.getByText(/only csv files are accepted/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/only csv files are accepted/i),
+    ).toBeInTheDocument();
     // [>]: The error state should be visible with red styling.
     const dropzone = screen.getByTestId("dropzone");
     expect(dropzone).toHaveClass("border-destructive");

@@ -126,7 +126,9 @@ export function FileDropzone({
           "flex h-16 w-16 items-center justify-center rounded-full transition-colors",
           !hasFile && !hasError && "bg-muted text-muted-foreground",
           isDragging && "bg-primary/10 text-primary",
-          hasFile && !hasError && "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50",
+          hasFile &&
+            !hasError &&
+            "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50",
           hasError && "bg-destructive/10 text-destructive",
         )}
       >

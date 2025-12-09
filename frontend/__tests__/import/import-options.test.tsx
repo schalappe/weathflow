@@ -5,11 +5,7 @@ import { ImportOptions } from "@/components/import/import-options";
 describe("ImportOptions", () => {
   it("renders Replace and Merge radio options", () => {
     render(
-      <ImportOptions
-        mode="merge"
-        onModeChange={vi.fn()}
-        isDisabled={false}
-      />,
+      <ImportOptions mode="merge" onModeChange={vi.fn()} isDisabled={false} />,
     );
 
     expect(screen.getByLabelText(/replace/i)).toBeInTheDocument();

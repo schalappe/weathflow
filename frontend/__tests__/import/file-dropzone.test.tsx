@@ -35,7 +35,9 @@ describe("FileDropzone", () => {
       />,
     );
 
-    expect(screen.getByText(/only csv files are accepted/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/only csv files are accepted/i),
+    ).toBeInTheDocument();
   });
 
   it("shows visual feedback on drag-over state", () => {
