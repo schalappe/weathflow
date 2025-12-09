@@ -11,9 +11,9 @@ from app.db.models.transaction import Transaction
 from app.services.calculator import calculate_and_update_month
 from app.services.categorizer import TransactionCategorizer
 from app.services.csv_parser import BankinCSVParser
+from app.services.dto.categorization import CategorizationResult, TransactionInput
+from app.services.dto.parsing import MonthData, ParsedTransaction
 from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError
-from app.services.schemas.categorization import CategorizationResult, TransactionInput
-from app.services.schemas.parsing import MonthData, ParsedTransaction
 
 LOW_CONFIDENCE_THRESHOLD = 0.8
 MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")

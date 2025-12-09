@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db.enums import MoneyMapType
-from app.schemas.months import (
+from app.responses.months import (
     MonthDetailResponse,
     MonthsListResponse,
     MonthSummary,

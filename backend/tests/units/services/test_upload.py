@@ -7,9 +7,9 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 from app.db.enums import MoneyMapType
+from app.services.dto.categorization import CategorizationResult
+from app.services.dto.parsing import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
 from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError
-from app.services.schemas.categorization import CategorizationResult
-from app.services.schemas.parsing import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
 from app.services.upload import UploadService
 from tests.conftest import DatabaseTestCase
 

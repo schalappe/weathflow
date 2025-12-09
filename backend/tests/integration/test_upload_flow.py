@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
+from app.services.dto.categorization import CategorizationResult
 from app.services.exceptions import CategorizationError
-from app.services.schemas.categorization import CategorizationResult
 from tests.integration.fixtures.csv_builder import CSVBuilder, combine_csvs
 
 # ##>: Fixture to mock the API key environment variable for categorization tests.

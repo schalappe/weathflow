@@ -1,18 +1,12 @@
 """Pydantic models for Monthly Data API endpoints."""
 
 from datetime import date, datetime
-from typing import TYPE_CHECKING, Literal, Self
+from typing import TYPE_CHECKING, Self
 
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from app.db.models.month import Month
-
-# ##>: Valid score labels matching the ScoreLabel enum in db/enums.py.
-ScoreLabelLiteral = Literal["Poor", "Need Improvement", "Okay", "Great"]
-
-# ##>: Valid Money Map types matching the MoneyMapType enum in db/enums.py.
-MoneyMapTypeLiteral = Literal["INCOME", "CORE", "CHOICE", "COMPOUND", "EXCLUDED"]
 
 
 class MonthSummary(BaseModel):

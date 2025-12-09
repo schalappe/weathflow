@@ -11,13 +11,13 @@ from app.db.enums import MoneyMapType
 from app.services.categorization_cache import CategorizationCache
 from app.services.categorization_prompt import CATEGORIZATION_SYSTEM_PROMPT
 from app.services.category_mapping import CategoryMapping
+from app.services.dto.categorization import CategorizationResult, TransactionInput
 from app.services.exceptions import (
     APIConnectionError,
     BatchCategorizationError,
     CategorizationError,
     InvalidResponseError,
 )
-from app.services.schemas.categorization import CategorizationResult, TransactionInput
 
 logger = logging.getLogger(__name__)
 

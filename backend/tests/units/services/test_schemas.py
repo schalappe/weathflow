@@ -7,12 +7,12 @@ from decimal import Decimal
 from pydantic import ValidationError
 
 from app.db.enums import MoneyMapType
-from app.services.schemas.categorization import (
+from app.services.dto.categorization import (
     CachedCategorization,
     CategorizationResult,
     TransactionInput,
 )
-from app.services.schemas.parsing import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
+from app.services.dto.parsing import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
 
 
 class TestParsedTransaction(unittest.TestCase):

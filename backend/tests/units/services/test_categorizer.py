@@ -11,12 +11,12 @@ import anthropic
 from app.db.enums import MoneyMapType
 from app.services.categorization_cache import CategorizationCache
 from app.services.categorizer import TransactionCategorizer
+from app.services.dto.categorization import TransactionInput
 from app.services.exceptions import (
     APIConnectionError,
     BatchCategorizationError,
     InvalidResponseError,
 )
-from app.services.schemas.categorization import TransactionInput
 
 
 def _make_transaction(
