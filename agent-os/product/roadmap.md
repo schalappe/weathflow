@@ -10,7 +10,7 @@
 
 5. [x] Upload and Categorize API — Build FastAPI endpoints for CSV upload, parsing preview, and triggering categorization with support for replace/merge import modes `M`
 
-6. [ ] Monthly Data API — Create endpoints to retrieve month data including totals, percentages, score, and transaction list with filtering capabilities `S`
+6. [x] Monthly Data API — Create endpoints to retrieve month data including totals, percentages, score, and transaction list with filtering capabilities `S`
 
 7. [ ] Import Page UI — Build the file upload interface with drag-and-drop, multi-month preview table, month selection checkboxes, and categorization progress indicator `M`
 
