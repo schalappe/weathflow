@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from app.db.models.month import Month
+    from app.db.models.transaction import Transaction
 
 
 class MonthSummary(BaseModel):
@@ -77,6 +78,34 @@ class TransactionResponse(BaseModel):
     money_map_type: str | None
     money_map_subcategory: str | None
     is_manually_corrected: bool
+
+    @classmethod
+    def from_model(cls, tx: "Transaction") -> Self:
+        """
+        Create a TransactionResponse from a database Transaction model.
+
+        Parameters
+        ----------
+        tx : Transaction
+            Database transaction record.
+
+        Returns
+        -------
+        TransactionResponse
+            Pydantic model instance.
+        """
+        return cls(
+            id=tx.id,
+            date=tx.date,
+            description=tx.description,
+            account=tx.account,
+            amount=tx.amount,
+            bankin_category=tx.bankin_category,
+            bankin_subcategory=tx.bankin_subcategory,
+            money_map_type=tx.money_map_type,
+            money_map_subcategory=tx.money_map_subcategory,
+            is_manually_corrected=tx.is_manually_corrected,
+        )
 
 
 class PaginationInfo(BaseModel):

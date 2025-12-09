@@ -160,21 +160,7 @@ def get_month_detail(
 
         month_summary = MonthSummary.from_model(month_record, transaction_count)
 
-        transaction_responses = [
-            TransactionResponse(
-                id=tx.id,
-                date=tx.date,
-                description=tx.description,
-                account=tx.account,
-                amount=tx.amount,
-                bankin_category=tx.bankin_category,
-                bankin_subcategory=tx.bankin_subcategory,
-                money_map_type=tx.money_map_type,
-                money_map_subcategory=tx.money_map_subcategory,
-                is_manually_corrected=tx.is_manually_corrected,
-            )
-            for tx in transactions
-        ]
+        transaction_responses = [TransactionResponse.from_model(tx) for tx in transactions]
 
         total_pages = ceil(total_items / page_size) if total_items > 0 else 0
 
