@@ -3,7 +3,6 @@
 import logging
 from datetime import date
 from math import ceil
-from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
@@ -11,12 +10,10 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.db.enums import MoneyMapType
 from app.schemas.months import (
-    MoneyMapTypeLiteral,
     MonthDetailResponse,
     MonthsListResponse,
     MonthSummary,
     PaginationInfo,
-    ScoreLabelLiteral,
     TransactionResponse,
 )
 from app.services import months as months_service
@@ -63,7 +60,7 @@ def list_months(db: Session = Depends(get_db)) -> MonthsListResponse:
                 choice_percentage=m.choice_percentage,
                 compound_percentage=m.compound_percentage,
                 score=m.score,
-                score_label=cast(ScoreLabelLiteral | None, m.score_label),
+                score_label=m.score_label,
                 transaction_count=tx_count,
                 created_at=m.created_at,
                 updated_at=m.updated_at,
@@ -73,10 +70,16 @@ def list_months(db: Session = Depends(get_db)) -> MonthsListResponse:
 
         return MonthsListResponse(months=month_summaries, total=len(month_summaries))
     except MonthDataError as error:
-        logger.exception("Failed to list months")
-        raise HTTPException(status_code=503, detail="Database temporarily unavailable. Please try again.") from error
+        logger.exception("Database error in list_months")
+        # ##>: Distinguish between connection issues and query issues for user guidance.
+        error_str = str(error).lower()
+        if "connection" in error_str or "timeout" in error_str:
+            detail = "Database temporarily unavailable. Please try again in a moment."
+        else:
+            detail = "An error occurred while retrieving month data. Please try again or contact support."
+        raise HTTPException(status_code=503, detail=detail) from error
     except Exception as error:
-        logger.exception("Unexpected error in list_months")
+        logger.exception("Unexpected error in list_months: error_type=%s", type(error).__name__)
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
@@ -173,7 +176,7 @@ def get_month_detail(
             choice_percentage=month_record.choice_percentage,
             compound_percentage=month_record.compound_percentage,
             score=month_record.score,
-            score_label=cast(ScoreLabelLiteral | None, month_record.score_label),
+            score_label=month_record.score_label,  # type: ignore[arg-type]
             transaction_count=transaction_count,
             created_at=month_record.created_at,
             updated_at=month_record.updated_at,
@@ -188,7 +191,7 @@ def get_month_detail(
                 amount=tx.amount,
                 bankin_category=tx.bankin_category,
                 bankin_subcategory=tx.bankin_subcategory,
-                money_map_type=cast(MoneyMapTypeLiteral | None, tx.money_map_type),
+                money_map_type=tx.money_map_type,  # type: ignore[arg-type]
                 money_map_subcategory=tx.money_map_subcategory,
                 is_manually_corrected=tx.is_manually_corrected,
             )
@@ -214,7 +217,15 @@ def get_month_detail(
         raise
     except MonthDataError as error:
         logger.exception("Database error in get_month_detail for %d-%02d", year, month)
-        raise HTTPException(status_code=503, detail="Database temporarily unavailable. Please try again.") from error
+        # ##>: Distinguish between connection issues and query issues for user guidance.
+        error_str = str(error).lower()
+        if "connection" in error_str or "timeout" in error_str:
+            detail = "Database temporarily unavailable. Please try again in a moment."
+        else:
+            detail = "An error occurred while retrieving month data. Please try again or contact support."
+        raise HTTPException(status_code=503, detail=detail) from error
     except Exception as error:
-        logger.exception("Unexpected error in get_month_detail for %d-%02d", year, month)
+        logger.exception(
+            "Unexpected error in get_month_detail for %d-%02d: error_type=%s", year, month, type(error).__name__
+        )
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
