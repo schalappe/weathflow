@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 from app.db.enums import MoneyMapType
 from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError
 from app.services.schemas.categorization import CategorizationResult
-from app.services.schemas.parsing import MonthData, MonthSummary, ParsedTransaction, ParseResult
+from app.services.schemas.parsing import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
 from app.services.upload import UploadService
 from tests.conftest import DatabaseTestCase
 
@@ -49,7 +49,7 @@ class TestUploadServicePreview(TestCase):
                             bankin_subcategory="Supermarché",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=1,
                         transaction_count=2,
@@ -95,7 +95,7 @@ class TestUploadServicePreview(TestCase):
                             bankin_subcategory="Café",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=2,
                         transaction_count=1,
@@ -156,7 +156,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
                             bankin_subcategory="Salaire",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=3,
                         transaction_count=1,
@@ -220,7 +220,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
                             bankin_subcategory="Salaire",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=1,
                         transaction_count=1,
@@ -241,7 +241,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
                             bankin_subcategory="Supermarché",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=2,
                         transaction_count=1,
@@ -294,7 +294,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
                             bankin_subcategory="Autre",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=4,
                         transaction_count=1,
@@ -370,7 +370,7 @@ class TestUploadServiceImportModes(DatabaseTestCase):
                             bankin_subcategory="Autre",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=5,
                         transaction_count=1,
@@ -463,7 +463,7 @@ class TestUploadServiceImportModes(DatabaseTestCase):
                             bankin_subcategory="Supermarché",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=6,
                         transaction_count=2,
@@ -532,7 +532,7 @@ class TestUploadServiceImportModes(DatabaseTestCase):
                             bankin_subcategory="Autre",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=7,
                         transaction_count=1,
@@ -586,7 +586,7 @@ class TestUploadServiceValidation(TestCase):
                             bankin_subcategory="Autre",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=1,
                         transaction_count=1,

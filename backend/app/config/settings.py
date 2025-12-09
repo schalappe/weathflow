@@ -31,6 +31,7 @@ class Settings(BaseSettings):
 
     anthropic_api_key: SecretStr
     anthropic_base_url: str | None = None
+    anthropic_model: str = "claude-sonnet-4-20250514"
     database_url: str = f"sqlite:///{Path(__file__).parent.parent.parent.parent / 'data' / 'moneymap.db'}"
     backend_port: int = 8000
     frontend_url: str = "http://localhost:3000"

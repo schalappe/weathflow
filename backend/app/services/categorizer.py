@@ -40,12 +40,17 @@ class TransactionCategorizer:
     <MoneyMapType.CORE: 'CORE'>
     """
 
-    MODEL: ClassVar[str] = "claude-sonnet-4-20250514"
     BATCH_SIZE: ClassVar[int] = 50
     MAX_TOKENS: ClassVar[int] = 8192
     MAX_RETRIES: ClassVar[int] = 3
 
-    def __init__(self, api_key: str, base_url: str | None = None, cache: CategorizationCache | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str | None = None,
+        model: str | None = None,
+        cache: CategorizationCache | None = None,
+    ) -> None:
         """
         Initialize categorizer with API key and optional cache.
 
@@ -55,10 +60,15 @@ class TransactionCategorizer:
             Anthropic API key for Claude API calls.
         base_url : str | None
             Optional base URL for Anthropic API.
+        model : str | None
+            Claude model to use. Defaults to settings.anthropic_model.
         cache : CategorizationCache | None
             Cache instance for recurring patterns. Creates default if None.
         """
+        from app.config.settings import get_settings
+
         self._client = Anthropic(api_key=api_key, base_url=base_url, max_retries=self.MAX_RETRIES)
+        self._model = model if model is not None else get_settings().anthropic_model
         self._cache = cache if cache is not None else CategorizationCache()
 
     def categorize(self, transactions: list[TransactionInput]) -> tuple[list[CategorizationResult], int]:
@@ -241,7 +251,7 @@ class TransactionCategorizer:
 
         try:
             response = self._client.messages.create(
-                model=self.MODEL,
+                model=self._model,
                 max_tokens=self.MAX_TOKENS,
                 system=CATEGORIZATION_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_prompt}],
