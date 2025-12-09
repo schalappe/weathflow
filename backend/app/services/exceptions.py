@@ -221,6 +221,60 @@ class UploadError(Exception):
     """
 
 
+class MonthDataError(Exception):
+    """
+    Base exception for all month data retrieval errors.
+
+    All month data-specific exceptions inherit from this class, allowing callers
+    to catch all month data errors with a single except clause.
+    """
+
+
+class MonthQueryError(MonthDataError):
+    """
+    Raised when a database query for months fails.
+
+    Parameters
+    ----------
+    reason : str
+        Description of the failure.
+
+    Attributes
+    ----------
+    reason : str
+        The failure reason for debugging.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(f"Failed to query months: {reason}")
+
+
+class TransactionQueryError(MonthDataError):
+    """
+    Raised when a transaction query fails.
+
+    Parameters
+    ----------
+    month_id : int
+        The ID of the month being queried.
+    reason : str
+        Description of the failure.
+
+    Attributes
+    ----------
+    month_id : int
+        The month ID for programmatic access.
+    reason : str
+        The failure reason for debugging.
+    """
+
+    def __init__(self, month_id: int, reason: str) -> None:
+        self.month_id = month_id
+        self.reason = reason
+        super().__init__(f"Failed to query transactions for month {month_id}: {reason}")
+
+
 class InvalidMonthFormatError(UploadError):
     """
     Raised when month format is not YYYY-MM.

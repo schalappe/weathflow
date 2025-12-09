@@ -71,7 +71,7 @@ class TestParsedTransaction(unittest.TestCase):
         )
 
         with self.assertRaises(ValidationError):
-            transaction.amount = Decimal("200.00")
+            transaction.amount = Decimal("200.00")  # type: ignore[misc]
 
     def test_accepts_optional_note(self) -> None:
         """Should accept a note when provided."""
@@ -118,7 +118,7 @@ class TestMonthSummary(unittest.TestCase):
         )
 
         with self.assertRaises(ValidationError):
-            summary.total_income = Decimal("5000.00")
+            summary.total_income = Decimal("5000.00")  # type: ignore[misc]
 
 
 class TestMonthData(unittest.TestCase):
@@ -170,7 +170,7 @@ class TestMonthData(unittest.TestCase):
         )
 
         with self.assertRaises(ValidationError):
-            month_data.year = 2024
+            month_data.year = 2024  # type: ignore[misc]
 
 
 class TestParseResult(unittest.TestCase):
@@ -209,7 +209,7 @@ class TestParseResult(unittest.TestCase):
         )
 
         with self.assertRaises(ValidationError):
-            result.total_transactions = 10
+            result.total_transactions = 10  # type: ignore[misc]
 
 
 class TestTransactionInput(unittest.TestCase):
@@ -289,4 +289,4 @@ class TestCachedCategorization(unittest.TestCase):
         )
 
         with self.assertRaises(ValidationError):
-            cached.hit_count = 10
+            cached.hit_count = 10  # type: ignore[misc]

@@ -64,7 +64,7 @@ class TestMonthStatsSchema(unittest.TestCase):
         )
 
         with self.assertRaises(ValidationError):
-            stats.score = 2
+            stats.score = 2  # type: ignore[misc]
 
     def test_month_stats_field_constraints(self) -> None:
         """Should enforce score range 0-3."""
