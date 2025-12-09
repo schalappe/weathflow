@@ -1,7 +1,9 @@
 """FastAPI router for Monthly Data API endpoints."""
 
+import logging
 from datetime import date
 from math import ceil
+from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
@@ -9,17 +11,21 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.db.enums import MoneyMapType
 from app.schemas.months import (
+    MoneyMapTypeLiteral,
     MonthDetailResponse,
     MonthsListResponse,
     MonthSummary,
     PaginationInfo,
+    ScoreLabelLiteral,
     TransactionResponse,
 )
 from app.services import months as months_service
+from app.services.exceptions import MonthDataError
 
 # ruff: noqa: B008
 
 router = APIRouter(prefix="/api", tags=["months"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/months", response_model=MonthsListResponse)
@@ -34,32 +40,41 @@ def list_months(db: Session = Depends(get_db)) -> MonthsListResponse:
     -------
     MonthsListResponse
         List of months with summary data and total count.
+
+    Raises
+    ------
+    HTTPException 503
+        If database is temporarily unavailable.
     """
-    # ##>: Use optimized query with JOIN to avoid N+1 queries.
-    months_with_counts = months_service.get_all_months_with_counts(db)
+    try:
+        # ##>: Use optimized query with JOIN to avoid N+1 queries.
+        months_with_counts = months_service.get_all_months_with_counts(db)
 
-    month_summaries = [
-        MonthSummary(
-            id=m.id,
-            year=m.year,
-            month=m.month,
-            total_income=m.total_income,
-            total_core=m.total_core,
-            total_choice=m.total_choice,
-            total_compound=m.total_compound,
-            core_percentage=m.core_percentage,
-            choice_percentage=m.choice_percentage,
-            compound_percentage=m.compound_percentage,
-            score=m.score,
-            score_label=m.score_label,
-            transaction_count=tx_count,
-            created_at=m.created_at,
-            updated_at=m.updated_at,
-        )
-        for m, tx_count in months_with_counts
-    ]
+        month_summaries = [
+            MonthSummary(
+                id=m.id,
+                year=m.year,
+                month=m.month,
+                total_income=m.total_income,
+                total_core=m.total_core,
+                total_choice=m.total_choice,
+                total_compound=m.total_compound,
+                core_percentage=m.core_percentage,
+                choice_percentage=m.choice_percentage,
+                compound_percentage=m.compound_percentage,
+                score=m.score,
+                score_label=cast(ScoreLabelLiteral | None, m.score_label),
+                transaction_count=tx_count,
+                created_at=m.created_at,
+                updated_at=m.updated_at,
+            )
+            for m, tx_count in months_with_counts
+        ]
 
-    return MonthsListResponse(months=month_summaries, total=len(month_summaries))
+        return MonthsListResponse(months=month_summaries, total=len(month_summaries))
+    except MonthDataError as error:
+        logger.error("Failed to list months: %s", str(error))
+        raise HTTPException(status_code=503, detail="Database temporarily unavailable. Please try again.") from error
 
 
 @router.get("/months/{year}/{month}", response_model=MonthDetailResponse)
@@ -103,76 +118,97 @@ def get_month_detail(
 
     Raises
     ------
+    HTTPException 400
+        If start_date is after end_date.
     HTTPException 404
         If month not found.
+    HTTPException 503
+        If database is temporarily unavailable.
     """
-    month_record = months_service.get_month_by_year_month(db, year, month)
-
-    if month_record is None:
-        raise HTTPException(status_code=404, detail="Month not found")
-
-    # ##>: Pass enum value to service (string comparison in database).
-    transactions, total_items = months_service.get_transactions_filtered(
-        db,
-        month_id=month_record.id,
-        category_type=category_type.value if category_type else None,
-        search=search,
-        start_date=start_date,
-        end_date=end_date,
-        page=page,
-        page_size=page_size,
-    )
-
-    # ##>: Use total_items (filtered count) for transaction_count when filters are applied.
-    # This provides consistency between transaction_count and pagination.total_items.
-    has_filters = any([category_type, search, start_date, end_date])
-    transaction_count = total_items if has_filters else len(month_record.transactions)
-
-    month_summary = MonthSummary(
-        id=month_record.id,
-        year=month_record.year,
-        month=month_record.month,
-        total_income=month_record.total_income,
-        total_core=month_record.total_core,
-        total_choice=month_record.total_choice,
-        total_compound=month_record.total_compound,
-        core_percentage=month_record.core_percentage,
-        choice_percentage=month_record.choice_percentage,
-        compound_percentage=month_record.compound_percentage,
-        score=month_record.score,
-        score_label=month_record.score_label,
-        transaction_count=transaction_count,
-        created_at=month_record.created_at,
-        updated_at=month_record.updated_at,
-    )
-
-    transaction_responses = [
-        TransactionResponse(
-            id=tx.id,
-            date=tx.date,
-            description=tx.description,
-            account=tx.account,
-            amount=tx.amount,
-            bankin_category=tx.bankin_category,
-            bankin_subcategory=tx.bankin_subcategory,
-            money_map_type=tx.money_map_type,
-            money_map_subcategory=tx.money_map_subcategory,
-            is_manually_corrected=tx.is_manually_corrected,
+    # ##>: Validate date range before querying database.
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(
+            status_code=400,
+            detail=f"start_date ({start_date}) must be before or equal to end_date ({end_date})",
         )
-        for tx in transactions
-    ]
 
-    total_pages = ceil(total_items / page_size) if total_items > 0 else 0
+    try:
+        month_record = months_service.get_month_by_year_month(db, year, month)
 
-    pagination = PaginationInfo(
-        page=page,
-        page_size=page_size,
-        total_items=total_items,
-        total_pages=total_pages,
-    )
+        if month_record is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No data found for {year}-{month:02d}. Please upload transactions for this month first.",
+            )
 
-    return MonthDetailResponse(
-        month=month_summary,
-        transactions=transaction_responses,
-        pagination=pagination,
-    )
+        # ##>: Pass enum value to service (string comparison in database).
+        transactions, total_items = months_service.get_transactions_filtered(
+            db,
+            month_id=month_record.id,
+            category_type=category_type.value if category_type else None,
+            search=search,
+            start_date=start_date,
+            end_date=end_date,
+            page=page,
+            page_size=page_size,
+        )
+
+        # ##>: Use total_items (filtered count) for transaction_count when filters are applied.
+        # This provides consistency between transaction_count and pagination.total_items.
+        has_filters = any([category_type, search, start_date, end_date])
+        transaction_count = total_items if has_filters else len(month_record.transactions)
+
+        month_summary = MonthSummary(
+            id=month_record.id,
+            year=month_record.year,
+            month=month_record.month,
+            total_income=month_record.total_income,
+            total_core=month_record.total_core,
+            total_choice=month_record.total_choice,
+            total_compound=month_record.total_compound,
+            core_percentage=month_record.core_percentage,
+            choice_percentage=month_record.choice_percentage,
+            compound_percentage=month_record.compound_percentage,
+            score=month_record.score,
+            score_label=cast(ScoreLabelLiteral | None, month_record.score_label),
+            transaction_count=transaction_count,
+            created_at=month_record.created_at,
+            updated_at=month_record.updated_at,
+        )
+
+        transaction_responses = [
+            TransactionResponse(
+                id=tx.id,
+                date=tx.date,
+                description=tx.description,
+                account=tx.account,
+                amount=tx.amount,
+                bankin_category=tx.bankin_category,
+                bankin_subcategory=tx.bankin_subcategory,
+                money_map_type=cast(MoneyMapTypeLiteral | None, tx.money_map_type),
+                money_map_subcategory=tx.money_map_subcategory,
+                is_manually_corrected=tx.is_manually_corrected,
+            )
+            for tx in transactions
+        ]
+
+        total_pages = ceil(total_items / page_size) if total_items > 0 else 0
+
+        pagination = PaginationInfo(
+            page=page,
+            page_size=page_size,
+            total_items=total_items,
+            total_pages=total_pages,
+        )
+
+        return MonthDetailResponse(
+            month=month_summary,
+            transactions=transaction_responses,
+            pagination=pagination,
+        )
+    except HTTPException:
+        # ##>: Re-raise HTTPException (404) without wrapping.
+        raise
+    except MonthDataError as error:
+        logger.error("Database error in get_month_detail for %d-%02d: %s", year, month, str(error))
+        raise HTTPException(status_code=503, detail="Database temporarily unavailable. Please try again.") from error

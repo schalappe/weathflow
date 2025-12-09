@@ -221,6 +221,85 @@ class UploadError(Exception):
     """
 
 
+class MonthDataError(Exception):
+    """
+    Base exception for all month data retrieval errors.
+
+    All month data-specific exceptions inherit from this class, allowing callers
+    to catch all month data errors with a single except clause.
+    """
+
+
+class MonthQueryError(MonthDataError):
+    """
+    Raised when a database query for months fails.
+
+    Parameters
+    ----------
+    reason : str
+        Description of the failure.
+
+    Attributes
+    ----------
+    reason : str
+        The failure reason for debugging.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(f"Failed to query months: {reason}")
+
+
+class TransactionQueryError(MonthDataError):
+    """
+    Raised when a transaction query fails.
+
+    Parameters
+    ----------
+    month_id : int
+        The ID of the month being queried.
+    reason : str
+        Description of the failure.
+
+    Attributes
+    ----------
+    month_id : int
+        The month ID for programmatic access.
+    reason : str
+        The failure reason for debugging.
+    """
+
+    def __init__(self, month_id: int, reason: str) -> None:
+        self.month_id = month_id
+        self.reason = reason
+        super().__init__(f"Failed to query transactions for month {month_id}: {reason}")
+
+
+class InvalidDateRangeError(MonthDataError):
+    """
+    Raised when start_date is after end_date.
+
+    Parameters
+    ----------
+    start_date : str
+        The start date that was provided.
+    end_date : str
+        The end date that was provided.
+
+    Attributes
+    ----------
+    start_date : str
+        The start date for programmatic access.
+    end_date : str
+        The end date for programmatic access.
+    """
+
+    def __init__(self, start_date: str, end_date: str) -> None:
+        self.start_date = start_date
+        self.end_date = end_date
+        super().__init__(f"start_date ({start_date}) must be before or equal to end_date ({end_date})")
+
+
 class InvalidMonthFormatError(UploadError):
     """
     Raised when month format is not YYYY-MM.

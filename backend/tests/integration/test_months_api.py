@@ -76,7 +76,7 @@ class TestGetMonthDetailEndpoint:
         response = client.get("/api/months/2025/10")
 
         assert response.status_code == 404
-        assert response.json()["detail"] == "Month not found"
+        assert "2025-10" in response.json()["detail"]
 
     def test_returns_paginated_transactions(self, client: TestClient, db_session: Session) -> None:
         """Should return month detail with paginated transactions."""
@@ -209,3 +209,141 @@ class TestGetMonthDetailEndpoint:
         data = response.json()
         assert data["pagination"]["total_items"] == 1
         assert "CARREFOUR" in data["transactions"][0]["description"]
+
+    def test_returns_404_with_contextual_message(self, client: TestClient) -> None:
+        """Should return 404 with contextual error message including year and month."""
+        response = client.get("/api/months/2025/10")
+
+        assert response.status_code == 404
+        detail = response.json()["detail"]
+        assert "2025-10" in detail
+        assert "upload" in detail.lower()
+
+    def test_date_range_filter(self, client: TestClient, db_session: Session) -> None:
+        """Should filter transactions by start_date and end_date query parameters."""
+        month = Month(year=2025, month=10, score=3, score_label="Great")
+        db_session.add(month)
+        db_session.commit()
+
+        # ##>: Add transactions on different days.
+        for day in [1, 10, 20, 30]:
+            tx = Transaction(
+                month_id=month.id,
+                date=date(2025, 10, day),
+                description=f"Transaction on {day}th",
+                amount=100.0,
+                money_map_type=MoneyMapType.CORE.value,
+            )
+            db_session.add(tx)
+        db_session.commit()
+
+        response = client.get(
+            "/api/months/2025/10",
+            params={"start_date": "2025-10-05", "end_date": "2025-10-25"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        # ##>: Only transactions on 10th and 20th should match.
+        assert data["pagination"]["total_items"] == 2
+
+    def test_invalid_date_range_returns_400(self, client: TestClient, db_session: Session) -> None:
+        """Should return 400 when start_date is after end_date."""
+        month = Month(year=2025, month=10, score=3, score_label="Great")
+        db_session.add(month)
+        db_session.commit()
+
+        response = client.get(
+            "/api/months/2025/10",
+            params={"start_date": "2025-10-20", "end_date": "2025-10-05"},
+        )
+
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        assert "start_date" in detail
+        assert "end_date" in detail
+
+    def test_combined_filters(self, client: TestClient, db_session: Session) -> None:
+        """Should apply multiple filters with AND logic via query parameters."""
+        month = Month(year=2025, month=10, score=3, score_label="Great")
+        db_session.add(month)
+        db_session.commit()
+
+        tx1 = Transaction(
+            month_id=month.id,
+            date=date(2025, 10, 5),
+            description="GROCERY STORE",
+            amount=-100.0,
+            money_map_type=MoneyMapType.CORE.value,
+        )
+        tx2 = Transaction(
+            month_id=month.id,
+            date=date(2025, 10, 15),
+            description="GROCERY MARKET",
+            amount=-50.0,
+            money_map_type=MoneyMapType.CHOICE.value,
+        )
+        tx3 = Transaction(
+            month_id=month.id,
+            date=date(2025, 10, 25),
+            description="RESTAURANT",
+            amount=-80.0,
+            money_map_type=MoneyMapType.CORE.value,
+        )
+        db_session.add_all([tx1, tx2, tx3])
+        db_session.commit()
+
+        # ##>: Filter by CORE category AND "grocery" search.
+        response = client.get(
+            "/api/months/2025/10",
+            params={"category_type": "CORE", "search": "grocery"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["pagination"]["total_items"] == 1
+        assert data["transactions"][0]["description"] == "GROCERY STORE"
+
+    def test_returns_empty_transactions_for_month_with_no_transactions(
+        self, client: TestClient, db_session: Session
+    ) -> None:
+        """Should return month detail with empty transactions when month has no transactions."""
+        month = Month(year=2025, month=10, score=3, score_label="Great")
+        db_session.add(month)
+        db_session.commit()
+
+        response = client.get("/api/months/2025/10")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["month"]["transaction_count"] == 0
+        assert data["transactions"] == []
+        assert data["pagination"]["total_items"] == 0
+        assert data["pagination"]["total_pages"] == 0
+
+    def test_returns_empty_transactions_when_page_exceeds_total(self, client: TestClient, db_session: Session) -> None:
+        """Should return empty transaction list when page number exceeds available pages."""
+        month = Month(year=2025, month=10, score=3, score_label="Great")
+        db_session.add(month)
+        db_session.commit()
+
+        # ##>: Add only 2 transactions.
+        for i in range(2):
+            tx = Transaction(
+                month_id=month.id,
+                date=date(2025, 10, i + 1),
+                description=f"Transaction {i + 1}",
+                amount=100.0,
+                money_map_type=MoneyMapType.CORE.value,
+            )
+            db_session.add(tx)
+        db_session.commit()
+
+        # ##>: Request page 10 with page_size=2 (only 1 page exists).
+        response = client.get("/api/months/2025/10", params={"page": 10, "page_size": 2})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["transactions"]) == 0
+        assert data["pagination"]["total_items"] == 2
+        assert data["pagination"]["total_pages"] == 1
