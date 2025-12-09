@@ -15,6 +15,24 @@ from app.services.exceptions import MonthQueryError, TransactionQueryError
 logger = logging.getLogger(__name__)
 
 
+def _escape_like_pattern(search: str) -> str:
+    """
+    Escape SQL LIKE wildcards to treat them as literal characters.
+
+    Parameters
+    ----------
+    search : str
+        The search string to escape.
+
+    Returns
+    -------
+    str
+        Search string with %, _, and \\ escaped.
+    """
+    # ##>: Escape backslash first, then wildcards, to avoid double-escaping.
+    return search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def get_all_months_with_counts(db: Session) -> list[Any]:
     """
     Retrieve all months with transaction counts, ordered by date (newest first).
@@ -45,34 +63,6 @@ def get_all_months_with_counts(db: Session) -> list[Any]:
             .all()
         )
         logger.info("Retrieved %d months with transaction counts", len(result))
-        return result
-    except SQLAlchemyError as error:
-        logger.error("Database error retrieving months: %s", str(error))
-        raise MonthQueryError(str(error)) from error
-
-
-def get_all_months(db: Session) -> list[Month]:
-    """
-    Retrieve all months ordered by date (newest first).
-
-    Parameters
-    ----------
-    db : Session
-        Database session.
-
-    Returns
-    -------
-    list[Month]
-        List of Month objects ordered by year desc, month desc.
-
-    Raises
-    ------
-    MonthQueryError
-        If database query fails.
-    """
-    try:
-        result = db.query(Month).order_by(Month.year.desc(), Month.month.desc()).all()
-        logger.info("Retrieved %d months", len(result))
         return result
     except SQLAlchemyError as error:
         logger.error("Database error retrieving months: %s", str(error))
@@ -170,7 +160,8 @@ def get_transactions_filtered(
             query = query.filter(Transaction.money_map_type == category_type)
 
         if search is not None and search.strip():
-            query = query.filter(Transaction.description.ilike(f"%{search}%"))
+            escaped_search = _escape_like_pattern(search.strip())
+            query = query.filter(Transaction.description.ilike(f"%{escaped_search}%", escape="\\"))
 
         if start_date is not None:
             query = query.filter(Transaction.date >= start_date)

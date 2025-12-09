@@ -275,31 +275,6 @@ class TransactionQueryError(MonthDataError):
         super().__init__(f"Failed to query transactions for month {month_id}: {reason}")
 
 
-class InvalidDateRangeError(MonthDataError):
-    """
-    Raised when start_date is after end_date.
-
-    Parameters
-    ----------
-    start_date : str
-        The start date that was provided.
-    end_date : str
-        The end date that was provided.
-
-    Attributes
-    ----------
-    start_date : str
-        The start date for programmatic access.
-    end_date : str
-        The end date for programmatic access.
-    """
-
-    def __init__(self, start_date: str, end_date: str) -> None:
-        self.start_date = start_date
-        self.end_date = end_date
-        super().__init__(f"start_date ({start_date}) must be before or equal to end_date ({end_date})")
-
-
 class InvalidMonthFormatError(UploadError):
     """
     Raised when month format is not YYYY-MM.

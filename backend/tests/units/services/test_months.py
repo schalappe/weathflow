@@ -54,30 +54,6 @@ class TestGetAllMonthsWithCounts(DatabaseTestCase):
         self.assertEqual(result[1][1], 1)  # month2 has 1 transaction
 
 
-class TestGetAllMonths(DatabaseTestCase):
-    """Tests for get_all_months function."""
-
-    def test_returns_months_ordered_by_date_desc(self) -> None:
-        """Should return months ordered by year desc, month desc."""
-        # ##>: Create months in non-chronological order.
-        month_jan = Month(year=2025, month=1, score=2, score_label="Okay")
-        month_oct = Month(year=2025, month=10, score=3, score_label="Great")
-        month_dec_2024 = Month(year=2024, month=12, score=1, score_label="Need Improvement")
-        self.session.add_all([month_jan, month_oct, month_dec_2024])
-        self.session.commit()
-
-        result = months_service.get_all_months(self.session)
-
-        self.assertEqual(len(result), 3)
-        # ##>: Order should be: 2025-10, 2025-01, 2024-12.
-        self.assertEqual(result[0].year, 2025)
-        self.assertEqual(result[0].month, 10)
-        self.assertEqual(result[1].year, 2025)
-        self.assertEqual(result[1].month, 1)
-        self.assertEqual(result[2].year, 2024)
-        self.assertEqual(result[2].month, 12)
-
-
 class TestGetMonthByYearMonth(DatabaseTestCase):
     """Tests for get_month_by_year_month function."""
 

@@ -73,8 +73,11 @@ def list_months(db: Session = Depends(get_db)) -> MonthsListResponse:
 
         return MonthsListResponse(months=month_summaries, total=len(month_summaries))
     except MonthDataError as error:
-        logger.error("Failed to list months: %s", str(error))
+        logger.exception("Failed to list months")
         raise HTTPException(status_code=503, detail="Database temporarily unavailable. Please try again.") from error
+    except Exception as error:
+        logger.exception("Unexpected error in list_months")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
 @router.get("/months/{year}/{month}", response_model=MonthDetailResponse)
@@ -207,8 +210,11 @@ def get_month_detail(
             pagination=pagination,
         )
     except HTTPException:
-        # ##>: Re-raise HTTPException (404) without wrapping.
+        # ##>: Re-raise HTTPException (400, 404) without wrapping.
         raise
     except MonthDataError as error:
-        logger.error("Database error in get_month_detail for %d-%02d: %s", year, month, str(error))
+        logger.exception("Database error in get_month_detail for %d-%02d", year, month)
         raise HTTPException(status_code=503, detail="Database temporarily unavailable. Please try again.") from error
+    except Exception as error:
+        logger.exception("Unexpected error in get_month_detail for %d-%02d", year, month)
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
