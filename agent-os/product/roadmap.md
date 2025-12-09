@@ -12,7 +12,7 @@
 
 6. [x] Monthly Data API — Create endpoints to retrieve month data including totals, percentages, score, and transaction list with filtering capabilities `S`
 
-7. [ ] Import Page UI — Build the file upload interface with drag-and-drop, multi-month preview table, month selection checkboxes, and categorization progress indicator `M`
+7. [x] Import Page UI — Build the file upload interface with drag-and-drop, multi-month preview table, month selection checkboxes, and categorization progress indicator `M`
 
 8. [ ] Monthly Dashboard UI — Create the main dashboard showing score card, Core/Choice/Compound metric cards with percentage indicators, pie chart breakdown, and transaction table `L`
 
