@@ -1,9 +1,11 @@
 """Pydantic models for Monthly Data API endpoints."""
 
 from datetime import date, datetime
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Self, cast
 
 from pydantic import BaseModel, Field
+
+from app.responses._types import MoneyMapTypeLiteral, ScoreLabelLiteral
 
 if TYPE_CHECKING:
     from app.db.models.month import Month
@@ -24,7 +26,7 @@ class MonthSummary(BaseModel):
     choice_percentage: float = Field(ge=0, le=100)
     compound_percentage: float = Field(ge=0, le=100)
     score: int = Field(ge=0, le=3)
-    score_label: str | None
+    score_label: ScoreLabelLiteral | None
     transaction_count: int = Field(ge=0)
     created_at: datetime
     updated_at: datetime
@@ -46,6 +48,7 @@ class MonthSummary(BaseModel):
         MonthSummary
             Pydantic model instance.
         """
+        # ##>: Cast score_label to Literal type; database CHECK constraint ensures validity.
         return cls(
             id=month.id,
             year=month.year,
@@ -58,7 +61,7 @@ class MonthSummary(BaseModel):
             choice_percentage=month.choice_percentage,
             compound_percentage=month.compound_percentage,
             score=month.score,
-            score_label=month.score_label,
+            score_label=cast(ScoreLabelLiteral | None, month.score_label),
             transaction_count=transaction_count,
             created_at=month.created_at,
             updated_at=month.updated_at,
@@ -75,7 +78,7 @@ class TransactionResponse(BaseModel):
     amount: float
     bankin_category: str | None
     bankin_subcategory: str | None
-    money_map_type: str | None
+    money_map_type: MoneyMapTypeLiteral | None
     money_map_subcategory: str | None
     is_manually_corrected: bool
 
@@ -94,6 +97,7 @@ class TransactionResponse(BaseModel):
         TransactionResponse
             Pydantic model instance.
         """
+        # ##>: Cast money_map_type to Literal type; database CHECK constraint ensures validity.
         return cls(
             id=tx.id,
             date=tx.date,
@@ -102,7 +106,7 @@ class TransactionResponse(BaseModel):
             amount=tx.amount,
             bankin_category=tx.bankin_category,
             bankin_subcategory=tx.bankin_subcategory,
-            money_map_type=tx.money_map_type,
+            money_map_type=cast(MoneyMapTypeLiteral | None, tx.money_map_type),
             money_map_subcategory=tx.money_map_subcategory,
             is_manually_corrected=tx.is_manually_corrected,
         )

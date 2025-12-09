@@ -1,5 +1,6 @@
 """Upload service for CSV processing and transaction categorization."""
 
+import logging
 import re
 from typing import Any, Literal
 
@@ -14,6 +15,8 @@ from app.services.csv_parser import BankinCSVParser
 from app.services.dto.categorization import CategorizationResult, TransactionInput
 from app.services.dto.parsing import MonthData, ParsedTransaction
 from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError
+
+logger = logging.getLogger(__name__)
 
 LOW_CONFIDENCE_THRESHOLD = 0.8
 MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
@@ -318,6 +321,14 @@ class UploadService:
             # ##>: IDs start at 1 for each month's batch, matching _transform_to_inputs.
             result = result_by_id.get(i + 1)
             if result is None:
+                # ##!: Missing result indicates a bug in ID mapping or API response.
+                logger.warning(
+                    "Missing categorization result for transaction %d (date=%s, description='%s'). "
+                    "This may indicate a bug in ID mapping or API response.",
+                    i + 1,
+                    t.date,
+                    t.description[:50],
+                )
                 continue
 
             new_transactions.append(
