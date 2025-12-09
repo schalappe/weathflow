@@ -1,7 +1,7 @@
 """Upload service for CSV processing and transaction categorization."""
 
+import logging
 import re
-from math import ceil
 from typing import Any, Literal
 
 from sqlalchemy.orm import Session
@@ -12,9 +12,11 @@ from app.db.models.transaction import Transaction
 from app.services.calculator import calculate_and_update_month
 from app.services.categorizer import TransactionCategorizer
 from app.services.csv_parser import BankinCSVParser
+from app.services.dto.categorization import CategorizationResult, TransactionInput
+from app.services.dto.parsing import MonthData, ParsedTransaction
 from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError
-from app.services.schemas.categorization import CategorizationResult, TransactionInput
-from app.services.schemas.parsing import MonthData, ParsedTransaction
+
+logger = logging.getLogger(__name__)
 
 LOW_CONFIDENCE_THRESHOLD = 0.8
 MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
@@ -38,7 +40,6 @@ class UploadService:
         """Initialize with parser instance. Categorizer is created lazily."""
         self._parser = BankinCSVParser()
         self._categorizer: TransactionCategorizer | None = None
-        self._api_call_count = 0
 
     def _get_categorizer(self) -> TransactionCategorizer:
         """
@@ -154,8 +155,8 @@ class UploadService:
         ScoreCalculationError
             If score calculation or persistence fails.
         """
-        self._api_call_count = 0
         result = self._parser.parse(file_content)
+        total_api_calls = 0
 
         if result.total_transactions == 0:
             raise NoTransactionsFoundError()
@@ -177,18 +178,19 @@ class UploadService:
                 continue
 
             month_data = result.months[month_key]
-            month_result = self._process_single_month(
+            month_result, api_calls = self._process_single_month(
                 db=db,
                 month_data=month_data,
                 import_mode=import_mode,
             )
             months_processed.append(month_result)
+            total_api_calls += api_calls
 
         return {
             "success": True,
             "months_processed": months_processed,
             "months_not_found": months_not_found,
-            "total_api_calls": self._api_call_count,
+            "total_api_calls": total_api_calls,
         }
 
     def _process_single_month(
@@ -196,8 +198,15 @@ class UploadService:
         db: Session,
         month_data: MonthData,
         import_mode: Literal["replace", "merge"],
-    ) -> dict[str, Any]:
-        """Process categorization and persistence for a single month."""
+    ) -> tuple[dict[str, Any], int]:
+        """
+        Process categorization and persistence for a single month.
+
+        Returns
+        -------
+        tuple[dict[str, Any], int]
+            Tuple of (month result dict, actual API call count).
+        """
         year, month = month_data.year, month_data.month
 
         # ##>: Handle import mode and get month record.
@@ -210,11 +219,7 @@ class UploadService:
         # ##>: Transform and categorize transactions. IDs start at 1 for each month.
         inputs = self._transform_to_inputs(month_data.transactions, start_id=1)
         categorizer = self._get_categorizer()
-        results = categorizer.categorize(inputs)
-
-        # ##>: Track API calls (estimate based on batch size of 50).
-        pending_count = len(inputs)
-        self._api_call_count += ceil(pending_count / 50)
+        results, api_call_count = categorizer.categorize(inputs)
 
         # ##>: Persist transactions and calculate score.
         inserted_count = self._persist_transactions(
@@ -232,7 +237,7 @@ class UploadService:
 
         low_confidence_count = self._count_low_confidence(results)
 
-        return {
+        month_result = {
             "year": year,
             "month": month,
             "transactions_categorized": inserted_count,
@@ -240,6 +245,8 @@ class UploadService:
             "score": updated_month.score,
             "score_label": updated_month.score_label,
         }
+
+        return month_result, api_call_count
 
     def _transform_to_inputs(self, transactions: list[ParsedTransaction], start_id: int) -> list[TransactionInput]:
         """Convert ParsedTransaction list to TransactionInput list."""
@@ -314,6 +321,14 @@ class UploadService:
             # ##>: IDs start at 1 for each month's batch, matching _transform_to_inputs.
             result = result_by_id.get(i + 1)
             if result is None:
+                # ##!: Missing result indicates a bug in ID mapping or API response.
+                logger.warning(
+                    "Missing categorization result for transaction %d (date=%s, description='%s'). "
+                    "This may indicate a bug in ID mapping or API response.",
+                    i + 1,
+                    t.date,
+                    t.description[:50],
+                )
                 continue
 
             new_transactions.append(

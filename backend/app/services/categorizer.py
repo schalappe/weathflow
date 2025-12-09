@@ -11,13 +11,13 @@ from app.db.enums import MoneyMapType
 from app.services.categorization_cache import CategorizationCache
 from app.services.categorization_prompt import CATEGORIZATION_SYSTEM_PROMPT
 from app.services.category_mapping import CategoryMapping
+from app.services.dto.categorization import CategorizationResult, TransactionInput
 from app.services.exceptions import (
     APIConnectionError,
     BatchCategorizationError,
     CategorizationError,
     InvalidResponseError,
 )
-from app.services.schemas.categorization import CategorizationResult, TransactionInput
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +40,17 @@ class TransactionCategorizer:
     <MoneyMapType.CORE: 'CORE'>
     """
 
-    MODEL: ClassVar[str] = "claude-sonnet-4-20250514"
     BATCH_SIZE: ClassVar[int] = 50
     MAX_TOKENS: ClassVar[int] = 8192
     MAX_RETRIES: ClassVar[int] = 3
 
-    def __init__(self, api_key: str, base_url: str | None = None, cache: CategorizationCache | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str | None = None,
+        model: str | None = None,
+        cache: CategorizationCache | None = None,
+    ) -> None:
         """
         Initialize categorizer with API key and optional cache.
 
@@ -55,13 +60,18 @@ class TransactionCategorizer:
             Anthropic API key for Claude API calls.
         base_url : str | None
             Optional base URL for Anthropic API.
+        model : str | None
+            Claude model to use. Defaults to settings.anthropic_model.
         cache : CategorizationCache | None
             Cache instance for recurring patterns. Creates default if None.
         """
+        from app.config.settings import get_settings
+
         self._client = Anthropic(api_key=api_key, base_url=base_url, max_retries=self.MAX_RETRIES)
+        self._model = model if model is not None else get_settings().anthropic_model
         self._cache = cache if cache is not None else CategorizationCache()
 
-    def categorize(self, transactions: list[TransactionInput]) -> list[CategorizationResult]:
+    def categorize(self, transactions: list[TransactionInput]) -> tuple[list[CategorizationResult], int]:
         """
         Categorize a list of transactions into Money Map types.
 
@@ -75,8 +85,8 @@ class TransactionCategorizer:
 
         Returns
         -------
-        list[CategorizationResult]
-            Categorization results matching input order.
+        tuple[list[CategorizationResult], int]
+            Tuple of (categorization results matching input order, actual API call count).
 
         Raises
         ------
@@ -88,10 +98,11 @@ class TransactionCategorizer:
             If some transactions fail to categorize.
         """
         if not transactions:
-            return []
+            return [], 0
 
         results: dict[int, CategorizationResult] = {}
         pending: list[TransactionInput] = []
+        api_call_count = 0
 
         # ##>: Phase 1: Try cache and deterministic rules first.
         for tx in transactions:
@@ -109,6 +120,9 @@ class TransactionCategorizer:
 
         # ##>: Phase 2: Call Claude API for remaining transactions.
         if pending:
+            from math import ceil
+
+            api_call_count = ceil(len(pending) / self.BATCH_SIZE)
             api_results = self._categorize_with_api(pending)
             for result in api_results:
                 results[result.id] = result
@@ -116,8 +130,8 @@ class TransactionCategorizer:
             self._update_cache(pending, api_results)
             self._cache.save()
 
-        # ##>: Phase 3: Return results in original order.
-        return [results[tx.id] for tx in transactions]
+        # ##>: Phase 3: Return results in original order with actual API call count.
+        return [results[tx.id] for tx in transactions], api_call_count
 
     def _check_cache(self, transaction: TransactionInput) -> CategorizationResult | None:
         """
@@ -237,7 +251,7 @@ class TransactionCategorizer:
 
         try:
             response = self._client.messages.create(
-                model=self.MODEL,
+                model=self._model,
                 max_tokens=self.MAX_TOKENS,
                 system=CATEGORIZATION_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_prompt}],

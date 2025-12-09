@@ -8,13 +8,13 @@ from pydantic import ValidationError
 from app.db.enums import MoneyMapType, ScoreLabel
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
+from app.services.dto.calculation import MonthStats
 from app.services.exceptions import (
     MonthNotFoundError,
     ScoreCalculationError,
     ScorePersistenceError,
     TransactionAggregationError,
 )
-from app.services.schemas.calculation import MonthStats
 from tests.conftest import DatabaseTestCase
 
 # =============================================================================

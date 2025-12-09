@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.schemas.upload import CategorizeResponse, ImportMode, UploadResponse
+from app.responses.upload import CategorizeResponse, ImportMode, UploadResponse
 from app.services.exceptions import (
     APIConnectionError,
     BatchCategorizationError,

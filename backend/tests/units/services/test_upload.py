@@ -7,9 +7,9 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 from app.db.enums import MoneyMapType
+from app.services.dto.categorization import CategorizationResult
+from app.services.dto.parsing import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
 from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError
-from app.services.schemas.categorization import CategorizationResult
-from app.services.schemas.parsing import MonthData, MonthSummary, ParsedTransaction, ParseResult
 from app.services.upload import UploadService
 from tests.conftest import DatabaseTestCase
 
@@ -49,7 +49,7 @@ class TestUploadServicePreview(TestCase):
                             bankin_subcategory="Supermarché",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=1,
                         transaction_count=2,
@@ -95,7 +95,7 @@ class TestUploadServicePreview(TestCase):
                             bankin_subcategory="Café",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=2,
                         transaction_count=1,
@@ -156,7 +156,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
                             bankin_subcategory="Salaire",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=3,
                         transaction_count=1,
@@ -169,14 +169,18 @@ class TestUploadServiceCategorization(DatabaseTestCase):
 
         mock_categorizer = MagicMock()
         mock_categorizer_class.return_value = mock_categorizer
-        mock_categorizer.categorize.return_value = [
-            CategorizationResult(
-                id=1,
-                money_map_type=MoneyMapType.INCOME,
-                money_map_subcategory="Salary",
-                confidence=0.95,
-            ),
-        ]
+        # ##>: Return tuple (results, api_call_count) matching new signature.
+        mock_categorizer.categorize.return_value = (
+            [
+                CategorizationResult(
+                    id=1,
+                    money_map_type=MoneyMapType.INCOME,
+                    money_map_subcategory="Salary",
+                    confidence=0.95,
+                ),
+            ],
+            1,
+        )
 
         service = UploadService()
         result = service.process_categorization(
@@ -216,7 +220,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
                             bankin_subcategory="Salaire",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=1,
                         transaction_count=1,
@@ -237,7 +241,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
                             bankin_subcategory="Supermarché",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=2,
                         transaction_count=1,
@@ -250,9 +254,11 @@ class TestUploadServiceCategorization(DatabaseTestCase):
 
         mock_categorizer = MagicMock()
         mock_categorizer_class.return_value = mock_categorizer
-        mock_categorizer.categorize.return_value = [
-            CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0),
-        ]
+        # ##>: Return tuple (results, api_call_count) matching new signature.
+        mock_categorizer.categorize.return_value = (
+            [CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0)],
+            1,
+        )
 
         service = UploadService()
         result = service.process_categorization(
@@ -288,7 +294,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
                             bankin_subcategory="Autre",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=4,
                         transaction_count=1,
@@ -301,9 +307,11 @@ class TestUploadServiceCategorization(DatabaseTestCase):
 
         mock_categorizer = MagicMock()
         mock_categorizer_class.return_value = mock_categorizer
-        mock_categorizer.categorize.return_value = [
-            CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0),
-        ]
+        # ##>: Return tuple (results, api_call_count) matching new signature.
+        mock_categorizer.categorize.return_value = (
+            [CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0)],
+            2,  # Simulate 2 API calls
+        )
 
         service = UploadService()
         result = service.process_categorization(
@@ -314,7 +322,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
         )
 
         self.assertIn("total_api_calls", result)
-        self.assertGreaterEqual(result["total_api_calls"], 1)
+        self.assertEqual(result["total_api_calls"], 2)
 
 
 @patch.dict(os.environ, MOCK_API_KEY_ENV)
@@ -362,7 +370,7 @@ class TestUploadServiceImportModes(DatabaseTestCase):
                             bankin_subcategory="Autre",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=5,
                         transaction_count=1,
@@ -375,9 +383,11 @@ class TestUploadServiceImportModes(DatabaseTestCase):
 
         mock_categorizer = MagicMock()
         mock_categorizer_class.return_value = mock_categorizer
-        mock_categorizer.categorize.return_value = [
-            CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0),
-        ]
+        # ##>: Return tuple (results, api_call_count) matching new signature.
+        mock_categorizer.categorize.return_value = (
+            [CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0)],
+            1,
+        )
 
         service = UploadService()
         service.process_categorization(
@@ -453,7 +463,7 @@ class TestUploadServiceImportModes(DatabaseTestCase):
                             bankin_subcategory="Supermarché",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=6,
                         transaction_count=2,
@@ -466,10 +476,14 @@ class TestUploadServiceImportModes(DatabaseTestCase):
 
         mock_categorizer = MagicMock()
         mock_categorizer_class.return_value = mock_categorizer
-        mock_categorizer.categorize.return_value = [
-            CategorizationResult(id=1, money_map_type=MoneyMapType.CORE, money_map_subcategory="", confidence=1.0),
-            CategorizationResult(id=2, money_map_type=MoneyMapType.CORE, money_map_subcategory="", confidence=1.0),
-        ]
+        # ##>: Return tuple (results, api_call_count) matching new signature.
+        mock_categorizer.categorize.return_value = (
+            [
+                CategorizationResult(id=1, money_map_type=MoneyMapType.CORE, money_map_subcategory="", confidence=1.0),
+                CategorizationResult(id=2, money_map_type=MoneyMapType.CORE, money_map_subcategory="", confidence=1.0),
+            ],
+            1,
+        )
 
         service = UploadService()
         result = service.process_categorization(
@@ -518,7 +532,7 @@ class TestUploadServiceImportModes(DatabaseTestCase):
                             bankin_subcategory="Autre",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=7,
                         transaction_count=1,
@@ -531,9 +545,11 @@ class TestUploadServiceImportModes(DatabaseTestCase):
 
         mock_categorizer = MagicMock()
         mock_categorizer_class.return_value = mock_categorizer
-        mock_categorizer.categorize.return_value = [
-            CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0),
-        ]
+        # ##>: Return tuple (results, api_call_count) matching new signature.
+        mock_categorizer.categorize.return_value = (
+            [CategorizationResult(id=1, money_map_type=MoneyMapType.INCOME, money_map_subcategory="", confidence=1.0)],
+            1,
+        )
 
         service = UploadService()
         result = service.process_categorization(
@@ -570,7 +586,7 @@ class TestUploadServiceValidation(TestCase):
                             bankin_subcategory="Autre",
                         ),
                     ],
-                    summary=MonthSummary(
+                    summary=ParsedMonthSummary(
                         year=2025,
                         month=1,
                         transaction_count=1,

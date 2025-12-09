@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 from app.db.enums import SCORE_TO_LABEL, MoneyMapType, ScoreLabel
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
+from app.services.dto.calculation import MonthStats
 from app.services.exceptions import MonthNotFoundError, ScorePersistenceError, TransactionAggregationError
-from app.services.schemas.calculation import MonthStats
 
 logger = logging.getLogger(__name__)
 

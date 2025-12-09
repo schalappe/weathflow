@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
+from app.services.dto.categorization import CategorizationResult
 from app.services.exceptions import CategorizationError
-from app.services.schemas.categorization import CategorizationResult
 from tests.integration.fixtures.csv_builder import CSVBuilder, combine_csvs
 
 # ##>: Fixture to mock the API key environment variable for categorization tests.
@@ -31,11 +31,13 @@ def _create_mock_categorizer(money_map_types: list[MoneyMapType] | None = None) 
     MagicMock
         Mock categorizer instance.
     """
+    from math import ceil
+
     mock_categorizer = MagicMock()
 
-    def categorize_side_effect(inputs: list[Any]) -> list[CategorizationResult]:
+    def categorize_side_effect(inputs: list[Any]) -> tuple[list[CategorizationResult], int]:
         types = money_map_types or [MoneyMapType.INCOME] * len(inputs)
-        return [
+        results = [
             CategorizationResult(
                 id=i + 1,
                 money_map_type=types[i % len(types)],
@@ -44,6 +46,9 @@ def _create_mock_categorizer(money_map_types: list[MoneyMapType] | None = None) 
             )
             for i in range(len(inputs))
         ]
+        # ##>: Return tuple (results, api_call_count) matching new signature.
+        api_calls = ceil(len(inputs) / 50) if inputs else 0
+        return results, api_calls
 
     mock_categorizer.categorize.side_effect = categorize_side_effect
     return mock_categorizer
@@ -277,11 +282,11 @@ class TestPartialFailure:
         mock_categorizer_class.return_value = mock_categorizer
         call_count = [0]
 
-        def categorize_side_effect(inputs: list[Any]) -> list[CategorizationResult]:
+        def categorize_side_effect(inputs: list[Any]) -> tuple[list[CategorizationResult], int]:
             call_count[0] += 1
             if call_count[0] == 1:
-                # ##>: First month succeeds.
-                return [
+                # ##>: First month succeeds. Return tuple matching new signature.
+                results = [
                     CategorizationResult(
                         id=i + 1,
                         money_map_type=MoneyMapType.INCOME,
@@ -290,6 +295,7 @@ class TestPartialFailure:
                     )
                     for i in range(len(inputs))
                 ]
+                return results, 1
             else:
                 # ##>: Second month fails.
                 raise CategorizationError("Claude API unavailable")

@@ -7,12 +7,12 @@ from decimal import Decimal
 from pydantic import ValidationError
 
 from app.db.enums import MoneyMapType
-from app.services.schemas.categorization import (
+from app.services.dto.categorization import (
     CachedCategorization,
     CategorizationResult,
     TransactionInput,
 )
-from app.services.schemas.parsing import MonthData, MonthSummary, ParsedTransaction, ParseResult
+from app.services.dto.parsing import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
 
 
 class TestParsedTransaction(unittest.TestCase):
@@ -88,12 +88,12 @@ class TestParsedTransaction(unittest.TestCase):
         self.assertEqual(transaction.note, "Important transaction")
 
 
-class TestMonthSummary(unittest.TestCase):
-    """Tests for MonthSummary model."""
+class TestParsedMonthSummary(unittest.TestCase):
+    """Tests for ParsedMonthSummary model."""
 
     def test_create_with_all_fields(self) -> None:
         """Should create a summary with all required fields."""
-        summary = MonthSummary(
+        summary = ParsedMonthSummary(
             year=2025,
             month=10,
             transaction_count=15,
@@ -109,7 +109,7 @@ class TestMonthSummary(unittest.TestCase):
 
     def test_immutable_raises_on_modification(self) -> None:
         """Should raise error when attempting to modify frozen model."""
-        summary = MonthSummary(
+        summary = ParsedMonthSummary(
             year=2025,
             month=10,
             transaction_count=15,
@@ -134,7 +134,7 @@ class TestMonthData(unittest.TestCase):
             bankin_category="Test",
             bankin_subcategory="Test",
         )
-        summary = MonthSummary(
+        summary = ParsedMonthSummary(
             year=2025,
             month=10,
             transaction_count=1,
@@ -155,7 +155,7 @@ class TestMonthData(unittest.TestCase):
 
     def test_immutable_raises_on_modification(self) -> None:
         """Should raise error when attempting to modify frozen model."""
-        summary = MonthSummary(
+        summary = ParsedMonthSummary(
             year=2025,
             month=10,
             transaction_count=0,
@@ -178,7 +178,7 @@ class TestParseResult(unittest.TestCase):
 
     def test_create_with_months_dict(self) -> None:
         """Should create parse result with months dictionary."""
-        summary = MonthSummary(
+        summary = ParsedMonthSummary(
             year=2025,
             month=10,
             transaction_count=0,

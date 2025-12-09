@@ -4,8 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-# ##>: Valid score labels matching the ScoreLabel enum in db/enums.py.
-ScoreLabelLiteral = Literal["Poor", "Need Improvement", "Okay", "Great"]
+from app.responses._types import ScoreLabelLiteral
 
 
 class TransactionPreview(BaseModel):

@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from pydantic import Field
 
-from app.services.schemas._base import FrozenModel
+from app.services.dto._base import FrozenModel
 
 
 class ParsedTransaction(FrozenModel):
@@ -45,9 +45,12 @@ class ParsedTransaction(FrozenModel):
     is_pointed: bool = False
 
 
-class MonthSummary(FrozenModel):
+class ParsedMonthSummary(FrozenModel):
     """
-    Summary statistics for a single month.
+    Summary statistics from CSV parsing for a single month.
+
+    This differs from the API's MonthSummary which includes score data.
+    ParsedMonthSummary only contains raw income/expenses before categorization.
 
     Attributes
     ----------
@@ -84,14 +87,14 @@ class MonthData(FrozenModel):
         The month (1-12).
     transactions : list[ParsedTransaction]
         All transactions in this month.
-    summary : MonthSummary
+    summary : ParsedMonthSummary
         Aggregated statistics for this month.
     """
 
     year: int
     month: int
     transactions: list[ParsedTransaction]
-    summary: MonthSummary
+    summary: ParsedMonthSummary
 
 
 class ParseResult(FrozenModel):

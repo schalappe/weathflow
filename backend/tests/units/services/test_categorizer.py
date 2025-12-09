@@ -11,12 +11,12 @@ import anthropic
 from app.db.enums import MoneyMapType
 from app.services.categorization_cache import CategorizationCache
 from app.services.categorizer import TransactionCategorizer
+from app.services.dto.categorization import TransactionInput
 from app.services.exceptions import (
     APIConnectionError,
     BatchCategorizationError,
     InvalidResponseError,
 )
-from app.services.schemas.categorization import TransactionInput
 
 
 def _make_transaction(
@@ -52,11 +52,12 @@ class TestTransactionCategorizerCache(unittest.TestCase):
         self.cache.put("NETFLIX.COM", MoneyMapType.CHOICE, "Subscription services", 0.98)
         transaction = _make_transaction(id=1, description="NETFLIX.COM 12/05")
 
-        results = self.categorizer.categorize([transaction])
+        results, api_calls = self.categorizer.categorize([transaction])
 
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].money_map_type, MoneyMapType.CHOICE)
         self.assertEqual(results[0].money_map_subcategory, "Subscription services")
+        self.assertEqual(api_calls, 0)
         cast(Mock, self.categorizer._client.messages.create).assert_not_called()
 
     def test_cache_hit_preserves_transaction_id(self) -> None:
@@ -64,7 +65,7 @@ class TestTransactionCategorizerCache(unittest.TestCase):
         self.cache.put("SPOTIFY.COM", MoneyMapType.CHOICE, "Subscription services", 0.99)
         transaction = _make_transaction(id=42, description="SPOTIFY.COM")
 
-        results = self.categorizer.categorize([transaction])
+        results, _ = self.categorizer.categorize([transaction])
 
         self.assertEqual(results[0].id, 42)
 
@@ -83,10 +84,11 @@ class TestTransactionCategorizerDeterministicRules(unittest.TestCase):
         """Should return EXCLUDED for internal transfer without API call."""
         transaction = _make_transaction(id=1, description="Virement interne vers Livret A")
 
-        results = self.categorizer.categorize([transaction])
+        results, api_calls = self.categorizer.categorize([transaction])
 
         self.assertEqual(results[0].money_map_type, MoneyMapType.EXCLUDED)
         self.assertEqual(results[0].confidence, 1.0)
+        self.assertEqual(api_calls, 0)
         cast(Mock, self.categorizer._client.messages.create).assert_not_called()
 
     def test_deterministic_mapping_returns_correct_category(self) -> None:
@@ -98,10 +100,11 @@ class TestTransactionCategorizerDeterministicRules(unittest.TestCase):
             bankin_subcategory="Supermarché / Epicerie",
         )
 
-        results = self.categorizer.categorize([transaction])
+        results, api_calls = self.categorizer.categorize([transaction])
 
         self.assertEqual(results[0].money_map_type, MoneyMapType.CORE)
         self.assertEqual(results[0].money_map_subcategory, "Groceries")
+        self.assertEqual(api_calls, 0)
         cast(Mock, self.categorizer._client.messages.create).assert_not_called()
 
 
@@ -133,12 +136,13 @@ class TestTransactionCategorizerAPI(unittest.TestCase):
         ]
         self.mock_client.messages.create.return_value = mock_response
 
-        results = self.categorizer.categorize([transaction])
+        results, api_calls = self.categorizer.categorize([transaction])
 
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].money_map_type, MoneyMapType.CHOICE)
         self.assertEqual(results[0].money_map_subcategory, "Shopping")
         self.assertEqual(results[0].confidence, 0.85)
+        self.assertEqual(api_calls, 1)
         self.mock_client.messages.create.assert_called_once()
 
     def test_api_response_defaults_confidence_to_one(self) -> None:
@@ -151,7 +155,7 @@ class TestTransactionCategorizerAPI(unittest.TestCase):
         ]
         self.mock_client.messages.create.return_value = mock_response
 
-        results = self.categorizer.categorize([transaction])
+        results, _ = self.categorizer.categorize([transaction])
 
         self.assertEqual(results[0].confidence, 1.0)
 
@@ -226,7 +230,7 @@ class TestTransactionCategorizerResponseParsing(unittest.TestCase):
         ]
         self.mock_client.messages.create.return_value = mock_response
 
-        results = self.categorizer.categorize([transaction])
+        results, _ = self.categorizer.categorize([transaction])
 
         self.assertEqual(results[0].money_map_type, MoneyMapType.CORE)
 
@@ -284,13 +288,14 @@ class TestTransactionCategorizerMixedPipeline(unittest.TestCase):
         ]
         self.mock_client.messages.create.return_value = mock_response
 
-        results = self.categorizer.categorize(transactions)
+        results, api_calls = self.categorizer.categorize(transactions)
 
         self.assertEqual(len(results), 4)
         self.assertEqual(results[0].money_map_type, MoneyMapType.CHOICE)  # Netflix
         self.assertEqual(results[1].money_map_type, MoneyMapType.EXCLUDED)  # Transfer
         self.assertEqual(results[2].money_map_type, MoneyMapType.CORE)  # Carrefour
         self.assertEqual(results[3].money_map_type, MoneyMapType.CHOICE)  # Unknown
+        self.assertEqual(api_calls, 1)  # Only 1 API call for the unknown transaction
 
     def test_results_maintain_original_order(self) -> None:
         """Should return results in same order as input transactions."""
@@ -308,7 +313,7 @@ class TestTransactionCategorizerMixedPipeline(unittest.TestCase):
         ]
         self.mock_client.messages.create.return_value = mock_response
 
-        results = self.categorizer.categorize(transactions)
+        results, _ = self.categorizer.categorize(transactions)
 
         self.assertEqual([r.id for r in results], [100, 50, 75])
 
@@ -325,9 +330,10 @@ class TestTransactionCategorizerEmptyInput(unittest.TestCase):
 
     def test_empty_input_returns_empty_list(self) -> None:
         """Should return empty list for empty input."""
-        results = self.categorizer.categorize([])
+        results, api_calls = self.categorizer.categorize([])
 
         self.assertEqual(results, [])
+        self.assertEqual(api_calls, 0)
         cast(Mock, self.categorizer._client.messages.create).assert_not_called()
 
 

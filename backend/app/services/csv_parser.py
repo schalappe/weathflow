@@ -8,8 +8,8 @@ from decimal import Decimal, InvalidOperation
 from io import StringIO
 from typing import ClassVar
 
+from app.services.dto.parsing import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
 from app.services.exceptions import InvalidFormatError, MissingColumnsError, RowParseError
-from app.services.schemas.parsing import MonthData, MonthSummary, ParsedTransaction, ParseResult
 
 
 class BankinCSVParser:
@@ -225,7 +225,7 @@ class BankinCSVParser:
             is_pointed=self._parse_pointed(row["Pointée"]),
         )
 
-    def _calculate_summary(self, transactions: list[ParsedTransaction], year: int, month: int) -> MonthSummary:
+    def _calculate_summary(self, transactions: list[ParsedTransaction], year: int, month: int) -> ParsedMonthSummary:
         """
         Calculate summary statistics for a list of transactions.
 
@@ -240,13 +240,13 @@ class BankinCSVParser:
 
         Returns
         -------
-        MonthSummary
+        ParsedMonthSummary
             Aggregated statistics.
         """
         total_income = sum((t.amount for t in transactions if t.amount > 0), Decimal("0"))
         total_expenses = sum((abs(t.amount) for t in transactions if t.amount < 0), Decimal("0"))
 
-        return MonthSummary(
+        return ParsedMonthSummary(
             year=year,
             month=month,
             transaction_count=len(transactions),
