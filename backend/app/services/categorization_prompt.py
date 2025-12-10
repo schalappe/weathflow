@@ -50,9 +50,14 @@ RÈGLES DE CATÉGORISATION :
 5. Les cafés (consommation) = CHOICE > Dining out
 6. Netflix, Spotify = CHOICE > Subscription services
 
-Pour chaque transaction, retourne un JSON avec :
-{
-  "money_map_type": "CORE|CHOICE|INCOME|COMPOUND|EXCLUDED",
-  "money_map_subcategory": "sous-catégorie correspondante"
-}"""
+Pour chaque transaction, retourne un tableau JSON. Chaque élément DOIT inclure l'id de la transaction :
+[
+  {
+    "id": <l'id de la transaction fourni en entrée>,
+    "money_map_type": "CORE|CHOICE|INCOME|COMPOUND|EXCLUDED",
+    "money_map_subcategory": "sous-catégorie correspondante"
+  }
+]
+
+IMPORTANT : L'id est obligatoire pour chaque transaction dans la réponse."""
 )

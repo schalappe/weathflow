@@ -342,6 +342,7 @@ class TransactionCategorizer:
         try:
             data = json.loads(cleaned)
         except json.JSONDecodeError as e:
+            logger.error("JSON parse error: %s. Response text: %s", e, response_text[:1000])
             raise InvalidResponseError(response_text) from e
 
         if not isinstance(data, list):
