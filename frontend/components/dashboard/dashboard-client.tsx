@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useCallback, useEffect } from "react";
+import { useReducer, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,12 @@ import { MetricCard } from "./metric-card";
 import { SpendingPieChart } from "./spending-pie-chart";
 import { MonthSelector } from "./month-selector";
 import { TransactionTable } from "./transaction-table";
-import { getMonthsList, getMonthDetail } from "@/lib/api-client";
+import { TransactionEditModal } from "./transaction-edit-modal";
+import {
+  getMonthsList,
+  getMonthDetail,
+  updateTransaction,
+} from "@/lib/api-client";
 import {
   formatMonthDisplay,
   meetsThreshold,
@@ -19,7 +24,12 @@ import {
   CATEGORY_TAILWIND,
   TRANSACTIONS_PER_PAGE,
 } from "@/lib/utils";
-import type { DashboardState, DashboardAction } from "@/types";
+import type {
+  DashboardState,
+  DashboardAction,
+  TransactionResponse,
+  UpdateTransactionPayload,
+} from "@/types";
 
 // [>]: Initial state for the dashboard reducer.
 const initialState: DashboardState = {
@@ -29,6 +39,7 @@ const initialState: DashboardState = {
   monthDetail: null,
   currentPage: 1,
   error: null,
+  editingTransaction: null,
 };
 
 // [>]: Reducer function handles all state transitions.
@@ -95,6 +106,36 @@ function dashboardReducer(
     case "RETRY":
       return {
         ...initialState,
+      };
+
+    case "OPEN_EDIT_MODAL":
+      return {
+        ...state,
+        editingTransaction: action.payload,
+      };
+
+    case "CLOSE_EDIT_MODAL":
+      return {
+        ...state,
+        editingTransaction: null,
+      };
+
+    case "TRANSACTION_UPDATED":
+      // [>]: Update transaction in list and replace month stats with recalculated values.
+      return {
+        ...state,
+        editingTransaction: null,
+        monthDetail: state.monthDetail
+          ? {
+              ...state.monthDetail,
+              month: action.payload.updated_month_stats,
+              transactions: state.monthDetail.transactions.map((tx) =>
+                tx.id === action.payload.transaction.id
+                  ? action.payload.transaction
+                  : tx,
+              ),
+            }
+          : null,
       };
 
     default:
@@ -184,6 +225,47 @@ export function DashboardClient() {
   const handleRetry = useCallback(() => {
     dispatch({ type: "RETRY" });
   }, []);
+
+  // [>]: Handle opening the edit modal when a transaction is clicked.
+  const handleTransactionClick = useCallback(
+    (transaction: TransactionResponse) => {
+      dispatch({ type: "OPEN_EDIT_MODAL", payload: transaction });
+    },
+    [],
+  );
+
+  // [>]: Handle closing the edit modal.
+  const handleCloseModal = useCallback(() => {
+    dispatch({ type: "CLOSE_EDIT_MODAL" });
+    setSaveError(null);
+  }, []);
+
+  // [>]: Modal state for save operation.
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // [>]: Handle saving transaction changes via API.
+  const handleSaveTransaction = useCallback(
+    async (payload: UpdateTransactionPayload) => {
+      if (!state.editingTransaction) return;
+
+      setIsSaving(true);
+      setSaveError(null);
+
+      try {
+        const response = await updateTransaction(
+          state.editingTransaction.id,
+          payload,
+        );
+        dispatch({ type: "TRANSACTION_UPDATED", payload: response });
+      } catch (error) {
+        setSaveError(getErrorMessage(error, "Failed to update transaction"));
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [state.editingTransaction],
+  );
 
   const isLoading = state.pageState === "loading";
 
@@ -348,12 +430,23 @@ export function DashboardClient() {
                     transactions={state.monthDetail.transactions}
                     pagination={state.monthDetail.pagination}
                     onPageChange={handlePageChange}
+                    onTransactionClick={handleTransactionClick}
                     isLoading={isLoading}
                   />
                 </div>
               </div>
             </>
           )}
+
+        {/* Transaction Edit Modal */}
+        <TransactionEditModal
+          transaction={state.editingTransaction}
+          isOpen={state.editingTransaction !== null}
+          onClose={handleCloseModal}
+          onSave={handleSaveTransaction}
+          isSaving={isSaving}
+          error={saveError}
+        />
       </main>
     </div>
   );

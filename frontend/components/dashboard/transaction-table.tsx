@@ -1,8 +1,15 @@
 "use client";
 
+import { Pencil } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -23,6 +30,7 @@ interface TransactionTableProps {
   transactions: TransactionResponse[];
   pagination: PaginationInfo;
   onPageChange: (page: number) => void;
+  onTransactionClick: (transaction: TransactionResponse) => void;
   isLoading: boolean;
 }
 
@@ -30,6 +38,7 @@ export function TransactionTable({
   transactions,
   pagination,
   onPageChange,
+  onTransactionClick,
   isLoading,
 }: TransactionTableProps) {
   const { page, total_pages } = pagination;
@@ -77,10 +86,28 @@ export function TransactionTable({
             </TableHeader>
             <TableBody>
               {transactions.map((tx) => (
-                <TableRow key={tx.id}>
+                <TableRow
+                  key={tx.id}
+                  onClick={() => onTransactionClick(tx)}
+                  className="cursor-pointer hover:bg-slate-50"
+                >
                   <TableCell>{formatTransactionDate(tx.date)}</TableCell>
-                  <TableCell className="max-w-[300px] truncate">
-                    {tx.description}
+                  <TableCell className="max-w-[300px]">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate">{tx.description}</span>
+                      {tx.is_manually_corrected && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Pencil className="h-3 w-3 flex-shrink-0 text-slate-400" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Manually corrected</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell
                     className={cn(

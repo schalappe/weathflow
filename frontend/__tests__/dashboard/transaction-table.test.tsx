@@ -44,6 +44,7 @@ describe("TransactionTable", () => {
         transactions={mockTransactions}
         pagination={mockPagination}
         onPageChange={vi.fn()}
+        onTransactionClick={vi.fn()}
         isLoading={false}
       />,
     );
@@ -60,6 +61,7 @@ describe("TransactionTable", () => {
         transactions={mockTransactions}
         pagination={mockPagination}
         onPageChange={vi.fn()}
+        onTransactionClick={vi.fn()}
         isLoading={false}
       />,
     );
@@ -75,6 +77,7 @@ describe("TransactionTable", () => {
         transactions={mockTransactions}
         pagination={mockPagination}
         onPageChange={vi.fn()}
+        onTransactionClick={vi.fn()}
         isLoading={false}
       />,
     );
@@ -97,6 +100,7 @@ describe("TransactionTable", () => {
         transactions={mockTransactions}
         pagination={mockPagination}
         onPageChange={onPageChange}
+        onTransactionClick={vi.fn()}
         isLoading={false}
       />,
     );

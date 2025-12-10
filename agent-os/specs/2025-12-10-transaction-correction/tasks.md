@@ -104,16 +104,16 @@ Primary Stack: FastAPI (Python) + Next.js (TypeScript)
 
 **Dependencies:** Task Group 3
 
-- [ ] 4.0 Complete frontend types and API client
-  - [ ] 4.1 Add TypeScript types to `frontend/types/index.ts`
+- [x] 4.0 Complete frontend types and API client
+  - [x] 4.1 Add TypeScript types to `frontend/types/index.ts`
     - `UpdateTransactionPayload`: `{ money_map_type: MoneyMapType, money_map_subcategory: string | null }`
     - `UpdateTransactionResponse`: `{ success: boolean, transaction: TransactionResponse, updated_month_stats: MonthSummary }`
-  - [ ] 4.2 Add `updateTransaction()` function to `frontend/lib/api-client.ts`
+  - [x] 4.2 Add `updateTransaction()` function to `frontend/lib/api-client.ts`
     - Parameters: `transactionId: number`, `payload: UpdateTransactionPayload`
     - Returns: `Promise<UpdateTransactionResponse>`
     - Use PATCH method with JSON body
     - Follow existing error handling pattern (try-catch, extractErrorMessage)
-  - [ ] 4.3 Create `frontend/lib/category-options.ts` with subcategory mappings
+  - [x] 4.3 Create `frontend/lib/category-options.ts` with subcategory mappings
     - `MONEY_MAP_TYPES: MoneyMapType[]` array
     - `SUBCATEGORY_OPTIONS: Record<MoneyMapType, string[]>` mapping
     - Include all subcategories per type from requirements
@@ -128,11 +128,11 @@ Primary Stack: FastAPI (Python) + Next.js (TypeScript)
 
 **Dependencies:** Task Group 4
 
-- [ ] 5.0 Complete UI component prerequisites
-  - [ ] 5.1 Install shadcn/ui Dialog component
+- [x] 5.0 Complete UI component prerequisites
+  - [x] 5.1 Install shadcn/ui Dialog component
     - Run: `cd frontend && bunx shadcn@latest add dialog`
     - Verify `frontend/components/ui/dialog.tsx` is created
-  - [ ] 5.2 Verify lucide-react Pencil icon is available
+  - [x] 5.2 Verify lucide-react Pencil icon is available
     - Check lucide-react is in package.json (should be installed with shadcn)
     - Test import: `import { Pencil } from 'lucide-react'`
 
@@ -145,31 +145,31 @@ Primary Stack: FastAPI (Python) + Next.js (TypeScript)
 
 **Dependencies:** Task Group 5
 
-- [ ] 6.0 Complete transaction edit modal component
-  - [ ] 6.1 Write 4 focused tests for TransactionEditModal
+- [x] 6.0 Complete transaction edit modal component
+  - [x] 6.1 Write 4 focused tests for TransactionEditModal
     - Test renders transaction details as read-only
     - Test filters subcategory options when type changes
     - Test save button disabled when no changes made
     - Test calls onSave with correct payload
-  - [ ] 6.2 Create `frontend/components/dashboard/transaction-edit-modal.tsx`
+  - [x] 6.2 Create `frontend/components/dashboard/transaction-edit-modal.tsx`
     - Props interface: `transaction: TransactionResponse | null`, `isOpen: boolean`, `onClose: () => void`, `onSave: (payload: UpdateTransactionPayload) => void`, `isSaving: boolean`, `error: string | null`
     - Internal state: `selectedType`, `selectedSubcategory`
     - Use Dialog, Select, Button from shadcn/ui
-  - [ ] 6.3 Implement read-only transaction details section
+  - [x] 6.3 Implement read-only transaction details section
     - Display description, amount (formatted), date
     - Match wireframe layout: `planning/visuals/model-wireframe.md`
-  - [ ] 6.4 Implement category type dropdown
+  - [x] 6.4 Implement category type dropdown
     - Pre-populate with current `money_map_type`
     - On change: clear subcategory and repopulate options
-  - [ ] 6.5 Implement subcategory dropdown
+  - [x] 6.5 Implement subcategory dropdown
     - Filter options based on selected type
     - Hide/disable for EXCLUDED type
     - Pre-populate with current `money_map_subcategory`
-  - [ ] 6.6 Implement save/cancel buttons with loading state
+  - [x] 6.6 Implement save/cancel buttons with loading state
     - Save disabled when no changes or isSaving
     - Show spinner on save button when isSaving
     - Display error message when error prop is set
-  - [ ] 6.7 Ensure modal tests pass
+  - [x] 6.7 Ensure modal tests pass
     - Run ONLY the 4 tests from 6.1
 
 **Acceptance Criteria:**
@@ -183,22 +183,22 @@ Primary Stack: FastAPI (Python) + Next.js (TypeScript)
 
 **Dependencies:** Task Group 6
 
-- [ ] 7.0 Complete transaction table modifications
-  - [ ] 7.1 Write 2 focused tests for transaction table updates
+- [x] 7.0 Complete transaction table modifications
+  - [x] 7.1 Write 2 focused tests for transaction table updates
     - Test click handler is called with transaction data
     - Test pencil icon displays for manually corrected transactions
-  - [ ] 7.2 Add `onTransactionClick` prop to `TransactionTableProps` interface
+  - [x] 7.2 Add `onTransactionClick` prop to `TransactionTableProps` interface
     - Type: `(transaction: TransactionResponse) => void`
     - Update interface in `frontend/components/dashboard/transaction-table.tsx`
-  - [ ] 7.3 Add click handler and cursor style to TableRow
+  - [x] 7.3 Add click handler and cursor style to TableRow
     - Pass `onClick={() => onTransactionClick(tx)}` to TableRow
     - Add `className="cursor-pointer"` for visual feedback
-  - [ ] 7.4 Add pencil icon indicator for corrected transactions
+  - [x] 7.4 Add pencil icon indicator for corrected transactions
     - Import `Pencil` from lucide-react
     - Conditionally render when `tx.is_manually_corrected === true`
     - Add tooltip: "Manually corrected"
     - Position next to description
-  - [ ] 7.5 Ensure table tests pass
+  - [x] 7.5 Ensure table tests pass
     - Run ONLY the 2 tests from 7.1
 
 **Acceptance Criteria:**
@@ -212,32 +212,32 @@ Primary Stack: FastAPI (Python) + Next.js (TypeScript)
 
 **Dependencies:** Task Group 7
 
-- [ ] 8.0 Complete dashboard client integration
-  - [ ] 8.1 Write 3 focused tests for dashboard modal integration
+- [x] 8.0 Complete dashboard client integration
+  - [x] 8.1 Write 3 focused tests for dashboard modal integration
     - Test clicking row opens modal with transaction data
     - Test successful save closes modal and refreshes data
     - Test error displays in modal without closing
-  - [ ] 8.2 Extend `DashboardState` interface with modal state
+  - [x] 8.2 Extend `DashboardState` interface with modal state
     - Add: `editingTransaction: TransactionResponse | null`
     - Add: `isEditModalOpen: boolean`
     - Add: `isSaving: boolean`
     - Add: `saveError: string | null`
-  - [ ] 8.3 Add reducer actions for modal state
+  - [x] 8.3 Add reducer actions for modal state
     - `OPEN_EDIT_MODAL`: Set editingTransaction and isEditModalOpen
     - `CLOSE_EDIT_MODAL`: Clear modal state
     - `SAVE_START`: Set isSaving true
     - `SAVE_SUCCESS`: Close modal, clear state
     - `SAVE_ERROR`: Set saveError, keep modal open
-  - [ ] 8.4 Implement modal handlers in DashboardClient
+  - [x] 8.4 Implement modal handlers in DashboardClient
     - `handleTransactionClick`: dispatch OPEN_EDIT_MODAL
     - `handleCloseModal`: dispatch CLOSE_EDIT_MODAL
     - `handleSaveTransaction`: API call, dispatch SAVE_START/SUCCESS/ERROR, trigger refetch
-  - [ ] 8.5 Render TransactionEditModal in DashboardClient
+  - [x] 8.5 Render TransactionEditModal in DashboardClient
     - Pass state and handlers as props
     - Position after TransactionTable in JSX
-  - [ ] 8.6 Pass `onTransactionClick` to TransactionTable
+  - [x] 8.6 Pass `onTransactionClick` to TransactionTable
     - Connect handler to table component
-  - [ ] 8.7 Ensure integration tests pass
+  - [x] 8.7 Ensure integration tests pass
     - Run ONLY the 3 tests from 8.1
 
 **Acceptance Criteria:**
