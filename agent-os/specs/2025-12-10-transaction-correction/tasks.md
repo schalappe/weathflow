@@ -14,20 +14,20 @@ Primary Stack: FastAPI (Python) + Next.js (TypeScript)
 
 **Dependencies:** None
 
-- [ ] 1.0 Complete backend response models and exception handling
-  - [ ] 1.1 Write 3 focused tests for transaction update validation
+- [x] 1.0 Complete backend response models and exception handling
+  - [x] 1.1 Write 3 focused tests for transaction update validation
     - Test valid MoneyMapType values are accepted
     - Test invalid MoneyMapType returns 400 error
     - Test subcategory validation per type
-  - [ ] 1.2 Create `TransactionNotFoundError` exception class
+  - [x] 1.2 Create `TransactionNotFoundError` exception class
     - Add to `backend/app/services/exceptions.py`
     - Include `transaction_id` attribute for programmatic access
     - Follow existing exception pattern in file
-  - [ ] 1.3 Create `backend/app/responses/transactions.py` with request/response models
+  - [x] 1.3 Create `backend/app/responses/transactions.py` with request/response models
     - `UpdateTransactionRequest`: money_map_type (MoneyMapType), money_map_subcategory (str | None)
     - `UpdateTransactionResponse`: success (bool), transaction (TransactionResponse), updated_month_stats (MonthSummary)
     - Reuse `TransactionResponse` and `MonthSummary` from `responses/months.py`
-  - [ ] 1.4 Ensure validation tests pass
+  - [x] 1.4 Ensure validation tests pass
     - Run ONLY the 3 tests from 1.1
     - Verify Pydantic validation works correctly
 
@@ -42,19 +42,19 @@ Primary Stack: FastAPI (Python) + Next.js (TypeScript)
 
 **Dependencies:** Task Group 1
 
-- [ ] 2.0 Complete transaction service layer
-  - [ ] 2.1 Write 4 focused tests for transaction service
+- [x] 2.0 Complete transaction service layer
+  - [x] 2.1 Write 4 focused tests for transaction service
     - Test update sets `is_manually_corrected = True`
     - Test update changes `money_map_type` and `money_map_subcategory`
     - Test update triggers month stats recalculation
     - Test update raises `TransactionNotFoundError` for invalid ID
-  - [ ] 2.2 Create `backend/app/services/transactions.py` with `update_transaction_category()` function
+  - [x] 2.2 Create `backend/app/services/transactions.py` with `update_transaction_category()` function
     - Parameters: `db: Session`, `transaction_id: int`, `money_map_type: MoneyMapType`, `money_map_subcategory: str | None`
     - Returns: `tuple[Transaction, Month]`
     - Fetch transaction or raise `TransactionNotFoundError`
     - Update fields and set `is_manually_corrected = True`
     - Call `calculate_and_update_month(db, transaction.month_id)` from calculator service
-  - [ ] 2.3 Ensure service tests pass
+  - [x] 2.3 Ensure service tests pass
     - Run ONLY the 4 tests from 2.1
     - Verify recalculation integration works
 
@@ -69,25 +69,25 @@ Primary Stack: FastAPI (Python) + Next.js (TypeScript)
 
 **Dependencies:** Task Group 2
 
-- [ ] 3.0 Complete transaction router
-  - [ ] 3.1 Write 4 focused integration tests for PATCH endpoint
+- [x] 3.0 Complete transaction router
+  - [x] 3.1 Write 4 focused integration tests for PATCH endpoint
     - Test valid update returns 200 with updated data
     - Test non-existent transaction returns 404
     - Test invalid category type returns 400
     - Test response includes recalculated month stats
-  - [ ] 3.2 Create `backend/app/routers/transactions.py` with PATCH endpoint
+  - [x] 3.2 Create `backend/app/routers/transactions.py` with PATCH endpoint
     - Route: `PATCH /api/transactions/{transaction_id}`
     - Path validation: `transaction_id: int = Path(..., ge=1)`
     - Request body: `UpdateTransactionRequest`
     - Response model: `UpdateTransactionResponse`
     - Follow pattern from `routers/months.py`
-  - [ ] 3.3 Add exception handlers for `TransactionNotFoundError` (404) and validation errors (400)
+  - [x] 3.3 Add exception handlers for `TransactionNotFoundError` (404) and validation errors (400)
     - Return proper HTTP status codes
     - Include descriptive error messages
-  - [ ] 3.4 Register router in `backend/app/main.py`
+  - [x] 3.4 Register router in `backend/app/main.py`
     - Import: `from app.routers import transactions`
     - Add: `app.include_router(transactions.router)`
-  - [ ] 3.5 Ensure router tests pass
+  - [x] 3.5 Ensure router tests pass
     - Run ONLY the 4 tests from 3.1
     - Verify end-to-end API flow works
 

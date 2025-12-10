@@ -300,3 +300,57 @@ class NoTransactionsFoundError(UploadError):
 
     def __init__(self) -> None:
         super().__init__("No transactions found in the uploaded file")
+
+
+class TransactionError(Exception):
+    """
+    Base exception for all transaction operation errors.
+
+    All transaction-specific exceptions inherit from this class, allowing
+    callers to catch all transaction errors with a single except clause.
+    """
+
+
+class TransactionNotFoundError(TransactionError):
+    """
+    Raised when a transaction record is not found in the database.
+
+    Parameters
+    ----------
+    transaction_id : int
+        The ID of the transaction that was not found.
+
+    Attributes
+    ----------
+    transaction_id : int
+        The transaction ID for programmatic access.
+    """
+
+    def __init__(self, transaction_id: int) -> None:
+        self.transaction_id = transaction_id
+        super().__init__(f"Transaction with id={transaction_id} not found")
+
+
+class InvalidSubcategoryError(TransactionError):
+    """
+    Raised when subcategory is invalid for the given MoneyMapType.
+
+    Parameters
+    ----------
+    money_map_type : str
+        The Money Map type that was specified.
+    subcategory : str
+        The invalid subcategory value.
+
+    Attributes
+    ----------
+    money_map_type : str
+        The type for programmatic access.
+    subcategory : str
+        The invalid subcategory for programmatic access.
+    """
+
+    def __init__(self, money_map_type: str, subcategory: str) -> None:
+        self.money_map_type = money_map_type
+        self.subcategory = subcategory
+        super().__init__(f"Invalid subcategory '{subcategory}' for type {money_map_type}")
