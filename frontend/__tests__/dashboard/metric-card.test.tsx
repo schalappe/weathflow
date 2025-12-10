@@ -58,4 +58,49 @@ describe("MetricCard", () => {
 
     expect(screen.getByLabelText("Threshold exceeded")).toBeInTheDocument();
   });
+
+  it("shows Savings indicator when compound is positive", () => {
+    render(
+      <MetricCard
+        title="Compound"
+        amount={500}
+        percentage={20}
+        isSuccess={true}
+        colorClass="border-l-amber-500"
+        compoundDirection="positive"
+      />,
+    );
+
+    expect(screen.getByText("Savings")).toBeInTheDocument();
+  });
+
+  it("shows Withdrawal indicator when compound is negative", () => {
+    render(
+      <MetricCard
+        title="Compound"
+        amount={1082}
+        percentage={-75.3}
+        isSuccess={false}
+        colorClass="border-l-amber-500"
+        compoundDirection="negative"
+      />,
+    );
+
+    expect(screen.getByText("Withdrawal")).toBeInTheDocument();
+  });
+
+  it("does not show direction indicator for non-Compound categories", () => {
+    render(
+      <MetricCard
+        title="Core"
+        amount={1200}
+        percentage={48.5}
+        isSuccess={true}
+        colorClass="border-l-violet-500"
+      />,
+    );
+
+    expect(screen.queryByText("Savings")).not.toBeInTheDocument();
+    expect(screen.queryByText("Withdrawal")).not.toBeInTheDocument();
+  });
 });

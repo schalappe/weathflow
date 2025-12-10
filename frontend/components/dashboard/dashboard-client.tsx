@@ -306,6 +306,11 @@ export function DashboardClient() {
                     state.monthDetail.month.compound_percentage,
                   )}
                   colorClass={CATEGORY_TAILWIND.COMPOUND}
+                  compoundDirection={
+                    state.monthDetail.month.total_compound >= 0
+                      ? "positive"
+                      : "negative"
+                  }
                 />
               </div>
 
