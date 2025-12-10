@@ -123,6 +123,9 @@ def update_transaction_category(
         transaction.money_map_subcategory = validated_subcategory
         transaction.is_manually_corrected = True
 
+        # ##>: Flush transaction changes so aggregation query sees updated values.
+        db.flush()
+
         # ##>: Recalculate month stats using existing service.
         updated_month = calculate_and_update_month(db, transaction.month_id)
 
