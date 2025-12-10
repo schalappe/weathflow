@@ -97,8 +97,8 @@ class TestUpdateTransactionEndpoint:
 
         assert response.status_code == 422
 
-    def test_invalid_subcategory_returns_400(self, client: TestClient, db_session: Session) -> None:
-        """Invalid subcategory for type returns 400 error."""
+    def test_invalid_subcategory_returns_422(self, client: TestClient, db_session: Session) -> None:
+        """Invalid subcategory for type returns 422 validation error."""
         _, transaction = _create_month_with_transaction(db_session)
 
         response = client.patch(
@@ -109,9 +109,10 @@ class TestUpdateTransactionEndpoint:
             },
         )
 
-        assert response.status_code == 400
+        # ##>: Pydantic model validation returns 422 (FastAPI convention for validation errors).
+        assert response.status_code == 422
         data = response.json()
-        assert "Invalid subcategory" in data["detail"]
+        assert "Invalid subcategory" in str(data["detail"])
 
     def test_response_includes_recalculated_month_stats(self, client: TestClient, db_session: Session) -> None:
         """Response includes updated month statistics after recalculation."""

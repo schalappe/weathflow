@@ -11,7 +11,12 @@ from app.db.models.transaction import Transaction
 from app.responses.months import MonthSummary, TransactionResponse
 from app.responses.transactions import UpdateTransactionRequest, UpdateTransactionResponse
 from app.services import transactions as transactions_service
-from app.services.exceptions import InvalidSubcategoryError, TransactionNotFoundError
+from app.services.exceptions import (
+    InvalidSubcategoryError,
+    MonthNotFoundError,
+    ScoreCalculationError,
+    TransactionNotFoundError,
+)
 
 # ruff: noqa: B008
 
@@ -83,6 +88,20 @@ def update_transaction(
         raise HTTPException(
             status_code=400,
             detail=f"Invalid subcategory '{error.subcategory}' for type {error.money_map_type}.",
+        ) from error
+    except MonthNotFoundError as error:
+        # ##>: Database inconsistency - transaction exists but its month does not.
+        logger.error("Month not found during recalculation: month_id=%d", error.month_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to recalculate month statistics. Please contact support.",
+        ) from error
+    except ScoreCalculationError as error:
+        # ##>: Catch all calculator errors (TransactionAggregationError, ScorePersistenceError).
+        logger.exception("Score calculation failed for transaction %d: %s", transaction_id, error)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to recalculate month statistics. Please try again.",
         ) from error
     except Exception as error:
         logger.exception(

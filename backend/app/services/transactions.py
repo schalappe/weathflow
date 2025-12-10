@@ -118,20 +118,24 @@ def update_transaction_category(
     # ##>: Validate and normalize subcategory before update.
     validated_subcategory = validate_subcategory(money_map_type, money_map_subcategory)
 
-    # ##>: Update transaction fields.
-    transaction.money_map_type = money_map_type.value
-    transaction.money_map_subcategory = validated_subcategory
-    transaction.is_manually_corrected = True
+    try:
+        transaction.money_map_type = money_map_type.value
+        transaction.money_map_subcategory = validated_subcategory
+        transaction.is_manually_corrected = True
 
-    # ##>: Recalculate month stats using existing service.
-    updated_month = calculate_and_update_month(db, transaction.month_id)
+        # ##>: Recalculate month stats using existing service.
+        updated_month = calculate_and_update_month(db, transaction.month_id)
 
-    logger.info(
-        "Updated transaction %d: type=%s, subcategory=%s, month_id=%d",
-        transaction_id,
-        money_map_type.value,
-        validated_subcategory,
-        transaction.month_id,
-    )
+        logger.info(
+            "Updated transaction %d: type=%s, subcategory=%s, month_id=%d",
+            transaction_id,
+            money_map_type.value,
+            validated_subcategory,
+            transaction.month_id,
+        )
 
-    return transaction, updated_month
+        return transaction, updated_month
+    except Exception:
+        # ##>: Rollback on any failure to maintain session consistency.
+        db.rollback()
+        raise
