@@ -439,7 +439,9 @@ export function DashboardClient() {
           )}
 
         {/* Transaction Edit Modal */}
+        {/* [>]: Key resets modal state when switching between transactions. */}
         <TransactionEditModal
+          key={state.editingTransaction?.id ?? "closed"}
           transaction={state.editingTransaction}
           isOpen={state.editingTransaction !== null}
           onClose={handleCloseModal}

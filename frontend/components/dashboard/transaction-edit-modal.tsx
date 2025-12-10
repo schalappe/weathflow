@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -45,18 +45,13 @@ export function TransactionEditModal({
   isSaving,
   error,
 }: TransactionEditModalProps) {
-  const [selectedType, setSelectedType] = useState<MoneyMapType | null>(null);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(
-    null,
+  // [>]: State initialized from transaction prop; parent uses key prop to reset on transaction change.
+  const [selectedType, setSelectedType] = useState<MoneyMapType | null>(
+    transaction?.money_map_type ?? null,
   );
-
-  // [>]: Sync form state when transaction prop changes.
-  useEffect(() => {
-    if (transaction) {
-      setSelectedType(transaction.money_map_type);
-      setSelectedSubcategory(transaction.money_map_subcategory);
-    }
-  }, [transaction]);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(
+    transaction?.money_map_subcategory ?? null,
+  );
 
   const handleTypeChange = useCallback((value: string) => {
     const newType = value as MoneyMapType;
