@@ -2,14 +2,12 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ImportPageClient } from "@/components/import/import-page-client";
 import { FileDropzone } from "@/components/import/file-dropzone";
-import { MonthPreviewTable } from "@/components/import/month-preview-table";
 import * as apiClient from "@/lib/api-client";
 import {
   formatCurrency,
   formatMonthKey,
   formatMonthDisplay,
 } from "@/lib/utils";
-import type { MonthSummaryResponse } from "@/types";
 
 vi.mock("@/lib/api-client", () => ({
   uploadCSV: vi.fn(),

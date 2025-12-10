@@ -219,7 +219,7 @@ export function ImportPageClient() {
           Import Transactions
         </h1>
         <p className="text-muted-foreground">
-          Upload your Bankin' CSV export to categorize transactions
+          Upload your Bankin`&apos;` CSV export to categorize transactions
         </p>
       </div>
 
