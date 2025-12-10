@@ -110,3 +110,11 @@ export function formatTransactionDate(dateString: string): string {
   const month = (date.getMonth() + 1).toString().padStart(2, "0");
   return `${day}/${month}`;
 }
+
+// [>]: Extract error message from unknown error, with fallback.
+export function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+// [>]: Pagination constants.
+export const TRANSACTIONS_PER_PAGE = 50;
