@@ -94,9 +94,17 @@ export function TransactionTable({
                   <TableCell>
                     {tx.money_map_type && (
                       <Badge
-                        className={
-                          CATEGORY_BADGE_CLASSES[tx.money_map_type] || ""
-                        }
+                        className={(() => {
+                          const badgeClass =
+                            CATEGORY_BADGE_CLASSES[tx.money_map_type];
+                          // [!]: Log unknown category types for debugging.
+                          if (!badgeClass) {
+                            console.warn(
+                              `[TransactionTable] Unknown category type: ${tx.money_map_type}`,
+                            );
+                          }
+                          return badgeClass || "bg-slate-400 text-white";
+                        })()}
                       >
                         {tx.money_map_type}
                       </Badge>

@@ -12,7 +12,12 @@ interface ScoreCardProps {
 }
 
 export function ScoreCard({ score, scoreLabel, monthDisplay }: ScoreCardProps) {
-  const scoreColor = SCORE_COLORS[score] || "bg-gray-500";
+  const scoreColor = SCORE_COLORS[score];
+  // [!]: Log unexpected score values for debugging.
+  if (!scoreColor) {
+    console.warn(`[ScoreCard] Unexpected score value: ${score}. Expected 0-3.`);
+  }
+  const finalColor = scoreColor || "bg-gray-500";
 
   return (
     <Card className="w-full">
@@ -21,7 +26,7 @@ export function ScoreCard({ score, scoreLabel, monthDisplay }: ScoreCardProps) {
         <div className="flex items-center gap-3">
           <span className="text-lg font-medium">Score: {score}/3</span>
           {scoreLabel && (
-            <Badge className={cn(scoreColor, "text-white")}>{scoreLabel}</Badge>
+            <Badge className={cn(finalColor, "text-white")}>{scoreLabel}</Badge>
           )}
         </div>
       </CardContent>

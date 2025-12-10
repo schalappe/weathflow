@@ -105,27 +105,39 @@ function dashboardReducer(
 export function DashboardClient() {
   const [state, dispatch] = useReducer(dashboardReducer, initialState);
 
-  // [>]: Fetch months list on mount.
+  // [>]: Fetch months list on mount with cleanup to prevent state updates after unmount.
   useEffect(() => {
+    let isMounted = true;
+
     async function loadMonths() {
       try {
         const response = await getMonthsList();
-        dispatch({ type: "MONTHS_LOADED", payload: response.months });
+        if (isMounted) {
+          dispatch({ type: "MONTHS_LOADED", payload: response.months });
+        }
       } catch (error) {
-        dispatch({
-          type: "LOAD_ERROR",
-          payload: getErrorMessage(error, "Failed to load months"),
-        });
+        if (isMounted) {
+          dispatch({
+            type: "LOAD_ERROR",
+            payload: getErrorMessage(error, "Failed to load months"),
+          });
+        }
       }
     }
 
     if (state.pageState === "loading" && state.monthsList.length === 0) {
       loadMonths();
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [state.pageState, state.monthsList.length]);
 
-  // [>]: Fetch month detail when selectedMonth or currentPage changes.
+  // [>]: Fetch month detail when selectedMonth or currentPage changes with cleanup.
   useEffect(() => {
+    let isMounted = true;
+
     async function loadMonthDetail() {
       if (!state.selectedMonth) return;
 
@@ -136,18 +148,26 @@ export function DashboardClient() {
           state.currentPage,
           TRANSACTIONS_PER_PAGE,
         );
-        dispatch({ type: "MONTH_DETAIL_LOADED", payload: response });
+        if (isMounted) {
+          dispatch({ type: "MONTH_DETAIL_LOADED", payload: response });
+        }
       } catch (error) {
-        dispatch({
-          type: "LOAD_ERROR",
-          payload: getErrorMessage(error, "Failed to load month data"),
-        });
+        if (isMounted) {
+          dispatch({
+            type: "LOAD_ERROR",
+            payload: getErrorMessage(error, "Failed to load month data"),
+          });
+        }
       }
     }
 
     if (state.selectedMonth && state.pageState === "loading") {
       loadMonthDetail();
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [state.selectedMonth, state.currentPage, state.pageState]);
 
   // [>]: Handle month change from selector.

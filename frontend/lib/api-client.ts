@@ -8,6 +8,19 @@ import type {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// [>]: Safely parse JSON from response, with user-friendly error on failure.
+async function safeParseJson<T>(response: Response): Promise<T> {
+  try {
+    return await response.json();
+  } catch (parseError) {
+    console.error(
+      `[safeParseJson] Failed to parse response from ${response.url}:`,
+      parseError,
+    );
+    throw new Error("Server returned an invalid response. Please try again.");
+  }
+}
+
 // [>]: Extract error message from response, handling non-JSON responses gracefully.
 async function extractErrorMessage(
   response: Response,
@@ -52,7 +65,7 @@ export async function uploadCSV(file: File): Promise<UploadResponse> {
     throw new Error(message);
   }
 
-  return response.json();
+  return safeParseJson<UploadResponse>(response);
 }
 
 export async function categorize(
@@ -98,7 +111,7 @@ export async function categorize(
     throw new Error(message);
   }
 
-  return response.json();
+  return safeParseJson<CategorizeResponse>(response);
 }
 
 export async function getMonthsList(): Promise<MonthsListResponse> {
@@ -123,7 +136,7 @@ export async function getMonthsList(): Promise<MonthsListResponse> {
     throw new Error(message);
   }
 
-  return response.json();
+  return safeParseJson<MonthsListResponse>(response);
 }
 
 export async function getMonthDetail(
@@ -157,5 +170,5 @@ export async function getMonthDetail(
     throw new Error(message);
   }
 
-  return response.json();
+  return safeParseJson<MonthDetailResponse>(response);
 }

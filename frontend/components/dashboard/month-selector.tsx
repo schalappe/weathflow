@@ -28,7 +28,16 @@ export function MonthSelector({
   const currentValue = formatMonthKey(selectedYear, selectedMonth);
 
   const handleValueChange = (value: string) => {
-    const [year, month] = value.split("-").map(Number);
+    const parts = value.split("-");
+    const year = Number(parts[0]);
+    const month = Number(parts[1]);
+
+    // [!]: Guard against malformed values propagating NaN to parent.
+    if (isNaN(year) || isNaN(month) || year < 1900 || month < 1 || month > 12) {
+      console.error(`[MonthSelector] Invalid month value format: "${value}"`);
+      return;
+    }
+
     onMonthChange(year, month);
   };
 

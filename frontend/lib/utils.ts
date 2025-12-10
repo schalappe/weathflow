@@ -1,6 +1,8 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { MoneyMapType } from "@/types";
 
+// [>]: Merge Tailwind classes with clsx for conditional styling.
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -58,8 +60,8 @@ export const SCORE_COLORS: Record<number, string> = {
   3: "bg-green-500",
 };
 
-// [>]: Category colors for pie chart (hex) and metric card accents (Tailwind border classes).
-export const CATEGORY_COLORS: Record<string, string> = {
+// [>]: Category colors for pie chart (hex) - typed with MoneyMapType for compile-time safety.
+export const CATEGORY_COLORS: Record<MoneyMapType, string> = {
   INCOME: "#3b82f6",
   CORE: "#8b5cf6",
   CHOICE: "#f59e0b",
@@ -67,7 +69,8 @@ export const CATEGORY_COLORS: Record<string, string> = {
   EXCLUDED: "#6b7280",
 };
 
-export const CATEGORY_TAILWIND: Record<string, string> = {
+// [>]: Metric card accent Tailwind border classes.
+export const CATEGORY_TAILWIND: Record<MoneyMapType, string> = {
   INCOME: "border-l-blue-500",
   CORE: "border-l-violet-500",
   CHOICE: "border-l-amber-500",
@@ -76,7 +79,7 @@ export const CATEGORY_TAILWIND: Record<string, string> = {
 };
 
 // [>]: Badge colors for transaction categories.
-export const CATEGORY_BADGE_CLASSES: Record<string, string> = {
+export const CATEGORY_BADGE_CLASSES: Record<MoneyMapType, string> = {
   INCOME: "bg-blue-500 text-white",
   CORE: "bg-violet-500 text-white",
   CHOICE: "bg-amber-500 text-white",
@@ -104,6 +107,10 @@ export function meetsThreshold(
 export function formatTransactionDate(dateString: string): string {
   const date = new Date(dateString);
   if (isNaN(date.getTime())) {
+    // [!]: Log invalid dates for debugging data quality issues.
+    console.warn(
+      `[formatTransactionDate] Invalid date string: "${dateString}"`,
+    );
     return "--/--";
   }
   const day = date.getDate().toString().padStart(2, "0");
