@@ -18,8 +18,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
 parts/
 sdist/
 var/
@@ -209,6 +207,7 @@ bun.lockb
 *.sqlite3
 *.db
 *.csv
+*.json
 *.jsonl
 *.parquet
 *.h5

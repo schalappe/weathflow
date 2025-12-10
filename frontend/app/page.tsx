@@ -1,5 +1,10 @@
-import { redirect } from "next/navigation";
+import { DashboardClient } from "@/components/dashboard/dashboard-client";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 export default function Home() {
-  redirect("/import");
+  return (
+    <ErrorBoundary>
+      <DashboardClient />
+    </ErrorBoundary>
+  );
 }

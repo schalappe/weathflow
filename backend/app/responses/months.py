@@ -22,9 +22,10 @@ class MonthSummary(BaseModel):
     total_core: float
     total_choice: float
     total_compound: float
-    core_percentage: float = Field(ge=0, le=100)
-    choice_percentage: float = Field(ge=0, le=100)
-    compound_percentage: float = Field(ge=0, le=100)
+    # [>]: No constraints on percentages — real financial data can exceed 100% (overspending) or be negative (debt).
+    core_percentage: float
+    choice_percentage: float
+    compound_percentage: float
     score: int = Field(ge=0, le=3)
     score_label: ScoreLabelLiteral | None
     transaction_count: int = Field(ge=0)
