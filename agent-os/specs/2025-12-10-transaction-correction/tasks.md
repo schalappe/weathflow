@@ -253,8 +253,8 @@ Primary Stack: FastAPI (Python) + Next.js (TypeScript)
 
 **Dependencies:** Task Groups 1-8
 
-- [ ] 9.0 Review existing tests and fill critical gaps
-  - [ ] 9.1 Review tests from all task groups
+- [x] 9.0 Review existing tests and fill critical gaps
+  - [x] 9.1 Review tests from all task groups
     - Backend validation tests (3 from 1.1)
     - Backend service tests (4 from 2.1)
     - Backend router tests (4 from 3.1)
@@ -262,18 +262,18 @@ Primary Stack: FastAPI (Python) + Next.js (TypeScript)
     - Frontend table tests (2 from 7.1)
     - Frontend integration tests (3 from 8.1)
     - Total existing: ~20 tests
-  - [ ] 9.2 Identify critical coverage gaps
+  - [x] 9.2 Identify critical coverage gaps
     - Focus on end-to-end user workflows
     - Check integration points between frontend and backend
     - Verify error scenarios are covered
-  - [ ] 9.3 Write up to 6 additional strategic tests
+  - [x] 9.3 Write up to 6 additional strategic tests
     - End-to-end: Complete correction flow from click to updated score
     - Edge case: Correction with EXCLUDED type (no subcategory)
     - Edge case: Changing from one type to another
     - Concurrent edit handling (if applicable)
     - Network error recovery
     - Score recalculation accuracy verification
-  - [ ] 9.4 Run feature-specific tests only
+  - [x] 9.4 Run feature-specific tests only
     - Run all tests related to transaction correction
     - Expected total: ~26 tests
     - Verify all critical workflows pass

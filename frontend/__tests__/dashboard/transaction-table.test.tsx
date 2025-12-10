@@ -28,6 +28,19 @@ const mockTransactions: TransactionResponse[] = [
     money_map_subcategory: "Food",
     is_manually_corrected: false,
   },
+  // [>]: Add manually corrected transaction for indicator tests.
+  {
+    id: 3,
+    date: "2025-10-17",
+    description: "Corrected expense",
+    account: "Main Account",
+    amount: -50,
+    bankin_category: "Shopping",
+    bankin_subcategory: "Misc",
+    money_map_type: "CHOICE",
+    money_map_subcategory: "Entertainment",
+    is_manually_corrected: true,
+  },
 ];
 
 const mockPagination: PaginationInfo = {
@@ -111,5 +124,121 @@ describe("TransactionTable", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(onPageChange).toHaveBeenCalledWith(2);
+  });
+
+  describe("row click behavior", () => {
+    it("calls onTransactionClick with transaction data when row is clicked", () => {
+      const onTransactionClick = vi.fn();
+      render(
+        <TransactionTable
+          transactions={mockTransactions}
+          pagination={mockPagination}
+          onPageChange={vi.fn()}
+          onTransactionClick={onTransactionClick}
+          isLoading={false}
+        />,
+      );
+
+      // [>]: Click the row containing "Grocery shopping".
+      const groceryRow = screen.getByText("Grocery shopping").closest("tr");
+      fireEvent.click(groceryRow!);
+
+      expect(onTransactionClick).toHaveBeenCalledTimes(1);
+      expect(onTransactionClick).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 2,
+          description: "Grocery shopping",
+          amount: -85.5,
+        }),
+      );
+    });
+
+    it("calls handler with correct transaction when multiple rows exist", () => {
+      const onTransactionClick = vi.fn();
+      render(
+        <TransactionTable
+          transactions={mockTransactions}
+          pagination={mockPagination}
+          onPageChange={vi.fn()}
+          onTransactionClick={onTransactionClick}
+          isLoading={false}
+        />,
+      );
+
+      // [>]: Click different rows and verify correct transaction is passed.
+      const salaryRow = screen.getByText("Salary payment").closest("tr");
+      fireEvent.click(salaryRow!);
+      expect(onTransactionClick).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: 1 }),
+      );
+
+      const correctedRow = screen.getByText("Corrected expense").closest("tr");
+      fireEvent.click(correctedRow!);
+      expect(onTransactionClick).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: 3, is_manually_corrected: true }),
+      );
+    });
+  });
+
+  describe("manually corrected indicator", () => {
+    it("displays pencil icon for manually corrected transactions", () => {
+      render(
+        <TransactionTable
+          transactions={mockTransactions}
+          pagination={mockPagination}
+          onPageChange={vi.fn()}
+          onTransactionClick={vi.fn()}
+          isLoading={false}
+        />,
+      );
+
+      // [>]: The corrected row should contain the pencil icon (SVG with lucide class).
+      const correctedCell = screen.getByText("Corrected expense").closest("td");
+      const pencilIcon = correctedCell?.querySelector("svg");
+
+      expect(pencilIcon).toBeInTheDocument();
+      expect(pencilIcon).toHaveClass("h-3", "w-3");
+    });
+
+    it("does not display pencil icon for non-corrected transactions", () => {
+      render(
+        <TransactionTable
+          transactions={mockTransactions}
+          pagination={mockPagination}
+          onPageChange={vi.fn()}
+          onTransactionClick={vi.fn()}
+          isLoading={false}
+        />,
+      );
+
+      // [>]: Non-corrected rows should not have pencil icons.
+      const salaryCell = screen.getByText("Salary payment").closest("td");
+      const pencilIcon = salaryCell?.querySelector("svg");
+
+      expect(pencilIcon).not.toBeInTheDocument();
+    });
+  });
+
+  describe("tooltip accessibility", () => {
+    it("has accessible tooltip trigger for manually corrected indicator", () => {
+      render(
+        <TransactionTable
+          transactions={mockTransactions}
+          pagination={mockPagination}
+          onPageChange={vi.fn()}
+          onTransactionClick={vi.fn()}
+          isLoading={false}
+        />,
+      );
+
+      // [>]: Find the tooltip trigger wrapper (the button/span wrapping the icon).
+      const correctedCell = screen.getByText("Corrected expense").closest("td");
+      const tooltipTrigger = correctedCell?.querySelector(
+        "[data-slot='tooltip-trigger']",
+      );
+
+      // [>]: Verify tooltip trigger exists and is properly structured.
+      expect(tooltipTrigger).toBeInTheDocument();
+    });
   });
 });
