@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 @router.patch("/{transaction_id}", response_model=UpdateTransactionResponse)
 def update_transaction(
+    request: UpdateTransactionRequest,
     transaction_id: int = Path(..., ge=1, description="Transaction ID"),
-    request: UpdateTransactionRequest = ...,
     db: Session = Depends(get_db),
 ) -> UpdateTransactionResponse:
     """

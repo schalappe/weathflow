@@ -26,7 +26,7 @@ class TestUpdateTransactionRequest:
 
         with pytest.raises(ValidationError) as exc_info:
             UpdateTransactionRequest(
-                money_map_type="INVALID_TYPE",
+                money_map_type="INVALID_TYPE",  # type: ignore[arg-type]
                 money_map_subcategory=None,
             )
 
