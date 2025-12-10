@@ -207,6 +207,7 @@ bun.lockb
 *.sqlite3
 *.db
 *.csv
+*.json
 *.jsonl
 *.parquet
 *.h5
