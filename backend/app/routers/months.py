@@ -5,10 +5,12 @@ from datetime import date
 from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db.enums import MoneyMapType
+from app.responses.history import HistoryResponse, MonthHistory
 from app.responses.months import (
     MonthDetailResponse,
     MonthsListResponse,
@@ -74,6 +76,67 @@ def list_months(db: Session = Depends(get_db)) -> MonthsListResponse:
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
     except Exception as error:
         logger.exception("Unexpected error in list_months: error_type=%s", type(error).__name__)
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
+
+
+@router.get("/months/history", response_model=HistoryResponse)
+def get_history(
+    months: int = Query(12, ge=1, le=24, description="Number of months to retrieve (1-24)"),
+    db: Session = Depends(get_db),
+) -> HistoryResponse:
+    """
+    Get historical data for score trend analysis.
+
+    Returns monthly data in chronological order (oldest first) with summary statistics
+    including score trend, average score, and best/worst months.
+
+    Parameters
+    ----------
+    months : int
+        Number of months to retrieve (default: 12, max: 24).
+
+    Returns
+    -------
+    HistoryResponse
+        List of months and summary statistics.
+
+    Raises
+    ------
+    HTTPException 503
+        If database is temporarily unavailable.
+    """
+    try:
+        month_records = months_service.get_months_history(db, months)
+
+        # ##>: Build response models with explicit error handling per record.
+        month_list: list[MonthHistory] = []
+        for record in month_records:
+            try:
+                month_list.append(MonthHistory.from_model(record))
+            except ValidationError as ve:
+                logger.error(
+                    "Data integrity error for month %d-%02d (id=%d): %s",
+                    record.year,
+                    record.month,
+                    record.id,
+                    str(ve),
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Data integrity error for {record.year}-{record.month:02d}. Please contact support.",
+                ) from ve
+
+        summary = months_service.calculate_history_summary(month_records)
+
+        return HistoryResponse(months=month_list, summary=summary)
+    except HTTPException:
+        # ##>: Re-raise HTTPException (from ValidationError handling) without wrapping.
+        raise
+    except MonthDataError as error:
+        logger.exception("Database error in get_history")
+        raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
+    except Exception as error:
+        logger.exception("Unexpected error in get_history: error_type=%s", type(error).__name__)
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
