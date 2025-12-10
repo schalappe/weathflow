@@ -47,12 +47,13 @@ describe("Additional Strategic Tests", () => {
     const emptyFile = new File([""], "empty.csv", { type: "text/csv" });
     fireEvent.change(input, { target: { files: [emptyFile] } });
 
+    // [>]: Error shows in both Alert and FileDropzone, use getAllByText.
     await waitFor(() => {
       expect(
-        screen.getByText(
+        screen.getAllByText(
           /csv file is empty or contains no valid transactions/i,
-        ),
-      ).toBeInTheDocument();
+        ).length,
+      ).toBeGreaterThan(0);
     });
   });
 
@@ -69,10 +70,11 @@ describe("Additional Strategic Tests", () => {
     const csvFile = new File(["content"], "test.csv", { type: "text/csv" });
     fireEvent.change(input, { target: { files: [csvFile] } });
 
+    // [>]: Error shows in both Alert and FileDropzone, use getAllByText.
     await waitFor(() => {
       expect(
-        screen.getByText(/unable to connect to server/i),
-      ).toBeInTheDocument();
+        screen.getAllByText(/unable to connect to server/i).length,
+      ).toBeGreaterThan(0);
     });
 
     // [>]: Should show retry button.
@@ -152,9 +154,11 @@ describe("Additional Strategic Tests", () => {
 
   it("dropzone shows file type validation error for non-CSV", () => {
     const onFileSelected = vi.fn();
+    const onValidationError = vi.fn();
     render(
       <FileDropzone
         onFileSelected={onFileSelected}
+        onValidationError={onValidationError}
         file={null}
         isDisabled={false}
         error="Only CSV files are accepted"

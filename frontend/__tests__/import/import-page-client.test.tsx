@@ -38,12 +38,10 @@ const mockCategorizeResponse = {
       year: 2025,
       month: 1,
       transactions_categorized: 89,
+      transactions_skipped: 0,
       low_confidence_count: 3,
       score: 3,
       score_label: "Great" as const,
-      core_percentage: 45,
-      choice_percentage: 25,
-      compound_percentage: 30,
     },
   ],
   months_not_found: [],
@@ -125,9 +123,9 @@ describe("ImportPageClient", () => {
     const csvFile = new File(["content"], "test.csv", { type: "text/csv" });
     fireEvent.change(input, { target: { files: [csvFile] } });
 
-    // [>]: Wait for error state.
+    // [>]: Error shows in both Alert and FileDropzone, use getAllByText.
     await waitFor(() => {
-      expect(screen.getByText(/network error/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/network error/i).length).toBeGreaterThan(0);
     });
 
     // [>]: Should show Try Again button.
@@ -173,5 +171,42 @@ describe("ImportPageClient", () => {
     await waitFor(() => {
       expect(screen.getByText(/drag your csv file here/i)).toBeInTheDocument();
     });
+  });
+
+  it("categorization API error displays error with retry option", async () => {
+    vi.mocked(apiClient.uploadCSV).mockResolvedValue(mockUploadResponse);
+    vi.mocked(apiClient.categorize).mockRejectedValue(
+      new Error("Claude API rate limit exceeded"),
+    );
+
+    render(<ImportPageClient />);
+
+    // [>]: Upload file first.
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    const csvFile = new File(["content"], "test.csv", { type: "text/csv" });
+    fireEvent.change(input, { target: { files: [csvFile] } });
+
+    // [>]: Wait for preview state.
+    await waitFor(() => {
+      expect(screen.getByText("Jan 2025")).toBeInTheDocument();
+    });
+
+    // [>]: Click categorize button.
+    fireEvent.click(
+      screen.getByRole("button", { name: /categorize selected months/i }),
+    );
+
+    // [>]: Error shows in both Alert and FileDropzone, use getAllByText.
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(/claude api rate limit exceeded/i).length,
+      ).toBeGreaterThan(0);
+    });
+
+    expect(
+      screen.getByRole("button", { name: /try again/i }),
+    ).toBeInTheDocument();
   });
 });

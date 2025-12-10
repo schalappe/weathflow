@@ -8,23 +8,19 @@ const mockResults: MonthResult[] = [
     year: 2025,
     month: 1,
     transactions_categorized: 89,
+    transactions_skipped: 0,
     low_confidence_count: 3,
     score: 3,
     score_label: "Great",
-    core_percentage: 45,
-    choice_percentage: 25,
-    compound_percentage: 30,
   },
   {
     year: 2025,
     month: 2,
     transactions_categorized: 76,
+    transactions_skipped: 0,
     low_confidence_count: 0,
     score: 1,
     score_label: "Need Improvement",
-    core_percentage: 60,
-    choice_percentage: 35,
-    compound_percentage: 5,
   },
 ];
 
@@ -81,5 +77,60 @@ describe("ResultsSummary", () => {
       name: /view transactions/i,
     });
     expect(viewButton).toBeDisabled();
+  });
+
+  it("displays warning when monthsNotFound contains items", () => {
+    render(
+      <ResultsSummary
+        results={mockResults}
+        monthsNotFound={["2024-11", "2024-12"]}
+        totalApiCalls={5}
+        onFinish={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText(/some months were not found in the csv/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("2024-11, 2024-12")).toBeInTheDocument();
+  });
+
+  it("displays low confidence count when greater than zero", () => {
+    render(
+      <ResultsSummary
+        results={mockResults}
+        monthsNotFound={[]}
+        totalApiCalls={5}
+        onFinish={vi.fn()}
+      />,
+    );
+
+    // [>]: Jan 2025 has 3 low confidence transactions.
+    expect(screen.getByText(/3 low confidence/i)).toBeInTheDocument();
+  });
+
+  it("displays skipped transactions warning when greater than zero", () => {
+    const resultsWithSkipped: MonthResult[] = [
+      {
+        year: 2025,
+        month: 1,
+        transactions_categorized: 87,
+        transactions_skipped: 2,
+        low_confidence_count: 0,
+        score: 3,
+        score_label: "Great",
+      },
+    ];
+
+    render(
+      <ResultsSummary
+        results={resultsWithSkipped}
+        monthsNotFound={[]}
+        totalApiCalls={2}
+        onFinish={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/2 skipped/i)).toBeInTheDocument();
   });
 });

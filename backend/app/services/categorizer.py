@@ -269,9 +269,21 @@ class TransactionCategorizer:
             raise APIConnectionError(retry_count=self.MAX_RETRIES) from e
 
         # ##>: Extract text content from response. Type narrowing for mypy.
+        if not response.content:
+            logger.error(
+                "Claude API returned empty content array for batch of %d transactions",
+                len(batch),
+            )
+            raise InvalidResponseError("Claude API returned empty response content")
+
         content_block = response.content[0]
         if not hasattr(content_block, "text"):
-            raise InvalidResponseError("Response does not contain text content")
+            logger.error(
+                "Claude API returned unexpected content type: %s. Expected text block.",
+                type(content_block).__name__,
+            )
+            raise InvalidResponseError(f"Unexpected response content type: {type(content_block).__name__}")
+
         response_text: str = content_block.text
         batch_ids = [tx.id for tx in batch]
 

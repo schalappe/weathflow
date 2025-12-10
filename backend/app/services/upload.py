@@ -222,7 +222,7 @@ class UploadService:
         results, api_call_count = categorizer.categorize(inputs)
 
         # ##>: Persist transactions and calculate score.
-        inserted_count = self._persist_transactions(
+        inserted_count, skipped_count = self._persist_transactions(
             db=db,
             month_id=month_record.id,
             transactions=month_data.transactions,
@@ -241,6 +241,7 @@ class UploadService:
             "year": year,
             "month": month,
             "transactions_categorized": inserted_count,
+            "transactions_skipped": skipped_count,
             "low_confidence_count": low_confidence_count,
             "score": updated_month.score,
             "score_label": updated_month.score_label,
@@ -308,10 +309,18 @@ class UploadService:
         transactions: list[ParsedTransaction],
         results: list[CategorizationResult],
         skip_keys: set[str],
-    ) -> int:
-        """Persist categorized transactions, skipping duplicates in merge mode."""
+    ) -> tuple[int, int]:
+        """
+        Persist categorized transactions, skipping duplicates in merge mode.
+
+        Returns
+        -------
+        tuple[int, int]
+            Tuple of (inserted_count, skipped_count).
+        """
         result_by_id: dict[int, CategorizationResult] = {r.id: r for r in results}
         new_transactions = []
+        skipped_count = 0
 
         for i, t in enumerate(transactions):
             tx_key = self._generate_transaction_key(t)
@@ -322,13 +331,14 @@ class UploadService:
             result = result_by_id.get(i + 1)
             if result is None:
                 # ##!: Missing result indicates a bug in ID mapping or API response.
-                logger.warning(
+                logger.error(
                     "Missing categorization result for transaction %d (date=%s, description='%s'). "
-                    "This may indicate a bug in ID mapping or API response.",
+                    "This indicates a bug in ID mapping or API response.",
                     i + 1,
                     t.date,
                     t.description[:50],
                 )
+                skipped_count += 1
                 continue
 
             new_transactions.append(
@@ -348,4 +358,4 @@ class UploadService:
         if new_transactions:
             db.add_all(new_transactions)
 
-        return len(new_transactions)
+        return len(new_transactions), skipped_count

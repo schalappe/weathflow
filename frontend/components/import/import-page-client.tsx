@@ -41,6 +41,12 @@ function importReducer(state: ImportState, action: ImportAction): ImportState {
         error: null,
       };
 
+    case "FILE_VALIDATION_ERROR":
+      return {
+        ...state,
+        error: action.payload,
+      };
+
     case "UPLOAD_START":
       return {
         ...state,
@@ -206,6 +212,11 @@ export function ImportPageClient() {
     dispatch({ type: "RESET" });
   }, []);
 
+  // [>]: Handle file validation error (e.g., non-CSV file).
+  const handleValidationError = useCallback((message: string) => {
+    dispatch({ type: "FILE_VALIDATION_ERROR", payload: message });
+  }, []);
+
   const isProcessing =
     state.pageState === "uploading" || state.pageState === "categorizing";
   const canCategorize =
@@ -219,7 +230,7 @@ export function ImportPageClient() {
           Import Transactions
         </h1>
         <p className="text-muted-foreground">
-          Upload your Bankin`&apos;` CSV export to categorize transactions
+          Upload your Bankin&apos; CSV export to categorize transactions
         </p>
       </div>
 
@@ -240,9 +251,10 @@ export function ImportPageClient() {
       {(state.pageState === "empty" || state.pageState === "error") && (
         <FileDropzone
           onFileSelected={handleFileSelected}
+          onValidationError={handleValidationError}
           file={state.file}
           isDisabled={isProcessing}
-          error={null}
+          error={state.error}
         />
       )}
 

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 interface FileDropzoneProps {
   onFileSelected: (file: File) => void;
+  onValidationError: (message: string) => void;
   file: File | null;
   isDisabled: boolean;
   error: string | null;
@@ -13,6 +14,7 @@ interface FileDropzoneProps {
 
 export function FileDropzone({
   onFileSelected,
+  onValidationError,
   file,
   isDisabled,
   error,
@@ -24,11 +26,14 @@ export function FileDropzone({
     (selectedFile: File) => {
       // [>]: Only accept .csv files.
       if (!selectedFile.name.toLowerCase().endsWith(".csv")) {
+        onValidationError(
+          "Invalid file type. Please select a CSV file (.csv extension required).",
+        );
         return;
       }
       onFileSelected(selectedFile);
     },
-    [onFileSelected],
+    [onFileSelected, onValidationError],
   );
 
   const handleDragOver = useCallback(

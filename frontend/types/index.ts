@@ -27,13 +27,10 @@ export interface MonthResult {
   year: number;
   month: number;
   transactions_categorized: number;
+  transactions_skipped: number;
   low_confidence_count: number;
   score: number;
   score_label: ScoreLabel;
-  // [>]: Percentages come from backend MonthStats calculation.
-  core_percentage?: number;
-  choice_percentage?: number;
-  compound_percentage?: number;
 }
 
 export interface CategorizeResponse {
@@ -69,6 +66,7 @@ export interface ImportState {
 
 export type ImportAction =
   | { type: "FILE_SELECTED"; payload: File }
+  | { type: "FILE_VALIDATION_ERROR"; payload: string }
   | { type: "UPLOAD_START" }
   | { type: "UPLOAD_SUCCESS"; payload: UploadResponse }
   | { type: "UPLOAD_ERROR"; payload: string }

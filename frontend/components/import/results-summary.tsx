@@ -118,38 +118,17 @@ function MonthResultCard({ result }: { result: MonthResult }) {
       <CardContent className="space-y-3">
         <div className="text-lg font-semibold">Score: {result.score}/3</div>
 
-        {/* Percentages */}
-        {(result.core_percentage !== undefined ||
-          result.choice_percentage !== undefined ||
-          result.compound_percentage !== undefined) && (
-          <div className="grid grid-cols-3 gap-2 text-center text-sm">
-            <div className="rounded-md bg-violet-100 p-2 dark:bg-violet-900/30">
-              <p className="font-medium text-violet-700 dark:text-violet-300">
-                {result.core_percentage?.toFixed(0) ?? "-"}%
-              </p>
-              <p className="text-xs text-muted-foreground">Core</p>
-            </div>
-            <div className="rounded-md bg-amber-100 p-2 dark:bg-amber-900/30">
-              <p className="font-medium text-amber-700 dark:text-amber-300">
-                {result.choice_percentage?.toFixed(0) ?? "-"}%
-              </p>
-              <p className="text-xs text-muted-foreground">Choice</p>
-            </div>
-            <div className="rounded-md bg-emerald-100 p-2 dark:bg-emerald-900/30">
-              <p className="font-medium text-emerald-700 dark:text-emerald-300">
-                {result.compound_percentage?.toFixed(0) ?? "-"}%
-              </p>
-              <p className="text-xs text-muted-foreground">Compound</p>
-            </div>
-          </div>
-        )}
-
         {/* Stats */}
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex flex-col gap-1 text-sm text-muted-foreground">
           <span>{result.transactions_categorized} transactions</span>
           {result.low_confidence_count > 0 && (
             <span className="text-amber-600">
               {result.low_confidence_count} low confidence
+            </span>
+          )}
+          {result.transactions_skipped > 0 && (
+            <span className="text-red-600">
+              {result.transactions_skipped} skipped (categorization error)
             </span>
           )}
         </div>
