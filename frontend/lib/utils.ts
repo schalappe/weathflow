@@ -1,0 +1,112 @@
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+// [>]: Using French locale for Euro formatting with space separators.
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+export function formatMonthDisplay(year: number, month: number): string {
+  const date = new Date(year, month - 1);
+  return date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+}
+
+export function formatMonthKey(year: number, month: number): string {
+  return `${year}-${month.toString().padStart(2, "0")}`;
+}
+
+// [>]: Sort month objects chronologically by year and month (oldest first).
+export function sortMonthsChronologically<
+  T extends { year: number; month: number },
+>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+}
+
+// [>]: Get month keys from an array of month objects.
+export function getMonthKeys(
+  months: { year: number; month: number }[],
+): string[] {
+  return months.map((m) => formatMonthKey(m.year, m.month));
+}
+
+// [>]: Pluralize a word based on count.
+export function pluralize(
+  count: number,
+  singular: string,
+  plural?: string,
+): string {
+  return `${count} ${count === 1 ? singular : plural || singular + "s"}`;
+}
+
+// [>]: Score colors matching spec: Great=#22c55e, Okay=#eab308, Need Improvement=#f97316, Poor=#ef4444.
+export const SCORE_COLORS: Record<number, string> = {
+  0: "bg-red-500",
+  1: "bg-orange-500",
+  2: "bg-yellow-500",
+  3: "bg-green-500",
+};
+
+// [>]: Category colors for pie chart (hex) and metric card accents (Tailwind border classes).
+export const CATEGORY_COLORS: Record<string, string> = {
+  INCOME: "#3b82f6",
+  CORE: "#8b5cf6",
+  CHOICE: "#f59e0b",
+  COMPOUND: "#10b981",
+  EXCLUDED: "#6b7280",
+};
+
+export const CATEGORY_TAILWIND: Record<string, string> = {
+  INCOME: "border-l-blue-500",
+  CORE: "border-l-violet-500",
+  CHOICE: "border-l-amber-500",
+  COMPOUND: "border-l-emerald-500",
+  EXCLUDED: "border-l-gray-500",
+};
+
+// [>]: Badge colors for transaction categories.
+export const CATEGORY_BADGE_CLASSES: Record<string, string> = {
+  INCOME: "bg-blue-500 text-white",
+  CORE: "bg-violet-500 text-white",
+  CHOICE: "bg-amber-500 text-white",
+  COMPOUND: "bg-emerald-500 text-white",
+  EXCLUDED: "bg-gray-500 text-white",
+};
+
+// [>]: Money Map thresholds. Core/Choice must be <= target, Compound must be >= target.
+export const THRESHOLDS = {
+  CORE: 50,
+  CHOICE: 30,
+  COMPOUND: 20,
+} as const;
+
+export function meetsThreshold(
+  category: "CORE" | "CHOICE" | "COMPOUND",
+  percentage: number,
+): boolean {
+  if (category === "COMPOUND") {
+    return percentage >= THRESHOLDS.COMPOUND;
+  }
+  return percentage <= THRESHOLDS[category];
+}
+
+export function formatTransactionDate(dateString: string): string {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) {
+    return "--/--";
+  }
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  return `${day}/${month}`;
+}

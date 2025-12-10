@@ -78,3 +78,83 @@ export type ImportAction =
   | { type: "CATEGORIZE_SUCCESS"; payload: CategorizeResponse }
   | { type: "CATEGORIZE_ERROR"; payload: string }
   | { type: "RESET" };
+
+// [>]: Dashboard API response types - mirroring backend/app/responses/months.py.
+
+export type MoneyMapType =
+  | "INCOME"
+  | "CORE"
+  | "CHOICE"
+  | "COMPOUND"
+  | "EXCLUDED";
+
+export interface MonthSummary {
+  id: number;
+  year: number;
+  month: number;
+  total_income: number;
+  total_core: number;
+  total_choice: number;
+  total_compound: number;
+  core_percentage: number;
+  choice_percentage: number;
+  compound_percentage: number;
+  score: number;
+  score_label: ScoreLabel | null;
+  transaction_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TransactionResponse {
+  id: number;
+  date: string;
+  description: string;
+  account: string | null;
+  amount: number;
+  bankin_category: string | null;
+  bankin_subcategory: string | null;
+  money_map_type: MoneyMapType | null;
+  money_map_subcategory: string | null;
+  is_manually_corrected: boolean;
+}
+
+export interface PaginationInfo {
+  page: number;
+  page_size: number;
+  total_items: number;
+  total_pages: number;
+}
+
+export interface MonthsListResponse {
+  months: MonthSummary[];
+  total: number;
+}
+
+export interface MonthDetailResponse {
+  month: MonthSummary;
+  transactions: TransactionResponse[];
+  pagination: PaginationInfo;
+}
+
+// [>]: Dashboard state types for reducer pattern.
+
+export type DashboardPageState = "loading" | "loaded" | "empty" | "error";
+
+export interface DashboardState {
+  pageState: DashboardPageState;
+  monthsList: MonthSummary[];
+  selectedMonth: { year: number; month: number } | null;
+  monthDetail: MonthDetailResponse | null;
+  currentPage: number;
+  error: string | null;
+}
+
+export type DashboardAction =
+  | { type: "LOAD_START" }
+  | { type: "MONTHS_LOADED"; payload: MonthSummary[] }
+  | { type: "MONTH_DETAIL_LOADED"; payload: MonthDetailResponse }
+  | { type: "SELECT_MONTH"; payload: { year: number; month: number } }
+  | { type: "SET_PAGE"; payload: number }
+  | { type: "LOAD_ERROR"; payload: string }
+  | { type: "RETRY" };
