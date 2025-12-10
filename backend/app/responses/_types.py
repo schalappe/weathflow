@@ -7,3 +7,6 @@ ScoreLabelLiteral = Literal["Poor", "Need Improvement", "Okay", "Great"]
 
 # ##>: Valid money map types matching the MoneyMapType enum in db/enums.py.
 MoneyMapTypeLiteral = Literal["INCOME", "CORE", "CHOICE", "COMPOUND", "EXCLUDED"]
+
+# ##>: Valid score trends for historical data API.
+ScoreTrendLiteral = Literal["improving", "declining", "stable"]
