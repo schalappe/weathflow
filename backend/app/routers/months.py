@@ -5,6 +5,7 @@ from datetime import date
 from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -106,10 +107,31 @@ def get_history(
     """
     try:
         month_records = months_service.get_months_history(db, months)
-        month_list = [MonthHistory.from_model(m) for m in month_records]
+
+        # ##>: Build response models with explicit error handling per record.
+        month_list: list[MonthHistory] = []
+        for record in month_records:
+            try:
+                month_list.append(MonthHistory.from_model(record))
+            except ValidationError as ve:
+                logger.error(
+                    "Data integrity error for month %d-%02d (id=%d): %s",
+                    record.year,
+                    record.month,
+                    record.id,
+                    str(ve),
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Data integrity error for {record.year}-{record.month:02d}. Please contact support.",
+                ) from ve
+
         summary = months_service.calculate_history_summary(month_records)
 
         return HistoryResponse(months=month_list, summary=summary)
+    except HTTPException:
+        # ##>: Re-raise HTTPException (from ValidationError handling) without wrapping.
+        raise
     except MonthDataError as error:
         logger.exception("Database error in get_history")
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error

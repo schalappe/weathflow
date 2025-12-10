@@ -1,9 +1,12 @@
 """Integration tests for history API endpoint."""
 
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.db.models.month import Month
+from app.services.exceptions import MonthQueryError
 
 
 class TestGetHistoryEndpoint:
@@ -130,3 +133,43 @@ class TestGetHistoryEndpoint:
         # ##>: Worst month should be most recent with score 1 (month 3).
         assert summary["worst_month"]["month"] == 3
         assert summary["worst_month"]["score"] == 1
+
+    def test_history_returns_503_on_database_error(self, client: TestClient) -> None:
+        """Should return 503 when database query fails."""
+        with patch(
+            "app.services.months.get_months_history",
+            side_effect=MonthQueryError("Connection refused"),
+        ):
+            response = client.get("/api/months/history")
+
+        assert response.status_code == 503
+        assert "Database temporarily unavailable" in response.json()["detail"]
+
+    def test_history_min_limit_1(self, client: TestClient) -> None:
+        """Should return 422 when months < 1."""
+        response = client.get("/api/months/history", params={"months": 0})
+
+        assert response.status_code == 422
+
+    def test_history_cross_year_boundary_order(self, client: TestClient, db_session: Session) -> None:
+        """Should correctly order months spanning year boundary."""
+        # ##>: Create months in non-chronological order across year boundary.
+        month_dec = Month(year=2024, month=12, score=2, score_label="Okay")
+        month_jan = Month(year=2025, month=1, score=3, score_label="Great")
+        month_feb = Month(year=2025, month=2, score=1, score_label="Need Improvement")
+        db_session.add_all([month_jan, month_dec, month_feb])  # Add out of order
+        db_session.commit()
+
+        response = client.get("/api/months/history", params={"months": 12})
+
+        assert response.status_code == 200
+        data = response.json()
+        months = data["months"]
+
+        # ##>: Should be: Dec 2024, Jan 2025, Feb 2025.
+        assert months[0]["year"] == 2024
+        assert months[0]["month"] == 12
+        assert months[1]["year"] == 2025
+        assert months[1]["month"] == 1
+        assert months[2]["year"] == 2025
+        assert months[2]["month"] == 2

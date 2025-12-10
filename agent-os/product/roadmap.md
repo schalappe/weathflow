@@ -18,7 +18,7 @@
 
 9. [x] Transaction Correction — Add inline editing capability to change transaction categories with automatic score recalculation when corrections are made `M`
 
-10. [ ] Historical Data API — Extend the months API to return aggregated history for the last N months with score and percentage trends `S`
+10. [x] Historical Data API — Extend the months API to return aggregated history for the last N months with score and percentage trends `S`
 
 11. [ ] Score Evolution Chart — Build a line chart component showing score progression over time using Recharts `S`
 

@@ -1,7 +1,12 @@
 """Tests for history service functions."""
 
+from unittest.mock import patch
+
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.db.models.month import Month
 from app.services import months as months_service
+from app.services.exceptions import MonthQueryError
 from tests.conftest import DatabaseTestCase
 
 
@@ -44,6 +49,32 @@ class TestGetMonthsHistory(DatabaseTestCase):
         result = months_service.get_months_history(self.session, limit=12)
 
         self.assertEqual(result, [])
+
+    def test_raises_month_query_error_on_database_failure(self) -> None:
+        """Should wrap SQLAlchemyError as MonthQueryError."""
+        with patch.object(self.session, "query", side_effect=SQLAlchemyError("Connection refused")):
+            with self.assertRaises(MonthQueryError) as context:
+                months_service.get_months_history(self.session, limit=12)
+
+            self.assertIn("Connection refused", str(context.exception))
+
+    def test_returns_months_sorted_across_year_boundary(self) -> None:
+        """Should correctly order months spanning year boundary."""
+        month_dec = Month(year=2024, month=12, score=2, score_label="Okay")
+        month_jan = Month(year=2025, month=1, score=3, score_label="Great")
+        month_feb = Month(year=2025, month=2, score=1, score_label="Need Improvement")
+        self.session.add_all([month_jan, month_dec, month_feb])  # Add out of order
+        self.session.commit()
+
+        result = months_service.get_months_history(self.session, limit=12)
+
+        # ##>: Dec 2024 should come before Jan 2025.
+        self.assertEqual(result[0].year, 2024)
+        self.assertEqual(result[0].month, 12)
+        self.assertEqual(result[1].year, 2025)
+        self.assertEqual(result[1].month, 1)
+        self.assertEqual(result[2].year, 2025)
+        self.assertEqual(result[2].month, 2)
 
 
 class TestCalculateScoreTrend(DatabaseTestCase):

@@ -1,33 +1,14 @@
 """Pydantic models for Historical Data API endpoint."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Self, cast
+from typing import TYPE_CHECKING, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from app.responses._types import ScoreLabelLiteral, ScoreTrendLiteral
 
 if TYPE_CHECKING:
     from app.db.models.month import Month
-
-
-def _format_month_label(year: int, month: int) -> str:
-    """
-    Format year and month as 'Oct 2025' style label.
-
-    Parameters
-    ----------
-    year : int
-        Year (e.g., 2025).
-    month : int
-        Month number (1-12).
-
-    Returns
-    -------
-    str
-        Formatted label (e.g., "Oct 2025").
-    """
-    return datetime(year, month, 1).strftime("%b %Y")
 
 
 class MonthReference(BaseModel):
@@ -43,16 +24,21 @@ class MonthHistory(BaseModel):
 
     year: int = Field(ge=2000, le=2100)
     month: int = Field(ge=1, le=12)
-    month_label: str = Field(description="e.g., 'Oct 2025'")
     total_income: float
     total_core: float
     total_choice: float
     total_compound: float
-    core_percentage: float
-    choice_percentage: float
-    compound_percentage: float
+    core_percentage: float = Field(ge=0.0)
+    choice_percentage: float = Field(ge=0.0)
+    compound_percentage: float = Field(ge=0.0)
     score: int = Field(ge=0, le=3)
     score_label: ScoreLabelLiteral | None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def month_label(self) -> str:
+        """Return formatted label (e.g., 'Oct 2025')."""
+        return datetime(self.year, self.month, 1).strftime("%b %Y")
 
     @classmethod
     def from_model(cls, month: "Month") -> Self:
@@ -69,10 +55,10 @@ class MonthHistory(BaseModel):
         MonthHistory
             Pydantic model instance.
         """
+        # ##>: score_label from database is str | None, validated by Pydantic against literal.
         return cls(
             year=month.year,
             month=month.month,
-            month_label=_format_month_label(month.year, month.month),
             total_income=month.total_income,
             total_core=month.total_core,
             total_choice=month.total_choice,
@@ -81,7 +67,7 @@ class MonthHistory(BaseModel):
             choice_percentage=month.choice_percentage,
             compound_percentage=month.compound_percentage,
             score=month.score,
-            score_label=cast(ScoreLabelLiteral | None, month.score_label),
+            score_label=month.score_label,  # type: ignore[arg-type]
         )
 
 
