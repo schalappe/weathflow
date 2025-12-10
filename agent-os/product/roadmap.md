@@ -16,7 +16,7 @@
 
 8. [x] Monthly Dashboard UI — Create the main dashboard showing score card, Core/Choice/Compound metric cards with percentage indicators, pie chart breakdown, and transaction table `L`
 
-9. [ ] Transaction Correction — Add inline editing capability to change transaction categories with automatic score recalculation when corrections are made `M`
+9. [x] Transaction Correction — Add inline editing capability to change transaction categories with automatic score recalculation when corrections are made `M`
 
 10. [ ] Historical Data API — Extend the months API to return aggregated history for the last N months with score and percentage trends `S`
 
