@@ -71,6 +71,7 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
           transactions={[]}
           pagination={emptyPagination}
           onPageChange={vi.fn()}
+          onTransactionClick={vi.fn()}
           isLoading={false}
         />,
       );
@@ -84,6 +85,7 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
           transactions={[]}
           pagination={emptyPagination}
           onPageChange={vi.fn()}
+          onTransactionClick={vi.fn()}
           isLoading={true}
         />,
       );

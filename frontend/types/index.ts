@@ -148,6 +148,7 @@ export interface DashboardState {
   monthDetail: MonthDetailResponse | null;
   currentPage: number;
   error: string | null;
+  editingTransaction: TransactionResponse | null;
 }
 
 export type DashboardAction =
@@ -157,4 +158,20 @@ export type DashboardAction =
   | { type: "SELECT_MONTH"; payload: { year: number; month: number } }
   | { type: "SET_PAGE"; payload: number }
   | { type: "LOAD_ERROR"; payload: string }
-  | { type: "RETRY" };
+  | { type: "RETRY" }
+  | { type: "OPEN_EDIT_MODAL"; payload: TransactionResponse }
+  | { type: "CLOSE_EDIT_MODAL" }
+  | { type: "TRANSACTION_UPDATED"; payload: UpdateTransactionResponse };
+
+// [>]: Transaction update API types - mirroring backend/app/responses/transactions.py.
+
+export interface UpdateTransactionPayload {
+  money_map_type: MoneyMapType;
+  money_map_subcategory: string | null;
+}
+
+export interface UpdateTransactionResponse {
+  success: boolean;
+  transaction: TransactionResponse;
+  updated_month_stats: MonthSummary;
+}

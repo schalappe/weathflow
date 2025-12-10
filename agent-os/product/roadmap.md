@@ -14,9 +14,9 @@
 
 7. [x] Import Page UI — Build the file upload interface with drag-and-drop, multi-month preview table, month selection checkboxes, and categorization progress indicator `M`
 
-8. [ ] Monthly Dashboard UI — Create the main dashboard showing score card, Core/Choice/Compound metric cards with percentage indicators, pie chart breakdown, and transaction table `L`
+8. [x] Monthly Dashboard UI — Create the main dashboard showing score card, Core/Choice/Compound metric cards with percentage indicators, pie chart breakdown, and transaction table `L`
 
-9. [ ] Transaction Correction — Add inline editing capability to change transaction categories with automatic score recalculation when corrections are made `M`
+9. [x] Transaction Correction — Add inline editing capability to change transaction categories with automatic score recalculation when corrections are made `M`
 
 10. [ ] Historical Data API — Extend the months API to return aggregated history for the last N months with score and percentage trends `S`
 

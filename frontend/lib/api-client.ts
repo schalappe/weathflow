@@ -3,6 +3,8 @@ import type {
   ImportMode,
   MonthDetailResponse,
   MonthsListResponse,
+  UpdateTransactionPayload,
+  UpdateTransactionResponse,
   UploadResponse,
 } from "@/types";
 
@@ -171,4 +173,36 @@ export async function getMonthDetail(
   }
 
   return safeParseJson<MonthDetailResponse>(response);
+}
+
+export async function updateTransaction(
+  transactionId: number,
+  payload: UpdateTransactionPayload,
+): Promise<UpdateTransactionResponse> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/api/transactions/${transactionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (networkError) {
+    console.error("Network error updating transaction:", networkError);
+    throw new Error(
+      "Unable to connect to server. Please check your network connection.",
+    );
+  }
+
+  if (!response.ok) {
+    const message = await extractErrorMessage(
+      response,
+      "Failed to update transaction",
+    );
+    console.error(
+      `Transaction update failed with status ${response.status}: ${message}`,
+    );
+    throw new Error(message);
+  }
+
+  return safeParseJson<UpdateTransactionResponse>(response);
 }
