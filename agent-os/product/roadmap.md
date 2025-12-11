@@ -22,7 +22,7 @@
 
 11. [x] Score Evolution Chart — Build a line chart component showing score progression over time using Recharts `S`
 
-12. [ ] Spending Breakdown Chart — Create a stacked bar chart showing Core/Choice/Compound distribution month-over-month `S`
+12. [x] Spending Breakdown Chart — Create a stacked bar chart showing Core/Choice/Compound distribution month-over-month `S`
 
 13. [ ] History Page UI — Combine evolution charts into a dedicated history page with period selector `M`
 
