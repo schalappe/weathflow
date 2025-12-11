@@ -30,7 +30,17 @@ export function PeriodSelector({
   return (
     <Select
       value={value.toString()}
-      onValueChange={(v) => onChange(Number(v))}
+      onValueChange={(v) => {
+        const numValue = Number(v);
+        const isValidPeriod = PERIOD_OPTIONS.some(
+          (opt) => opt.value === numValue,
+        );
+        if (!isValidPeriod) {
+          console.warn(`[PeriodSelector] Unexpected value received: "${v}"`);
+          return;
+        }
+        onChange(numValue);
+      }}
       disabled={disabled}
     >
       <SelectTrigger className="w-[120px]">

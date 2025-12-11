@@ -101,6 +101,7 @@ export function HistoryClient() {
           dispatch({ type: "LOAD_SUCCESS", payload: response.months });
         }
       } catch (error) {
+        console.error("[HistoryClient] Failed to load history data:", error);
         if (isMounted) {
           dispatch({
             type: "LOAD_ERROR",

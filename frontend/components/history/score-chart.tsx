@@ -10,6 +10,7 @@ import {
   ReferenceArea,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { SCORE_COLORS_HEX } from "@/lib/utils";
 import type { MonthHistory } from "@/types";
 
@@ -50,6 +51,12 @@ function CustomTooltip({
 
 // [>]: Generate last 12 months range and fill gaps with null.
 function transformToChartData(months: MonthHistory[]): ChartDataPoint[] {
+  // [!]: Guard against non-array input.
+  if (!Array.isArray(months)) {
+    console.warn("[ScoreChart] Invalid months data: expected array");
+    return [];
+  }
+
   const now = new Date();
   const result: ChartDataPoint[] = [];
 
@@ -85,6 +92,16 @@ function transformToChartData(months: MonthHistory[]): ChartDataPoint[] {
   return result;
 }
 
+// [>]: Chart error fallback displayed when Recharts encounters an error.
+const chartErrorFallback = (
+  <div
+    className="flex h-[250px] items-center justify-center text-muted-foreground"
+    data-testid="chart-error"
+  >
+    Unable to display chart
+  </div>
+);
+
 export function ScoreChart({ months }: ScoreChartProps) {
   const chartData = transformToChartData(months);
   const isEmpty = chartData.every((d) => d.score === null);
@@ -95,51 +112,53 @@ export function ScoreChart({ months }: ScoreChartProps) {
         <CardTitle>Score Evolution (Last 12 Months)</CardTitle>
       </CardHeader>
       <CardContent>
-        {isEmpty ? (
-          <div
-            className="flex h-[250px] items-center justify-center text-muted-foreground"
-            data-testid="empty-state"
-          >
-            No historical data available
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={chartData}>
-              {/* [>]: Background zones for score thresholds (10% opacity). */}
-              <ReferenceArea
-                y1={0}
-                y2={1}
-                fill={SCORE_COLORS_HEX[0]}
-                fillOpacity={0.1}
-              />
-              <ReferenceArea
-                y1={1}
-                y2={2}
-                fill={SCORE_COLORS_HEX[1]}
-                fillOpacity={0.1}
-              />
-              <ReferenceArea
-                y1={2}
-                y2={3}
-                fill={SCORE_COLORS_HEX[3]}
-                fillOpacity={0.1}
-              />
+        <ErrorBoundary fallback={chartErrorFallback}>
+          {isEmpty ? (
+            <div
+              className="flex h-[250px] items-center justify-center text-muted-foreground"
+              data-testid="empty-state"
+            >
+              No historical data available
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={chartData}>
+                {/* [>]: Background zones for score thresholds (10% opacity). */}
+                <ReferenceArea
+                  y1={0}
+                  y2={1}
+                  fill={SCORE_COLORS_HEX[0]}
+                  fillOpacity={0.1}
+                />
+                <ReferenceArea
+                  y1={1}
+                  y2={2}
+                  fill={SCORE_COLORS_HEX[1]}
+                  fillOpacity={0.1}
+                />
+                <ReferenceArea
+                  y1={2}
+                  y2={3}
+                  fill={SCORE_COLORS_HEX[3]}
+                  fillOpacity={0.1}
+                />
 
-              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-              <YAxis domain={[0, 3]} ticks={[0, 1, 2, 3]} width={30} />
-              <Tooltip content={<CustomTooltip />} />
-              <Line
-                type="monotone"
-                dataKey="score"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                dot={{ fill: "#3b82f6", r: 4 }}
-                activeDot={{ r: 6 }}
-                connectNulls={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        )}
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis domain={[0, 3]} ticks={[0, 1, 2, 3]} width={30} />
+                <Tooltip content={<CustomTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="score"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  dot={{ fill: "#3b82f6", r: 4 }}
+                  activeDot={{ r: 6 }}
+                  connectNulls={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </ErrorBoundary>
       </CardContent>
     </Card>
   );
