@@ -354,3 +354,74 @@ class InvalidSubcategoryError(TransactionError):
         self.money_map_type = money_map_type
         self.subcategory = subcategory
         super().__init__(f"Invalid subcategory '{subcategory}' for type {money_map_type}")
+
+
+class AdviceGenerationError(Exception):
+    """
+    Base exception for all advice generation errors.
+
+    All advice-specific exceptions inherit from this class, allowing
+    callers to catch all advice errors with a single except clause.
+    """
+
+
+class InsufficientDataError(AdviceGenerationError):
+    """
+    Raised when there is not enough historical data for advice generation.
+
+    Parameters
+    ----------
+    min_months_required : int
+        Minimum number of months required for advice generation.
+
+    Attributes
+    ----------
+    min_months_required : int
+        The minimum months required for programmatic access.
+    """
+
+    def __init__(self, min_months_required: int) -> None:
+        self.min_months_required = min_months_required
+        super().__init__(f"Advice generation requires at least {min_months_required} months of data")
+
+
+class AdviceAPIError(AdviceGenerationError):
+    """
+    Raised when Claude API is unreachable or returns an error.
+
+    Parameters
+    ----------
+    retry_count : int
+        Number of retry attempts made before giving up.
+
+    Attributes
+    ----------
+    retry_count : int
+        The number of retries for programmatic access.
+    """
+
+    def __init__(self, retry_count: int) -> None:
+        self.retry_count = retry_count
+        super().__init__(f"Claude API unreachable after {retry_count} retries")
+
+
+class AdviceParseError(AdviceGenerationError):
+    """
+    Raised when Claude API returns unparseable JSON response.
+
+    Parameters
+    ----------
+    raw_response : str
+        The raw response text that could not be parsed.
+
+    Attributes
+    ----------
+    raw_response : str
+        The raw response for debugging and logging.
+    """
+
+    def __init__(self, raw_response: str) -> None:
+        self.raw_response = raw_response
+        # ##>: Truncate response in message for readability but keep full in attribute.
+        preview = raw_response[:100] + "..." if len(raw_response) > 100 else raw_response
+        super().__init__(f"Invalid JSON response from Claude API: {preview}")
