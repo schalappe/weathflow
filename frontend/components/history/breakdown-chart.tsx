@@ -10,6 +10,7 @@ import {
   Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { CATEGORY_COLORS, sortMonthsChronologically, cn } from "@/lib/utils";
 import type { MonthHistory } from "@/types";
 
@@ -65,22 +66,46 @@ function CustomTooltip({
   );
 }
 
+// [>]: Validate month data has required numeric properties.
+function isValidMonthData(m: MonthHistory): boolean {
+  return (
+    typeof m?.year === "number" &&
+    typeof m?.month === "number" &&
+    m.month >= 1 &&
+    m.month <= 12 &&
+    typeof m?.core_percentage === "number" &&
+    typeof m?.choice_percentage === "number" &&
+    typeof m?.compound_percentage === "number"
+  );
+}
+
 // [>]: Filter empty months, sort chronologically, map to chart format.
 function transformToChartData(
   months: MonthHistory[],
 ): BreakdownChartDataPoint[] {
-  // [>]: Filter out months where all percentages are zero.
-  const validMonths = months.filter(
-    (m) =>
+  // [!]: Guard against non-array input.
+  if (!Array.isArray(months)) {
+    console.warn(
+      "[SpendingBreakdownChart] Invalid months data: expected array",
+    );
+    return [];
+  }
+
+  // [>]: Filter out invalid months and months where all percentages are zero.
+  const validMonths = months.filter((m) => {
+    if (!isValidMonthData(m)) {
+      console.warn("[SpendingBreakdownChart] Skipping invalid month data:", m);
+      return false;
+    }
+    return (
       m.core_percentage !== 0 ||
       m.choice_percentage !== 0 ||
-      m.compound_percentage !== 0,
-  );
+      m.compound_percentage !== 0
+    );
+  });
 
-  // [>]: Sort chronologically (oldest first).
   const sorted = sortMonthsChronologically(validMonths);
 
-  // [>]: Transform to chart data points.
   return sorted.map((m) => {
     const date = new Date(m.year, m.month - 1);
     return {
@@ -96,6 +121,16 @@ function transformToChartData(
   });
 }
 
+// [>]: Chart error fallback displayed when Recharts encounters an error.
+const chartErrorFallback = (
+  <div
+    className="flex h-[250px] items-center justify-center text-muted-foreground"
+    data-testid="chart-error"
+  >
+    Unable to display chart
+  </div>
+);
+
 export function SpendingBreakdownChart({
   months,
   className,
@@ -109,46 +144,48 @@ export function SpendingBreakdownChart({
         <CardTitle>Spending Breakdown by Month</CardTitle>
       </CardHeader>
       <CardContent>
-        {isEmpty ? (
-          <div
-            className="flex h-[250px] items-center justify-center text-muted-foreground"
-            data-testid="empty-state"
-          >
-            No spending data available
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={chartData}>
-              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-              <YAxis
-                domain={[0, 100]}
-                ticks={[0, 25, 50, 75, 100]}
-                tickFormatter={(v) => `${v}%`}
-                width={40}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-              <Bar
-                dataKey="core"
-                name="Core"
-                stackId="spending"
-                fill={CATEGORY_COLORS.CORE}
-              />
-              <Bar
-                dataKey="choice"
-                name="Choice"
-                stackId="spending"
-                fill={CATEGORY_COLORS.CHOICE}
-              />
-              <Bar
-                dataKey="compound"
-                name="Compound"
-                stackId="spending"
-                fill={CATEGORY_COLORS.COMPOUND}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        )}
+        <ErrorBoundary fallback={chartErrorFallback}>
+          {isEmpty ? (
+            <div
+              className="flex h-[250px] items-center justify-center text-muted-foreground"
+              data-testid="empty-state"
+            >
+              No spending data available
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={chartData}>
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis
+                  domain={[0, 100]}
+                  ticks={[0, 25, 50, 75, 100]}
+                  tickFormatter={(v) => `${v}%`}
+                  width={40}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                <Bar
+                  dataKey="core"
+                  name="Core"
+                  stackId="spending"
+                  fill={CATEGORY_COLORS.CORE}
+                />
+                <Bar
+                  dataKey="choice"
+                  name="Choice"
+                  stackId="spending"
+                  fill={CATEGORY_COLORS.CHOICE}
+                />
+                <Bar
+                  dataKey="compound"
+                  name="Compound"
+                  stackId="spending"
+                  fill={CATEGORY_COLORS.COMPOUND}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </ErrorBoundary>
       </CardContent>
     </Card>
   );
