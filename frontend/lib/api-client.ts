@@ -1,5 +1,7 @@
 import type {
   CategorizeResponse,
+  GenerateAdviceResponse,
+  GetAdviceResponse,
   HistoryResponse,
   ImportMode,
   MonthDetailResponse,
@@ -236,4 +238,65 @@ export async function getMonthsHistory(
   }
 
   return safeParseJson<HistoryResponse>(response);
+}
+
+export async function getAdvice(
+  year: number,
+  month: number,
+): Promise<GetAdviceResponse> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/api/advice/${year}/${month}`);
+  } catch (networkError) {
+    console.error("Network error fetching advice:", networkError);
+    throw new Error(
+      "Unable to connect to server. Please check your network connection.",
+    );
+  }
+
+  if (!response.ok) {
+    const message = await extractErrorMessage(
+      response,
+      "Failed to load advice",
+    );
+    console.error(
+      `Get advice failed with status ${response.status}: ${message}`,
+    );
+    throw new Error(message);
+  }
+
+  return safeParseJson<GetAdviceResponse>(response);
+}
+
+export async function generateAdvice(
+  year: number,
+  month: number,
+  regenerate: boolean = false,
+): Promise<GenerateAdviceResponse> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/api/advice/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ year, month, regenerate }),
+    });
+  } catch (networkError) {
+    console.error("Network error generating advice:", networkError);
+    throw new Error(
+      "Unable to connect to server. Please check your network connection.",
+    );
+  }
+
+  if (!response.ok) {
+    const message = await extractErrorMessage(
+      response,
+      "Failed to generate advice",
+    );
+    console.error(
+      `Generate advice failed with status ${response.status}: ${message}`,
+    );
+    throw new Error(message);
+  }
+
+  return safeParseJson<GenerateAdviceResponse>(response);
 }

@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Upload } from "lucide-react";
+import { AdvicePanel } from "./advice-panel";
 import { PeriodSelector } from "./period-selector";
 import { ScoreChart } from "./score-chart";
 import { SpendingBreakdownChart } from "./breakdown-chart";
@@ -197,6 +198,14 @@ export function HistoryClient() {
             <ScoreChart months={state.months} />
             <SpendingBreakdownChart months={state.months} />
           </div>
+
+          {/* Advice Panel - uses most recent month from history */}
+          {state.months.length > 0 && (
+            <AdvicePanel
+              year={state.months[state.months.length - 1].year}
+              month={state.months[state.months.length - 1].month}
+            />
+          )}
         </>
       )}
     </div>

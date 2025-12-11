@@ -8,6 +8,13 @@ import { createMonthHistory } from "@/__tests__/utils/test-factories";
 // [>]: Mock the API client module.
 vi.mock("@/lib/api-client", () => ({
   getMonthsHistory: vi.fn(),
+  getAdvice: vi.fn().mockResolvedValue({
+    success: true,
+    advice: null,
+    generated_at: null,
+    exists: false,
+  }),
+  generateAdvice: vi.fn(),
 }));
 
 // [>]: Mock ResizeObserver for Recharts ResponsiveContainer.

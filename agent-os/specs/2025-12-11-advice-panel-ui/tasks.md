@@ -14,23 +14,23 @@ Primary Stack: Next.js + TypeScript + shadcn/ui
 
 **Dependencies:** None
 
-- [ ] 1.0 Complete foundation layer
-  - [ ] 1.1 Add advice TypeScript types to `types/index.ts`
+- [x] 1.0 Complete foundation layer
+  - [x] 1.1 Add advice TypeScript types to `types/index.ts`
     - Add `ProblemArea` interface: category (string), amount (number), trend (string)
     - Add `AdviceData` interface: analysis, problem_areas, recommendations, encouragement
     - Add `GetAdviceResponse` interface: success, advice, generated_at, exists
     - Add `GenerateAdviceResponse` interface: success, advice, generated_at, was_cached
     - Mirror backend models from `backend/app/responses/advice.py`
-  - [ ] 1.2 Add `getAdvice()` function to `lib/api-client.ts`
+  - [x] 1.2 Add `getAdvice()` function to `lib/api-client.ts`
     - GET request to `/api/advice/{year}/{month}`
     - Follow existing pattern: try/catch for network, extractErrorMessage, safeParseJson
     - Return `Promise<GetAdviceResponse>`
-  - [ ] 1.3 Add `generateAdvice()` function to `lib/api-client.ts`
+  - [x] 1.3 Add `generateAdvice()` function to `lib/api-client.ts`
     - POST request to `/api/advice/generate`
     - Body: `{ year, month, regenerate }`
     - Headers: `Content-Type: application/json`
     - Return `Promise<GenerateAdviceResponse>`
-  - [ ] 1.4 Add `formatAdviceTimestamp()` helper to `lib/utils.ts`
+  - [x] 1.4 Add `formatAdviceTimestamp()` helper to `lib/utils.ts`
     - Return relative time for recent advice (< 24h): "il y a X heures"
     - Return absolute date for older advice: "15 octobre 2025"
     - Use French locale formatting
@@ -49,17 +49,17 @@ Primary Stack: Next.js + TypeScript + shadcn/ui
 
 **Dependencies:** Task Group 1
 
-- [ ] 2.0 Complete state management
-  - [ ] 2.1 Create `advice-panel.tsx` with state types and reducer
+- [x] 2.0 Complete state management
+  - [x] 2.1 Create `advice-panel.tsx` with state types and reducer
     - Define `AdvicePanelState` type: 'loading' | 'loaded' | 'empty' | 'error'
     - Define `AdviceState` interface: panelState, advice, generatedAt, isRegenerating, error
     - Create discriminated union `AdviceAction` type with 7 action types
     - Implement `adviceReducer` function with all state transitions
-  - [ ] 2.2 Implement data fetching useEffect
+  - [x] 2.2 Implement data fetching useEffect
     - Fetch on mount and when year/month props change
     - Use `isMounted` cleanup flag to prevent memory leaks
     - Dispatch FETCH_START, FETCH_SUCCESS, FETCH_EMPTY, or FETCH_ERROR
-  - [ ] 2.3 Implement generate/regenerate handler
+  - [x] 2.3 Implement generate/regenerate handler
     - Use `useCallback` to memoize handler
     - Dispatch REGENERATE_START, then call generateAdvice API
     - Dispatch REGENERATE_SUCCESS or REGENERATE_ERROR based on result
@@ -77,23 +77,23 @@ Primary Stack: Next.js + TypeScript + shadcn/ui
 
 **Dependencies:** Task Group 2
 
-- [ ] 3.0 Complete sub-components
-  - [ ] 3.1 Create `AdviceSkeletonLoader` sub-component
+- [x] 3.0 Complete sub-components
+  - [x] 3.1 Create `AdviceSkeletonLoader` sub-component
     - Use animate-pulse with bg-slate-200 rounded divs
     - Mimic layout of loaded state (3 sections with varying widths)
     - Follow existing skeleton patterns from dashboard
-  - [ ] 3.2 Create `EmptyState` sub-component
+  - [x] 3.2 Create `EmptyState` sub-component
     - Props: `onGenerate`, `isLoading`
     - Centered layout with Sparkles icon in rounded bg-slate-100
     - "Aucun conseil disponible" heading
     - Description text about generating advice
     - Button with Loader2 spinner when loading
-  - [ ] 3.3 Create `ErrorState` sub-component
+  - [x] 3.3 Create `ErrorState` sub-component
     - Props: `error`, `onRetry`
     - Use Alert with variant="destructive"
     - AlertCircle icon + error message + retry Button
     - Follow pattern from history-client.tsx error state
-  - [ ] 3.4 Create `ProblemAreaItem` sub-component
+  - [x] 3.4 Create `ProblemAreaItem` sub-component
     - Props: `area: ProblemArea`, `index: number`
     - Display: index, category, formatCurrency(amount), trend
     - Trend color: red for +, green for -, gray for neutral
@@ -111,27 +111,27 @@ Primary Stack: Next.js + TypeScript + shadcn/ui
 
 **Dependencies:** Task Group 3
 
-- [ ] 4.0 Complete content display
-  - [ ] 4.1 Create `AdviceContent` sub-component structure
+- [x] 4.0 Complete content display
+  - [x] 4.1 Create `AdviceContent` sub-component structure
     - Props: advice, generatedAt, onRegenerate, isRegenerating, regenerateError
     - Use space-y-6 for section spacing
     - Add border-t separator before footer
-  - [ ] 4.2 Implement Analysis section
+  - [x] 4.2 Implement Analysis section
     - BarChart3 icon + "Analyse des tendances" heading
     - Display advice.analysis as paragraph text
     - Use text-sm text-slate-600 styling
-  - [ ] 4.3 Implement Problem Areas section
+  - [x] 4.3 Implement Problem Areas section
     - AlertTriangle icon + "Points d'attention" heading
     - Map over advice.problem_areas with ProblemAreaItem
     - Conditionally render only if problem_areas.length > 0
-  - [ ] 4.4 Implement Recommendations section
+  - [x] 4.4 Implement Recommendations section
     - CheckCircle2 icon + "Recommandations" heading
     - Ordered list with list-decimal list-inside
     - Map over advice.recommendations
-  - [ ] 4.5 Implement Encouragement section
+  - [x] 4.5 Implement Encouragement section
     - Sparkles icon + "Encouragement" heading
     - Display advice.encouragement as paragraph
-  - [ ] 4.6 Implement footer with timestamp and regenerate button
+  - [x] 4.6 Implement footer with timestamp and regenerate button
     - Left: timestamp using formatAdviceTimestamp()
     - Right: Button variant="outline" size="sm"
     - Loader2 spinner when isRegenerating
@@ -149,17 +149,17 @@ Primary Stack: Next.js + TypeScript + shadcn/ui
 
 **Dependencies:** Task Group 4
 
-- [ ] 5.0 Complete main component assembly
-  - [ ] 5.1 Assemble AdvicePanel with Card container
+- [x] 5.0 Complete main component assembly
+  - [x] 5.1 Assemble AdvicePanel with Card container
     - Card with CardHeader and CardTitle "Conseils Personnalisés"
     - CardContent wrapping state-based rendering
     - Accept className prop with cn() merge
-  - [ ] 5.2 Implement conditional rendering based on panelState
+  - [x] 5.2 Implement conditional rendering based on panelState
     - loading: render AdviceSkeletonLoader
     - empty: render EmptyState with handlers
     - error: render ErrorState with handlers
     - loaded: render AdviceContent with all props
-  - [ ] 5.3 Export AdvicePanel component
+  - [x] 5.3 Export AdvicePanel component
     - Named export from advice-panel.tsx
     - Ensure all imports are correct (lucide-react icons, shadcn components)
 
@@ -177,15 +177,15 @@ Primary Stack: Next.js + TypeScript + shadcn/ui
 
 **Dependencies:** Task Group 5
 
-- [ ] 6.0 Complete integration
-  - [ ] 6.1 Import AdvicePanel in history-client.tsx
+- [x] 6.0 Complete integration
+  - [x] 6.1 Import AdvicePanel in history-client.tsx
     - Add import statement at top of file
     - Import from './advice-panel'
-  - [ ] 6.2 Add AdvicePanel below charts grid
+  - [x] 6.2 Add AdvicePanel below charts grid
     - Render inside loaded/loading state block (where months.length > 0)
     - Pass most recent month: `months[months.length - 1].year` and `.month`
     - Add className="mt-6" for spacing from charts
-  - [ ] 6.3 Verify end-to-end flow manually
+  - [x] 6.3 Verify end-to-end flow manually
     - Navigate to History page
     - Verify loading state appears
     - Verify empty/loaded state based on API response
@@ -205,18 +205,18 @@ Primary Stack: Next.js + TypeScript + shadcn/ui
 
 **Dependencies:** Task Group 6
 
-- [ ] 7.0 Complete component tests
-  - [ ] 7.1 Write 6 focused tests for AdvicePanel
+- [x] 7.0 Complete component tests
+  - [x] 7.1 Write 6 focused tests for AdvicePanel
     - Test 1: Shows skeleton loader in loading state
     - Test 2: Shows empty state when exists=false
     - Test 3: Shows advice content when loaded
     - Test 4: Shows error state with retry button on error
     - Test 5: Trend colors are correct (red for +, green for -)
     - Test 6: Regenerate button shows spinner while loading
-  - [ ] 7.2 Write 2 tests for API client functions
+  - [x] 7.2 Write 2 tests for API client functions
     - Test 1: getAdvice returns typed response
     - Test 2: generateAdvice sends correct payload
-  - [ ] 7.3 Run feature-specific tests only
+  - [x] 7.3 Run feature-specific tests only
     - Run tests for advice-panel component
     - Run tests for api-client advice functions
     - Verify all 8 tests pass

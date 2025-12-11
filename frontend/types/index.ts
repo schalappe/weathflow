@@ -216,3 +216,32 @@ export interface HistoryResponse {
   months: MonthHistory[];
   summary: HistorySummary;
 }
+
+// [>]: Advice API response types - mirroring backend/app/responses/advice.py.
+
+export interface ProblemArea {
+  category: string;
+  amount: number;
+  trend: string;
+}
+
+export interface AdviceData {
+  analysis: string;
+  problem_areas: ProblemArea[];
+  recommendations: string[];
+  encouragement: string;
+}
+
+export interface GetAdviceResponse {
+  success: boolean;
+  advice: AdviceData | null;
+  generated_at: string | null;
+  exists: boolean;
+}
+
+export interface GenerateAdviceResponse {
+  success: boolean;
+  advice: AdviceData;
+  generated_at: string;
+  was_cached: boolean;
+}
