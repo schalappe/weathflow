@@ -1,5 +1,7 @@
 """Unit tests for advice service functions."""
 
+from sqlalchemy.orm import Session
+
 from app.db.models.advice import Advice
 from app.db.models.month import Month
 from app.services import advice as advice_service
@@ -7,7 +9,7 @@ from app.services.dto.advice import AdviceResponse, ProblemArea
 from tests.conftest import DatabaseTestCase
 
 
-def _create_month(session, year: int = 2025, month: int = 1) -> Month:
+def _create_month(session: Session, year: int = 2025, month: int = 1) -> Month:
     """Create a test month record."""
     month_record = Month(
         year=year,
@@ -59,6 +61,7 @@ class TestGetAdviceByMonthId(DatabaseTestCase):
         result = advice_service.get_advice_by_month_id(self.session, month.id)
 
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertEqual(result.month_id, month.id)
         self.assertEqual(result.advice_text, '{"analysis": "test"}')
 

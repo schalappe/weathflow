@@ -3,6 +3,7 @@
 import json
 from unittest.mock import MagicMock, patch
 
+from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.db.models.advice import Advice
@@ -61,7 +62,7 @@ class TestGenerateThenRetrieveFlow:
     def test_full_generate_then_retrieve_flow(
         self,
         mock_generator_class: MagicMock,
-        client,
+        client: TestClient,
         db_session: Session,
     ) -> None:
         """Full flow: generate advice then retrieve it."""
@@ -93,7 +94,7 @@ class TestGenerateThenRetrieveFlow:
     def test_advice_persisted_correctly_in_database(
         self,
         mock_generator_class: MagicMock,
-        client,
+        client: TestClient,
         db_session: Session,
     ) -> None:
         """Advice JSON is persisted correctly in database."""
@@ -123,7 +124,7 @@ class TestGenerateThenRetrieveFlow:
     def test_regeneration_replaces_existing_advice(
         self,
         mock_generator_class: MagicMock,
-        client,
+        client: TestClient,
         db_session: Session,
     ) -> None:
         """Regeneration replaces existing advice record."""
@@ -153,6 +154,7 @@ class TestGenerateThenRetrieveFlow:
         assert advice_count == 1
 
         advice = db_session.query(Advice).filter(Advice.month_id == month.id).first()
+        assert advice is not None
         stored_data = json.loads(advice.advice_text)
         assert stored_data["analysis"] == "Votre gestion financière montre des progrès."
 
@@ -165,7 +167,7 @@ class TestErrorHandling:
     def test_returns_503_when_claude_api_unavailable(
         self,
         mock_generator_class: MagicMock,
-        client,
+        client: TestClient,
         db_session: Session,
     ) -> None:
         """Returns 503 when Claude API is unavailable."""
@@ -181,7 +183,7 @@ class TestErrorHandling:
         assert response.status_code == 503
         assert "AI service temporarily unavailable" in response.json()["detail"]
 
-    def test_returns_400_when_insufficient_historical_data(self, client, db_session: Session) -> None:
+    def test_returns_400_when_insufficient_historical_data(self, client: TestClient, db_session: Session) -> None:
         """Returns 400 when insufficient historical data for advice generation."""
         _create_month(db_session, 2025, 10)
 
