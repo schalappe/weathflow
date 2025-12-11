@@ -180,6 +180,9 @@ export interface UpdateTransactionResponse {
 
 export type ScoreTrend = "improving" | "declining" | "stable";
 
+// [>]: Score value constrained to 0-3 matching backend Field(ge=0, le=3).
+export type Score = 0 | 1 | 2 | 3;
+
 export interface MonthHistory {
   year: number;
   month: number;
@@ -190,7 +193,7 @@ export interface MonthHistory {
   core_percentage: number;
   choice_percentage: number;
   compound_percentage: number;
-  score: number;
+  score: Score;
   score_label: ScoreLabel | null;
   month_label: string;
 }
@@ -198,7 +201,7 @@ export interface MonthHistory {
 export interface MonthReference {
   year: number;
   month: number;
-  score: number;
+  score: Score;
 }
 
 export interface HistorySummary {

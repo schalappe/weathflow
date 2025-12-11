@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, beforeAll } from "vitest";
 import { ScoreChart } from "@/components/history/score-chart";
-import type { MonthHistory } from "@/types";
+import type { MonthHistory, Score } from "@/types";
 
 // [>]: Mock ResizeObserver for Recharts ResponsiveContainer.
 beforeAll(() => {
@@ -16,7 +16,7 @@ beforeAll(() => {
 function createMonthHistory(
   year: number,
   month: number,
-  score: number,
+  score: Score,
 ): MonthHistory {
   const scoreLabels = ["Poor", "Need Improvement", "Okay", "Great"] as const;
   const monthNames = [
@@ -60,7 +60,7 @@ describe("ScoreChart", () => {
     const { container } = render(<ScoreChart months={months} />);
 
     expect(
-      screen.getByText("Score Evolution (12 derniers mois)"),
+      screen.getByText("Score Evolution (Last 12 Months)"),
     ).toBeInTheDocument();
     expect(
       container.querySelector(".recharts-responsive-container"),

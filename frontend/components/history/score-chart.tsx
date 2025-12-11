@@ -92,7 +92,7 @@ export function ScoreChart({ months }: ScoreChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Score Evolution (12 derniers mois)</CardTitle>
+        <CardTitle>Score Evolution (Last 12 Months)</CardTitle>
       </CardHeader>
       <CardContent>
         {isEmpty ? (
@@ -121,7 +121,7 @@ export function ScoreChart({ months }: ScoreChartProps) {
               <ReferenceArea
                 y1={2}
                 y2={3}
-                fill={SCORE_COLORS_HEX[2]}
+                fill={SCORE_COLORS_HEX[3]}
                 fillOpacity={0.1}
               />
 
