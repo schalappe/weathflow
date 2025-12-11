@@ -26,7 +26,7 @@
 
 13. [x] History Page UI — Combine evolution charts into a dedicated history page with period selector `M`
 
-14. [ ] Advice Generation Service — Implement Claude API integration that analyzes the last 3 months and generates personalized recommendations with trend analysis `M`
+14. [x] Advice Generation Service — Implement Claude API integration that analyzes the last 3 months and generates personalized recommendations with trend analysis `M`
 
 15. [ ] Advice API and Storage — Create endpoints to generate and retrieve advice, storing generated advice in the database for the month `S`
 
