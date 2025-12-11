@@ -26,9 +26,20 @@ interface BreakdownChartDataPoint {
   core: number;
   choice: number;
   compound: number;
+  // [>]: Original values preserved for tooltip display.
+  originalCore: number;
+  originalChoice: number;
+  originalCompound: number;
 }
 
-// [>]: Custom tooltip matching app styling.
+// [>]: Map dataKey to original value field for tooltip display.
+const ORIGINAL_VALUE_MAP: Record<string, keyof BreakdownChartDataPoint> = {
+  core: "originalCore",
+  choice: "originalChoice",
+  compound: "originalCompound",
+};
+
+// [>]: Custom tooltip matching app styling, shows original percentages.
 function CustomTooltip({
   active,
   payload,
@@ -38,6 +49,7 @@ function CustomTooltip({
   payload?: Array<{
     name: string;
     value: number;
+    dataKey: string;
     color: string;
     payload: BreakdownChartDataPoint;
   }>;
@@ -51,17 +63,24 @@ function CustomTooltip({
   return (
     <div className="rounded-md border bg-background p-2 shadow-md">
       <p className="font-medium">{displayLabel}</p>
-      {payload.map((entry) => (
-        <div key={entry.name} className="flex items-center gap-2 text-sm">
-          <div
-            className="h-3 w-3 rounded"
-            style={{ backgroundColor: entry.color }}
-          />
-          <span className="text-muted-foreground">
-            {entry.name}: {entry.value.toFixed(1)}%
-          </span>
-        </div>
-      ))}
+      {payload.map((entry) => {
+        // [>]: Use original value for display, not normalized value.
+        const originalKey = ORIGINAL_VALUE_MAP[entry.dataKey];
+        const displayValue = originalKey
+          ? (entry.payload[originalKey] as number)
+          : entry.value;
+        return (
+          <div key={entry.name} className="flex items-center gap-2 text-sm">
+            <div
+              className="h-3 w-3 rounded"
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="text-muted-foreground">
+              {entry.name}: {displayValue.toFixed(1)}%
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -77,6 +96,35 @@ function isValidMonthData(m: MonthHistory): boolean {
     typeof m?.choice_percentage === "number" &&
     typeof m?.compound_percentage === "number"
   );
+}
+
+// [>]: Normalize percentages for stacked bar display when compound is negative.
+function normalizePercentages(
+  core: number,
+  choice: number,
+  compound: number,
+): { core: number; choice: number; compound: number } {
+  // [>]: When compound is negative, spending exceeds income.
+  // Normalize to show relative proportions of spending categories.
+  if (compound < 0) {
+    // [>]: Use absolute values of spending categories only.
+    const totalSpending = core + choice;
+    if (totalSpending === 0) return { core: 0, choice: 0, compound: 0 };
+    return {
+      core: (core / totalSpending) * 100,
+      choice: (choice / totalSpending) * 100,
+      compound: 0,
+    };
+  }
+
+  // [>]: Normal case: all positive, sum to ~100%.
+  const total = core + choice + compound;
+  if (total === 0) return { core: 0, choice: 0, compound: 0 };
+  return {
+    core: (core / total) * 100,
+    choice: (choice / total) * 100,
+    compound: (compound / total) * 100,
+  };
 }
 
 // [>]: Filter empty months, sort chronologically, map to chart format.
@@ -108,15 +156,23 @@ function transformToChartData(
 
   return sorted.map((m) => {
     const date = new Date(m.year, m.month - 1);
+    const normalized = normalizePercentages(
+      m.core_percentage,
+      m.choice_percentage,
+      m.compound_percentage,
+    );
     return {
       label: date.toLocaleDateString("en-US", { month: "short" }),
       fullLabel: date.toLocaleDateString("en-US", {
         month: "long",
         year: "numeric",
       }),
-      core: m.core_percentage,
-      choice: m.choice_percentage,
-      compound: m.compound_percentage,
+      core: normalized.core,
+      choice: normalized.choice,
+      compound: normalized.compound,
+      originalCore: m.core_percentage,
+      originalChoice: m.choice_percentage,
+      originalCompound: m.compound_percentage,
     };
   });
 }
