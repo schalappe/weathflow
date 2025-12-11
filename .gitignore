@@ -222,3 +222,6 @@ bun.lockb
 
 # Claude
 CLAUDE.md
+
+# MCP
+.playwright-mcp/
