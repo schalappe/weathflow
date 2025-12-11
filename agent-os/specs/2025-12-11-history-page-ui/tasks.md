@@ -14,20 +14,20 @@ Primary Stack: Next.js + TypeScript + shadcn/ui
 
 **Dependencies:** None
 
-- [ ] 1.0 Complete period selector component
-  - [ ] 1.1 Write 3 focused tests for PeriodSelector
+- [x] 1.0 Complete period selector component
+  - [x] 1.1 Write 3 focused tests for PeriodSelector
     - Test renders with default value (12)
     - Test onChange callback fires with correct value
     - Test all 4 options are present (3, 6, 12, 0)
-  - [ ] 1.2 Create PeriodSelector component
+  - [x] 1.2 Create PeriodSelector component
     - File: `frontend/components/history/period-selector.tsx`
     - Props: `{ value: number; onChange: (months: number) => void; disabled?: boolean }`
     - Use shadcn/ui Select component
     - Define PERIOD_OPTIONS constant: `[{ label: '3 mois', value: 3 }, ...]`
-  - [ ] 1.3 Style period selector
+  - [x] 1.3 Style period selector
     - Match dashboard's MonthSelector styling pattern
     - Ensure dropdown width accommodates all labels
-  - [ ] 1.4 Ensure period selector tests pass
+  - [x] 1.4 Ensure period selector tests pass
     - Run ONLY the 3 tests from 1.1
     - Do NOT run entire test suite
 
@@ -44,21 +44,21 @@ Primary Stack: Next.js + TypeScript + shadcn/ui
 
 **Dependencies:** Task Group 1
 
-- [ ] 2.0 Complete history client state management
-  - [ ] 2.1 Write 4 focused tests for state management
+- [x] 2.0 Complete history client state management
+  - [x] 2.1 Write 4 focused tests for state management
     - Test initial state is loading with period=12
     - Test LOAD_SUCCESS sets pageState to "loaded" and stores months
     - Test LOAD_EMPTY sets pageState to "empty"
     - Test SET_PERIOD updates period and triggers loading
-  - [ ] 2.2 Define TypeScript types for state and actions
+  - [x] 2.2 Define TypeScript types for state and actions
     - File: `frontend/components/history/history-client.tsx`
     - HistoryState: `{ pageState, period, months, error }`
     - HistoryAction: discriminated union with LOAD_START, LOAD_SUCCESS, LOAD_EMPTY, LOAD_ERROR, SET_PERIOD
-  - [ ] 2.3 Implement historyReducer function
+  - [x] 2.3 Implement historyReducer function
     - Handle all 5 action types
     - SET_PERIOD should set pageState to "loading" (triggers refetch)
     - LOAD_SUCCESS should check if months array is empty → dispatch LOAD_EMPTY instead
-  - [ ] 2.4 Ensure state management tests pass
+  - [x] 2.4 Ensure state management tests pass
     - Run ONLY the 4 tests from 2.1
     - Do NOT run entire test suite
 
@@ -75,20 +75,20 @@ Primary Stack: Next.js + TypeScript + shadcn/ui
 
 **Dependencies:** Task Group 2
 
-- [ ] 3.0 Complete history client data fetching
-  - [ ] 3.1 Write 3 focused tests for data fetching
+- [x] 3.0 Complete history client data fetching
+  - [x] 3.1 Write 3 focused tests for data fetching
     - Test initial mount fetches data with period=12
     - Test error state displays when API fails
     - Test period change triggers new fetch
-  - [ ] 3.2 Implement useEffect for data fetching
+  - [x] 3.2 Implement useEffect for data fetching
     - Call `getMonthsHistory(state.period)` from `@/lib/api-client`
     - Use `isMounted` cleanup pattern (prevent memory leaks)
     - Dispatch LOAD_SUCCESS, LOAD_EMPTY, or LOAD_ERROR based on result
-  - [ ] 3.3 Implement handlePeriodChange callback
+  - [x] 3.3 Implement handlePeriodChange callback
     - Use `useCallback` for memoization
     - Dispatch SET_PERIOD action with new value
     - useEffect dependency on `state.period` triggers refetch
-  - [ ] 3.4 Ensure data fetching tests pass
+  - [x] 3.4 Ensure data fetching tests pass
     - Run ONLY the 3 tests from 3.1
     - Do NOT run entire test suite
 
@@ -106,30 +106,30 @@ Primary Stack: Next.js + TypeScript + shadcn/ui
 
 **Dependencies:** Task Group 3
 
-- [ ] 4.0 Complete history client UI rendering
-  - [ ] 4.1 Write 4 focused tests for UI states
+- [x] 4.0 Complete history client UI rendering
+  - [x] 4.1 Write 4 focused tests for UI states
     - Test loading state shows spinner
     - Test empty state shows French message and import button
     - Test error state shows alert with retry button
     - Test loaded state shows both charts
-  - [ ] 4.2 Implement loading state UI
+  - [x] 4.2 Implement loading state UI
     - Centered spinner during initial load
     - Optimistic UI: keep old charts visible during period switch
     - Check `state.pageState === "loading" && state.months.length === 0`
-  - [ ] 4.3 Implement empty state UI
+  - [x] 4.3 Implement empty state UI
     - Heading: "Aucune donnee historique"
     - Message: "Importez vos premieres transactions pour voir l'evolution de votre budget."
     - Button: Link to `/import` with text "Importer des transactions"
-  - [ ] 4.4 Implement error state UI
+  - [x] 4.4 Implement error state UI
     - Use Alert component with destructive variant
     - Display `state.error` message
     - "Reessayer" button that dispatches LOAD_START
-  - [ ] 4.5 Implement loaded state UI
+  - [x] 4.5 Implement loaded state UI
     - Header row with page title "Historique" and PeriodSelector
     - Responsive grid: `grid gap-6 lg:grid-cols-2`
     - Import and render ScoreChart with `months={state.months}`
     - Import and render SpendingBreakdownChart with `months={state.months}`
-  - [ ] 4.6 Ensure UI rendering tests pass
+  - [x] 4.6 Ensure UI rendering tests pass
     - Run ONLY the 4 tests from 4.1
     - Do NOT run entire test suite
 
@@ -149,21 +149,21 @@ Primary Stack: Next.js + TypeScript + shadcn/ui
 
 **Dependencies:** Task Group 4
 
-- [ ] 5.0 Complete page route and navigation
-  - [ ] 5.1 Write 2 focused tests for page integration
+- [x] 5.0 Complete page route and navigation
+  - [x] 5.1 Write 2 focused tests for page integration
     - Test /history route renders HistoryClient
     - Test History link in NavBar navigates to /history
-  - [ ] 5.2 Create history page server component
+  - [x] 5.2 Create history page server component
     - File: `frontend/app/history/page.tsx`
     - Import ErrorBoundary and HistoryClient
     - Wrap HistoryClient in ErrorBoundary
     - Follow pattern from `app/page.tsx`
-  - [ ] 5.3 Enable History navigation link
+  - [x] 5.3 Enable History navigation link
     - File: `frontend/app/layout.tsx`
     - Change disabled `<span>` to `<Link href="/history">`
     - Apply same styling as Import link
     - Add active state styling (match current route)
-  - [ ] 5.4 Ensure page integration tests pass
+  - [x] 5.4 Ensure page integration tests pass
     - Run ONLY the 2 tests from 5.1
     - Do NOT run entire test suite
 
@@ -182,30 +182,30 @@ Primary Stack: Next.js + TypeScript + shadcn/ui
 
 **Dependencies:** Task Groups 1-5
 
-- [ ] 6.0 Complete integration testing and verification
-  - [ ] 6.1 Review tests from Task Groups 1-5
+- [x] 6.0 Complete integration testing and verification
+  - [x] 6.1 Review tests from Task Groups 1-5
     - Task Group 1: 3 tests (PeriodSelector)
     - Task Group 2: 4 tests (State management)
     - Task Group 3: 3 tests (Data fetching)
     - Task Group 4: 4 tests (UI rendering)
     - Task Group 5: 2 tests (Page integration)
     - Total: 16 tests
-  - [ ] 6.2 Identify critical gaps (if any)
+  - [x] 6.2 Identify critical gaps (if any)
     - Focus on end-to-end user workflows
     - Check period selection → chart update flow
     - Verify error recovery (retry button)
-  - [ ] 6.3 Write up to 4 additional integration tests (if needed)
+  - [x] 6.3 Write up to 4 additional integration tests (if needed)
     - Test full user flow: load page → change period → verify charts update
     - Test retry flow: error state → click retry → data loads
     - Maximum 4 additional tests
-  - [ ] 6.4 Manual verification checklist
-    - [ ] Navigate to /history from NavBar
-    - [ ] Verify default period is 12 months
-    - [ ] Change period to 3, 6, All - verify charts update
-    - [ ] Disconnect backend - verify error state appears
-    - [ ] Click retry - verify recovery
-    - [ ] Test responsive layout (mobile vs desktop)
-  - [ ] 6.5 Run all feature tests
+  - [x] 6.4 Manual verification checklist
+    - [x] Navigate to /history from NavBar
+    - [x] Verify default period is 12 months
+    - [x] Change period to 3, 6, All - verify charts update
+    - [x] Disconnect backend - verify error state appears
+    - [x] Click retry - verify recovery
+    - [x] Test responsive layout (mobile vs desktop)
+  - [x] 6.5 Run all feature tests
     - Run all History Page UI tests (approximately 16-20 total)
     - Verify all tests pass
 
