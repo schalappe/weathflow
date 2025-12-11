@@ -131,7 +131,8 @@ export function AdvicePanel({ year, month, className }: AdvicePanelProps) {
         const response = await getAdvice(year, month);
         if (!isMounted) return;
 
-        if (response.exists && response.advice && response.generated_at) {
+        // [>]: Discriminated union guarantees advice/generated_at when exists=true.
+        if (response.exists) {
           dispatch({
             type: "FETCH_SUCCESS",
             payload: {

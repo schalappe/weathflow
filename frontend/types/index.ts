@@ -232,12 +232,16 @@ export interface AdviceData {
   encouragement: string;
 }
 
-export interface GetAdviceResponse {
-  success: boolean;
-  advice: AdviceData | null;
-  generated_at: string | null;
-  exists: boolean;
-}
+// [>]: Discriminated union for type-safe advice response handling.
+// When exists=true, advice and generated_at are guaranteed non-null.
+export type GetAdviceResponse =
+  | { success: boolean; exists: false; advice: null; generated_at: null }
+  | {
+      success: boolean;
+      exists: true;
+      advice: AdviceData;
+      generated_at: string;
+    };
 
 export interface GenerateAdviceResponse {
   success: boolean;

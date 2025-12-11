@@ -308,4 +308,104 @@ describe("AdvicePanel - User Interactions", () => {
       expect(mockGetAdvice).toHaveBeenCalledWith(2025, 12);
     });
   });
+
+  it("shows error banner while keeping existing advice when regeneration fails", async () => {
+    const user = userEvent.setup();
+    const mockAdvice = createMockAdviceData();
+
+    mockGetAdvice.mockResolvedValue({
+      success: true,
+      advice: mockAdvice,
+      generated_at: new Date().toISOString(),
+      exists: true,
+    });
+
+    mockGenerateAdvice.mockRejectedValue(new Error("AI service unavailable"));
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    // [>]: Wait for advice to load.
+    await waitFor(() => {
+      expect(screen.getByText("Analyse des tendances")).toBeInTheDocument();
+    });
+
+    // [>]: Click regenerate button.
+    await user.click(screen.getByRole("button", { name: /Regenerer/ }));
+
+    // [>]: Error banner should appear.
+    await waitFor(() => {
+      expect(screen.getByText("AI service unavailable")).toBeInTheDocument();
+    });
+
+    // [>]: Existing advice should still be visible (not replaced by error state).
+    expect(screen.getByText(mockAdvice.analysis)).toBeInTheDocument();
+    expect(screen.getByText(mockAdvice.encouragement)).toBeInTheDocument();
+  });
+
+  it("hides problem areas section when array is empty", async () => {
+    const mockAdvice = createMockAdviceData({
+      problem_areas: [],
+    });
+
+    mockGetAdvice.mockResolvedValue({
+      success: true,
+      advice: mockAdvice,
+      generated_at: new Date().toISOString(),
+      exists: true,
+    });
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Analyse des tendances")).toBeInTheDocument();
+    });
+
+    // [>]: Problem areas section should not be visible when empty.
+    expect(screen.queryByText("Points d'attention")).not.toBeInTheDocument();
+  });
+
+  it("hides recommendations section when array is empty", async () => {
+    const mockAdvice = createMockAdviceData({
+      recommendations: [],
+    });
+
+    mockGetAdvice.mockResolvedValue({
+      success: true,
+      advice: mockAdvice,
+      generated_at: new Date().toISOString(),
+      exists: true,
+    });
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Analyse des tendances")).toBeInTheDocument();
+    });
+
+    // [>]: Recommendations section should not be visible when empty.
+    expect(screen.queryByText("Recommandations")).not.toBeInTheDocument();
+  });
+
+  it("shows gray color for neutral trend (0%)", async () => {
+    const mockAdvice = createMockAdviceData({
+      problem_areas: [{ category: "Neutral", amount: 100, trend: "0%" }],
+    });
+
+    mockGetAdvice.mockResolvedValue({
+      success: true,
+      advice: mockAdvice,
+      generated_at: new Date().toISOString(),
+      exists: true,
+    });
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("0%")).toBeInTheDocument();
+    });
+
+    // [>]: Neutral trend should have gray color class.
+    const neutralTrend = screen.getByText("0%");
+    expect(neutralTrend).toHaveClass("text-slate-500");
+  });
 });

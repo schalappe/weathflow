@@ -146,12 +146,18 @@ export function formatAdviceTimestamp(isoString: string): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
 
-  // [>]: Handle future dates (clock skew or data corruption).
+  // [!]: Future timestamp indicates clock skew or data corruption.
+  // Show actual date instead of misleading "just now" text.
   if (diffMs < 0) {
-    console.warn(
-      `[formatAdviceTimestamp] Future timestamp detected: "${isoString}"`,
+    console.error(
+      `[formatAdviceTimestamp] Future timestamp detected: "${isoString}". ` +
+        `Client: ${now.toISOString()}. Diff: ${Math.abs(diffMs / 1000)}s in future.`,
     );
-    return "a l'instant";
+    return date.toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
   }
 
   const diffHours = diffMs / (1000 * 60 * 60);
