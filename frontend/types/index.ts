@@ -216,3 +216,37 @@ export interface HistoryResponse {
   months: MonthHistory[];
   summary: HistorySummary;
 }
+
+// [>]: Advice API response types based on backend/app/responses/advice.py.
+// [>]: Uses discriminated union for type-safe null handling (safer than backend's optional fields).
+
+export interface ProblemArea {
+  category: string;
+  amount: number;
+  trend: string;
+}
+
+export interface AdviceData {
+  analysis: string;
+  problem_areas: ProblemArea[];
+  recommendations: string[];
+  encouragement: string;
+}
+
+// [>]: Discriminated union for type-safe advice response handling.
+// When exists=true, advice and generated_at are guaranteed non-null.
+export type GetAdviceResponse =
+  | { success: boolean; exists: false; advice: null; generated_at: null }
+  | {
+      success: boolean;
+      exists: true;
+      advice: AdviceData;
+      generated_at: string;
+    };
+
+export interface GenerateAdviceResponse {
+  success: boolean;
+  advice: AdviceData;
+  generated_at: string;
+  was_cached: boolean;
+}

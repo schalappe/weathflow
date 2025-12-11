@@ -1,4 +1,4 @@
-import type { MonthHistory, Score } from "@/types";
+import type { AdviceData, MonthHistory, Score } from "@/types";
 
 // [>]: Factory for creating test MonthHistory data with flexible percentages.
 export function createMonthHistory(
@@ -40,5 +40,27 @@ export function createMonthHistory(
     score,
     score_label: scoreLabels[score],
     month_label: `${monthNames[month - 1]} ${year}`,
+  };
+}
+
+// [>]: Factory for creating test AdviceData with sensible defaults.
+export function createMockAdviceData(
+  overrides: Partial<AdviceData> = {},
+): AdviceData {
+  return {
+    analysis:
+      "Tes depenses 'Choice' ont augmente de 15% sur les 3 derniers mois, principalement dans les abonnements.",
+    problem_areas: [
+      { category: "Abonnements", amount: 85, trend: "+20%" },
+      { category: "Restaurants", amount: 120, trend: "+10%" },
+    ],
+    recommendations: [
+      "Audite tes abonnements: certains ne sont peut-etre plus utilises.",
+      "Prepare tes repas le dimanche pour reduire les sorties au restaurant.",
+      "Tu es proche du score 'Great'! Continue ainsi.",
+    ],
+    encouragement:
+      "Tu as fait des progres ce mois-ci! Continue sur cette lancee.",
+    ...overrides,
   };
 }

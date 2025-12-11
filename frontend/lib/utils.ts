@@ -133,3 +133,51 @@ export function getErrorMessage(error: unknown, fallback: string): string {
 
 // [>]: Pagination constants.
 export const TRANSACTIONS_PER_PAGE = 50;
+
+// [>]: Format advice timestamp with French locale.
+// Uses relative time for <24h, absolute date otherwise.
+export function formatAdviceTimestamp(isoString: string): string {
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) {
+    console.warn(`[formatAdviceTimestamp] Invalid date string: "${isoString}"`);
+    return "date inconnue";
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+
+  // [!]: Future timestamp indicates clock skew or data corruption.
+  // Show actual date instead of misleading "just now" text.
+  if (diffMs < 0) {
+    console.error(
+      `[formatAdviceTimestamp] Future timestamp detected: "${isoString}". ` +
+        `Client: ${now.toISOString()}. Diff: ${Math.abs(diffMs / 1000)}s in future.`,
+    );
+    return date.toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  // [>]: Use relative time for recent advice (<24h).
+  if (diffHours < 1) {
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    if (diffMinutes < 1) return "a l'instant";
+    return `il y a ${diffMinutes} minute${diffMinutes > 1 ? "s" : ""}`;
+  }
+
+  if (diffHours < 24) {
+    const hours = Math.floor(diffHours);
+    return `il y a ${hours} heure${hours > 1 ? "s" : ""}`;
+  }
+
+  // [>]: Absolute date for older advice (French locale).
+  return date.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
