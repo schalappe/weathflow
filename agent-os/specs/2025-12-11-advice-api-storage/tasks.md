@@ -19,23 +19,23 @@ This feature exposes the existing `AdviceGenerator` service via REST API. Most i
 **Dependencies:** None
 **Estimated Time:** 45-60 minutes
 
-- [ ] 1.0 Complete service layer for advice CRUD
-  - [ ] 1.1 Write 4 focused tests for advice service functions
+- [x] 1.0 Complete service layer for advice CRUD
+  - [x] 1.1 Write 4 focused tests for advice service functions
     - Test `get_advice_by_month_id()` returns advice when exists
     - Test `get_advice_by_month_id()` returns None when not exists
     - Test `create_or_update_advice()` creates new advice record
     - Test `create_or_update_advice()` updates existing advice record
-  - [ ] 1.2 Add `AdviceQueryError` exception to `exceptions.py`
+  - [x] 1.2 Add `AdviceQueryError` exception to `exceptions.py`
     - Inherit from `AdviceGenerationError`
     - Include `month_id` and `reason` attributes
     - Follow existing exception pattern (lines 359-427)
-  - [ ] 1.3 Create `backend/app/services/advice.py` with CRUD functions
+  - [x] 1.3 Create `backend/app/services/advice.py` with CRUD functions
     - `get_advice_by_month_id(db, month_id) -> Advice | None`
     - `create_or_update_advice(db, month_id, advice_text) -> Advice`
     - `month_to_month_data(month: Month) -> MonthData`
     - `advice_response_to_json(advice: AdviceResponse) -> str`
     - Follow pattern from `backend/app/services/months.py`
-  - [ ] 1.4 Ensure service layer tests pass
+  - [x] 1.4 Ensure service layer tests pass
     - Run only the 4 tests from task 1.1
     - Verify CRUD operations work correctly
 
@@ -55,19 +55,19 @@ This feature exposes the existing `AdviceGenerator` service via REST API. Most i
 **Dependencies:** None (can run in parallel with Task Group 1)
 **Estimated Time:** 30-45 minutes
 
-- [ ] 2.0 Complete response models for advice endpoints
-  - [ ] 2.1 Write 3 focused tests for response model converters
+- [x] 2.0 Complete response models for advice endpoints
+  - [x] 2.1 Write 3 focused tests for response model converters
     - Test `AdviceData.from_json()` parses valid JSON string
     - Test `AdviceData.from_service_response()` converts DTO correctly
     - Test response models validate field constraints
-  - [ ] 2.2 Create `backend/app/responses/advice.py`
+  - [x] 2.2 Create `backend/app/responses/advice.py`
     - `ProblemAreaResponse` model (category, amount, trend)
     - `AdviceData` model with `from_json()` and `from_service_response()` class methods
     - `GenerateAdviceRequest` model (year, month, regenerate)
     - `GenerateAdviceResponse` model (success, advice, generated_at, was_cached)
     - `GetAdviceResponse` model (success, advice, generated_at, exists)
     - Follow pattern from `backend/app/responses/months.py`
-  - [ ] 2.3 Ensure response model tests pass
+  - [x] 2.3 Ensure response model tests pass
     - Run only the 3 tests from task 2.1
     - Verify JSON parsing and DTO conversion work
 
@@ -87,15 +87,15 @@ This feature exposes the existing `AdviceGenerator` service via REST API. Most i
 **Dependencies:** Task Groups 1 and 2
 **Estimated Time:** 60-90 minutes
 
-- [ ] 3.0 Complete API router with both endpoints
-  - [ ] 3.1 Write 6 focused tests for advice endpoints
+- [x] 3.0 Complete API router with both endpoints
+  - [x] 3.1 Write 6 focused tests for advice endpoints
     - Test POST generates new advice when none exists
     - Test POST returns cached advice when exists and `regenerate=False`
     - Test POST regenerates advice when `regenerate=True`
     - Test POST returns 404 when month not found
     - Test GET returns existing advice with `exists=True`
     - Test GET returns `exists=False` when no advice
-  - [ ] 3.2 Create `backend/app/routers/advice.py` with POST endpoint
+  - [x] 3.2 Create `backend/app/routers/advice.py` with POST endpoint
     - `POST /api/advice/generate` with `GenerateAdviceRequest` body
     - Check month exists (404 if not)
     - Check for cached advice (return if exists and not regenerating)
@@ -104,15 +104,15 @@ This feature exposes the existing `AdviceGenerator` service via REST API. Most i
     - Call `AdviceGenerator.generate_advice()`
     - Store result via `create_or_update_advice()`
     - Map exceptions to HTTP status codes (400, 404, 500, 503)
-  - [ ] 3.3 Add GET endpoint to advice router
+  - [x] 3.3 Add GET endpoint to advice router
     - `GET /api/advice/{year}/{month}` with path validation
     - Check month exists (404 if not)
     - Query advice via `get_advice_by_month_id()`
     - Return `exists=False` if no advice, otherwise parse and return
-  - [ ] 3.4 Wire router in `backend/app/main.py`
+  - [x] 3.4 Wire router in `backend/app/main.py`
     - Import advice router
     - Add `app.include_router(advice.router)`
-  - [ ] 3.5 Ensure API tests pass
+  - [x] 3.5 Ensure API tests pass
     - Run only the 6 tests from task 3.1
     - Verify all endpoints respond correctly
 
@@ -133,23 +133,23 @@ This feature exposes the existing `AdviceGenerator` service via REST API. Most i
 **Dependencies:** Task Groups 1, 2, and 3
 **Estimated Time:** 30-45 minutes
 
-- [ ] 4.0 Review existing tests and add integration coverage
-  - [ ] 4.1 Review tests from Task Groups 1-3
+- [x] 4.0 Review existing tests and add integration coverage
+  - [x] 4.1 Review tests from Task Groups 1-3
     - Review 4 service tests (Task 1.1)
     - Review 3 response model tests (Task 2.1)
     - Review 6 endpoint tests (Task 3.1)
     - Total existing: 13 tests
-  - [ ] 4.2 Identify critical integration gaps
+  - [x] 4.2 Identify critical integration gaps
     - Full flow: generate → store → retrieve
     - Error scenarios with mocked Claude API
     - Insufficient data handling (< 2 months)
-  - [ ] 4.3 Write up to 5 additional integration tests
+  - [x] 4.3 Write up to 5 additional integration tests
     - Test full generate-then-retrieve flow
     - Test 400 error when insufficient historical data
     - Test regeneration replaces existing advice
     - Test 503 error when Claude API unavailable (mocked)
     - Test advice JSON persisted correctly in database
-  - [ ] 4.4 Run all feature-specific tests
+  - [x] 4.4 Run all feature-specific tests
     - Run all 18 tests (13 existing + 5 integration)
     - Verify all pass
     - Run quality checks: `ruff check`, `ruff format`, `mypy`

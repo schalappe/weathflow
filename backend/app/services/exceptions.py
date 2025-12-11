@@ -425,3 +425,28 @@ class AdviceParseError(AdviceGenerationError):
         # ##>: Truncate response in message for readability but keep full in attribute.
         preview = raw_response[:100] + "..." if len(raw_response) > 100 else raw_response
         super().__init__(f"Invalid JSON response from Claude API: {preview}")
+
+
+class AdviceQueryError(AdviceGenerationError):
+    """
+    Raised when a database query for advice fails.
+
+    Parameters
+    ----------
+    month_id : int
+        The ID of the month being queried.
+    reason : str
+        Description of the failure.
+
+    Attributes
+    ----------
+    month_id : int
+        The month ID for programmatic access.
+    reason : str
+        The failure reason for debugging.
+    """
+
+    def __init__(self, month_id: int, reason: str) -> None:
+        self.month_id = month_id
+        self.reason = reason
+        super().__init__(f"Failed to query advice for month {month_id}: {reason}")
