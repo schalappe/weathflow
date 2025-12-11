@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, beforeAll } from "vitest";
 import { ScoreChart } from "@/components/history/score-chart";
-import type { MonthHistory, Score } from "@/types";
+import { createMonthHistory } from "@/__tests__/utils/test-factories";
 
 // [>]: Mock ResizeObserver for Recharts ResponsiveContainer.
 beforeAll(() => {
@@ -11,44 +11,6 @@ beforeAll(() => {
     disconnect() {}
   };
 });
-
-// [>]: Factory for test month data.
-function createMonthHistory(
-  year: number,
-  month: number,
-  score: Score,
-): MonthHistory {
-  const scoreLabels = ["Poor", "Need Improvement", "Okay", "Great"] as const;
-  const monthNames = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-
-  return {
-    year,
-    month,
-    total_income: 5000,
-    total_core: 2000,
-    total_choice: 1500,
-    total_compound: 1000,
-    core_percentage: 40,
-    choice_percentage: 30,
-    compound_percentage: 20,
-    score,
-    score_label: scoreLabels[score],
-    month_label: `${monthNames[month - 1]} ${year}`,
-  };
-}
 
 describe("ScoreChart", () => {
   it("renders chart with data points", () => {
