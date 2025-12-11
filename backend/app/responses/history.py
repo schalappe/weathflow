@@ -28,9 +28,9 @@ class MonthHistory(BaseModel):
     total_core: float
     total_choice: float
     total_compound: float
-    core_percentage: float = Field(ge=0.0)
-    choice_percentage: float = Field(ge=0.0)
-    compound_percentage: float = Field(ge=0.0)
+    core_percentage: float
+    choice_percentage: float
+    compound_percentage: float
     score: int = Field(ge=0, le=3)
     score_label: ScoreLabelLiteral | None
 
