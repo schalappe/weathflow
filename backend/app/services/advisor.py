@@ -224,10 +224,15 @@ class AdviceGenerator:
                 messages=[{"role": "user", "content": user_prompt}],
             )
         except anthropic.AuthenticationError as e:
+            logger.error("Anthropic authentication failed: %s", e)
             raise AdviceGenerationError(
                 "Invalid Anthropic API key. Please check your ANTHROPIC_API_KEY environment variable."
             ) from e
-        except (anthropic.APIConnectionError, anthropic.RateLimitError) as e:
+        except anthropic.APIConnectionError as e:
+            logger.error("Claude API connection failed after %d retries: %s", self.MAX_RETRIES, e)
+            raise AdviceAPIError(retry_count=self.MAX_RETRIES) from e
+        except anthropic.RateLimitError as e:
+            logger.error("Claude API rate limit exceeded after %d retries: %s", self.MAX_RETRIES, e)
             raise AdviceAPIError(retry_count=self.MAX_RETRIES) from e
         except anthropic.APIStatusError as e:
             logger.error("Anthropic API error (status %s): %s", e.status_code, e.message)
@@ -278,6 +283,7 @@ class AdviceGenerator:
             raise AdviceParseError(response_text) from e
 
         if not isinstance(data, dict):
+            logger.error("Claude API returned non-object JSON type: %s", type(data).__name__)
             raise AdviceParseError(response_text)
 
         try:

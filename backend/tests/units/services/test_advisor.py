@@ -270,6 +270,42 @@ class TestAdviceGeneratorAPICall(unittest.TestCase):
         with self.assertRaises(AdviceParseError):
             self.generator._call_claude_api("test prompt")
 
+    def test_rate_limit_error_raises_advice_api_error(self) -> None:
+        """Should raise AdviceAPIError on rate limit."""
+        self.mock_client.messages.create.side_effect = anthropic.RateLimitError(
+            message="Rate limit exceeded", response=MagicMock(), body=None
+        )
+
+        with self.assertRaises(AdviceAPIError) as context:
+            self.generator._call_claude_api("test prompt")
+
+        self.assertEqual(context.exception.retry_count, 3)
+
+    def test_api_status_error_raises_advice_api_error(self) -> None:
+        """Should raise AdviceAPIError on API status errors (5xx, 4xx)."""
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        self.mock_client.messages.create.side_effect = anthropic.APIStatusError(
+            message="Internal Server Error", response=mock_response, body=None
+        )
+
+        with self.assertRaises(AdviceAPIError) as context:
+            self.generator._call_claude_api("test prompt")
+
+        self.assertEqual(context.exception.retry_count, 3)
+
+    def test_non_text_content_block_raises_advice_parse_error(self) -> None:
+        """Should raise AdviceParseError when content block has no text attribute."""
+        mock_response = MagicMock()
+        mock_content = MagicMock(spec=[])
+        mock_response.content = [mock_content]
+        self.mock_client.messages.create.return_value = mock_response
+
+        with self.assertRaises(AdviceParseError) as context:
+            self.generator._call_claude_api("test prompt")
+
+        self.assertIn("content type", str(context.exception))
+
 
 class TestAdviceGeneratorResponseParsing(unittest.TestCase):
     """Tests for response parsing (Task Group 8)."""
@@ -325,6 +361,20 @@ class TestAdviceGeneratorResponseParsing(unittest.TestCase):
     def test_missing_fields_raise_advice_parse_error(self) -> None:
         """Should raise AdviceParseError when required fields missing."""
         response_text = '{"analysis": "Test"}'
+
+        with self.assertRaises(AdviceParseError):
+            self.generator._parse_response(response_text)
+
+    def test_json_array_response_raises_advice_parse_error(self) -> None:
+        """Should raise AdviceParseError when JSON is not an object."""
+        response_text = '["item1", "item2"]'
+
+        with self.assertRaises(AdviceParseError):
+            self.generator._parse_response(response_text)
+
+    def test_json_string_response_raises_advice_parse_error(self) -> None:
+        """Should raise AdviceParseError when JSON is a primitive string."""
+        response_text = '"just a string"'
 
         with self.assertRaises(AdviceParseError):
             self.generator._parse_response(response_text)
