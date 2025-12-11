@@ -46,20 +46,27 @@ class AdviceData(BaseModel):
         ValueError
             If JSON is malformed or missing required fields.
         """
-        data = json.loads(json_str)
-        return cls(
-            analysis=data["analysis"],
-            problem_areas=[
-                ProblemAreaResponse(
-                    category=pa["category"],
-                    amount=pa["amount"],
-                    trend=pa["trend"],
-                )
-                for pa in data["problem_areas"]
-            ],
-            recommendations=data["recommendations"],
-            encouragement=data["encouragement"],
-        )
+        try:
+            data = json.loads(json_str)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"Malformed advice JSON: {error}") from error
+
+        try:
+            return cls(
+                analysis=data["analysis"],
+                problem_areas=[
+                    ProblemAreaResponse(
+                        category=pa["category"],
+                        amount=pa["amount"],
+                        trend=pa["trend"],
+                    )
+                    for pa in data["problem_areas"]
+                ],
+                recommendations=data["recommendations"],
+                encouragement=data["encouragement"],
+            )
+        except KeyError as error:
+            raise ValueError(f"Advice JSON missing required field: {error}") from error
 
     @classmethod
     def from_service_response(cls, response: "ServiceAdviceResponse") -> Self:

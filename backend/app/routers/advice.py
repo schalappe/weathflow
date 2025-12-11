@@ -17,7 +17,9 @@ from app.services import advice as advice_service
 from app.services import months as months_service
 from app.services.advisor import AdviceGenerator
 from app.services.exceptions import (
+    AdviceAPIError,
     AdviceGenerationError,
+    AdviceParseError,
     AdviceQueryError,
     InsufficientDataError,
     MonthDataError,
@@ -43,11 +45,12 @@ def _http_detail_for_advice_error(error: AdviceGenerationError) -> str:
     str
         User-friendly error message for HTTP response.
     """
-    error_str = str(error).lower()
-    if "insufficient" in error_str or "requires at least" in error_str:
+    if isinstance(error, InsufficientDataError):
         return "Not enough historical data. Please upload at least 2 months of transactions."
-    if "api" in error_str or "unreachable" in error_str:
+    if isinstance(error, AdviceAPIError):
         return "AI service temporarily unavailable. Please try again in a moment."
+    if isinstance(error, AdviceParseError):
+        return "AI service returned an invalid response. Please try again."
     return "An error occurred while generating advice. Please try again."
 
 
@@ -78,10 +81,10 @@ def generate_advice(
         If month not found.
     HTTPException 400
         If insufficient data for advice generation.
-    HTTPException 503
-        If AI service or database unavailable.
     HTTPException 500
-        If response parsing fails or unexpected error.
+        If stored advice data is corrupted or unexpected error.
+    HTTPException 503
+        If AI service or database unavailable (AdviceQueryError, MonthDataError).
     """
     try:
         month_record = months_service.get_month_by_year_month(db, request.year, request.month)
@@ -132,13 +135,17 @@ def generate_advice(
 
     except HTTPException:
         raise
+    except ValueError as error:
+        # ##>: Catches corrupted JSON from AdviceData.from_json() when loading cached advice.
+        logger.exception("Corrupted advice data for %d-%02d", request.year, request.month)
+        raise HTTPException(
+            status_code=500,
+            detail="Stored advice data is corrupted. Please regenerate advice with regenerate=true.",
+        ) from error
     except InsufficientDataError as error:
-        logger.warning("Insufficient data for advice generation: %s", error)
+        logger.info("Insufficient data for advice generation: %s", error)
         raise HTTPException(status_code=400, detail=_http_detail_for_advice_error(error)) from error
-    except AdviceQueryError as error:
-        logger.exception("Database error in generate_advice")
-        raise HTTPException(status_code=503, detail="Database temporarily unavailable.") from error
-    except MonthDataError as error:
+    except (AdviceQueryError, MonthDataError) as error:
         logger.exception("Database error in generate_advice")
         raise HTTPException(status_code=503, detail="Database temporarily unavailable.") from error
     except AdviceGenerationError as error:
@@ -204,6 +211,13 @@ def get_advice(
 
     except HTTPException:
         raise
+    except ValueError as error:
+        # ##>: Catches corrupted JSON from AdviceData.from_json() when loading stored advice.
+        logger.exception("Corrupted advice data for %d-%02d", year, month)
+        raise HTTPException(
+            status_code=500,
+            detail="Stored advice data is corrupted. Please regenerate advice.",
+        ) from error
     except (AdviceQueryError, MonthDataError) as error:
         logger.exception("Database error in get_advice for %d-%02d", year, month)
         raise HTTPException(status_code=503, detail="Database temporarily unavailable.") from error

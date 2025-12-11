@@ -43,7 +43,7 @@ def get_advice_by_month_id(db: Session, month_id: int) -> Advice | None:
             logger.info("No advice found for month_id=%d", month_id)
         return result
     except SQLAlchemyError as error:
-        logger.error("Database error retrieving advice for month_id=%d: %s", month_id, str(error))
+        logger.exception("Database error retrieving advice for month_id=%d", month_id)
         raise AdviceQueryError(month_id, str(error)) from error
 
 
@@ -89,7 +89,7 @@ def create_or_update_advice(db: Session, month_id: int, advice_text: str) -> Adv
         return advice
     except SQLAlchemyError as error:
         db.rollback()
-        logger.error("Database error saving advice for month_id=%d: %s", month_id, str(error))
+        logger.exception("Database error saving advice for month_id=%d", month_id)
         raise AdviceQueryError(month_id, str(error)) from error
 
 

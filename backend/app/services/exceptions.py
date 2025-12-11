@@ -1,4 +1,4 @@
-"""Custom exceptions for CSV parsing, transaction categorization, and score calculation operations."""
+"""Custom domain exceptions for all service layer operations."""
 
 from typing import Any
 
