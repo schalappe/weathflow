@@ -60,6 +60,14 @@ export const SCORE_COLORS: Record<number, string> = {
   3: "bg-green-500",
 };
 
+// [>]: Score colors as hex values for Recharts (matches SCORE_COLORS).
+export const SCORE_COLORS_HEX: Record<number, string> = {
+  0: "#ef4444",
+  1: "#f97316",
+  2: "#eab308",
+  3: "#22c55e",
+};
+
 // [>]: Category colors for pie chart (hex) - typed with MoneyMapType for compile-time safety.
 export const CATEGORY_COLORS: Record<MoneyMapType, string> = {
   INCOME: "#3b82f6",

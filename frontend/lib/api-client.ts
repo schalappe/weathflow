@@ -1,5 +1,6 @@
 import type {
   CategorizeResponse,
+  HistoryResponse,
   ImportMode,
   MonthDetailResponse,
   MonthsListResponse,
@@ -205,4 +206,34 @@ export async function updateTransaction(
   }
 
   return safeParseJson<UpdateTransactionResponse>(response);
+}
+
+export async function getMonthsHistory(
+  months: number = 12,
+): Promise<HistoryResponse> {
+  const url = new URL(`${API_BASE}/api/months/history`);
+  url.searchParams.set("months", months.toString());
+
+  let response: Response;
+  try {
+    response = await fetch(url.toString());
+  } catch (networkError) {
+    console.error("Network error fetching months history:", networkError);
+    throw new Error(
+      "Unable to connect to server. Please check your network connection.",
+    );
+  }
+
+  if (!response.ok) {
+    const message = await extractErrorMessage(
+      response,
+      "Failed to load history data",
+    );
+    console.error(
+      `Months history failed with status ${response.status}: ${message}`,
+    );
+    throw new Error(message);
+  }
+
+  return safeParseJson<HistoryResponse>(response);
 }
