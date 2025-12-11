@@ -30,7 +30,7 @@
 
 15. [x] Advice API and Storage — Create endpoints to generate and retrieve advice, storing generated advice in the database for the month `S`
 
-16. [ ] Advice Panel UI — Build the advice display component showing analysis, problem areas, recommendations, and encouragement with a regenerate button `M`
+16. [x] Advice Panel UI — Build the advice display component showing analysis, problem areas, recommendations, and encouragement with a regenerate button `M`
 
 17. [ ] Transaction Filters — Add filtering by category type, date range, and search by description to the transaction table `S`
 
