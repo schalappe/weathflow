@@ -77,6 +77,17 @@ describe("API Client - Advice Functions", () => {
 
       await expect(getAdvice(2025, 12)).rejects.toThrow("Month not found");
     });
+
+    it("throws user-friendly error on malformed JSON response", async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.reject(new SyntaxError("Unexpected token")),
+      });
+
+      await expect(getAdvice(2025, 12)).rejects.toThrow(
+        "Server returned an invalid response",
+      );
+    });
   });
 
   describe("generateAdvice", () => {

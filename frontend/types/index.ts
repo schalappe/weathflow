@@ -217,7 +217,8 @@ export interface HistoryResponse {
   summary: HistorySummary;
 }
 
-// [>]: Advice API response types - mirroring backend/app/responses/advice.py.
+// [>]: Advice API response types based on backend/app/responses/advice.py.
+// [>]: Uses discriminated union for type-safe null handling (safer than backend's optional fields).
 
 export interface ProblemArea {
   category: string;

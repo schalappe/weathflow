@@ -408,4 +408,121 @@ describe("AdvicePanel - User Interactions", () => {
     const neutralTrend = screen.getByText("0%");
     expect(neutralTrend).toHaveClass("text-slate-500");
   });
+
+  it("disables regenerate button during regeneration to prevent double-submit", async () => {
+    const user = userEvent.setup();
+    const mockAdvice = createMockAdviceData();
+
+    mockGetAdvice.mockResolvedValue({
+      success: true,
+      advice: mockAdvice,
+      generated_at: new Date().toISOString(),
+      exists: true,
+    });
+
+    // [>]: Slow response to observe disabled state.
+    mockGenerateAdvice.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                success: true,
+                advice: mockAdvice,
+                generated_at: new Date().toISOString(),
+                was_cached: false,
+              }),
+            200,
+          ),
+        ),
+    );
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /Regenerer/ }),
+      ).toBeInTheDocument();
+    });
+
+    const button = screen.getByRole("button", { name: /Regenerer/ });
+    await user.click(button);
+
+    // [>]: Button should be disabled during regeneration.
+    expect(screen.getByRole("button", { name: /Regeneration/ })).toBeDisabled();
+  });
+});
+
+describe("AdvicePanel - Error State Actionable Guidance", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows import link for data-related errors (month not found)", async () => {
+    mockGetAdvice.mockRejectedValue(new Error("Month not found"));
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Month not found")).toBeInTheDocument();
+    });
+
+    // [>]: Data-related error should show import link instead of retry.
+    const importLink = screen.getByRole("link", { name: /Importer/ });
+    expect(importLink).toHaveAttribute("href", "/import");
+    expect(
+      screen.queryByRole("button", { name: "Reessayer" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows import link for insufficient data errors", async () => {
+    mockGetAdvice.mockRejectedValue(
+      new Error("Insufficient data for analysis"),
+    );
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Insufficient data for analysis"),
+      ).toBeInTheDocument();
+    });
+
+    // [>]: Insufficient data should prompt import.
+    const importLink = screen.getByRole("link", { name: /Importer/ });
+    expect(importLink).toHaveAttribute("href", "/import");
+  });
+
+  it("shows retry button for network errors", async () => {
+    mockGetAdvice.mockRejectedValue(new Error("Network error"));
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Network error")).toBeInTheDocument();
+    });
+
+    // [>]: Network errors should show retry, not import link.
+    expect(
+      screen.getByRole("button", { name: "Reessayer" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /Importer/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows retry button for generic server errors", async () => {
+    mockGetAdvice.mockRejectedValue(new Error("Internal server error"));
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Internal server error")).toBeInTheDocument();
+    });
+
+    // [>]: Server errors can be retried.
+    expect(
+      screen.getByRole("button", { name: "Reessayer" }),
+    ).toBeInTheDocument();
+  });
 });

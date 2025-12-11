@@ -1,6 +1,7 @@
 "use client";
 
 import { useReducer, useCallback, useEffect } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -12,6 +13,7 @@ import {
   Loader2,
   RefreshCw,
   Sparkles,
+  Upload,
 } from "lucide-react";
 import { getAdvice, generateAdvice } from "@/lib/api-client";
 import {
@@ -303,21 +305,46 @@ function EmptyState({ onGenerate, isLoading }: EmptyStateProps) {
   );
 }
 
-// [>]: Error state with retry button.
+// [>]: Detect data-related errors that require importing data rather than retrying.
+function isDataRelatedError(error: string | null): boolean {
+  if (!error) return false;
+  const lowerError = error.toLowerCase();
+  return (
+    lowerError.includes("mois") ||
+    lowerError.includes("month") ||
+    lowerError.includes("donnees") ||
+    lowerError.includes("data") ||
+    lowerError.includes("not found") ||
+    lowerError.includes("insufficient")
+  );
+}
+
+// [>]: Error state with actionable guidance based on error type.
 interface ErrorStateProps {
   error: string | null;
   onRetry: () => void;
 }
 
 function ErrorState({ error, onRetry }: ErrorStateProps) {
+  const needsImport = isDataRelatedError(error);
+
   return (
     <Alert variant="destructive">
       <AlertCircle className="h-4 w-4" />
-      <AlertDescription className="flex items-center justify-between">
+      <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <span>{error}</span>
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          Reessayer
-        </Button>
+        {needsImport ? (
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/import">
+              <Upload className="mr-2 h-4 w-4" />
+              Importer des donnees
+            </Link>
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            Reessayer
+          </Button>
+        )}
       </AlertDescription>
     </Alert>
   );
