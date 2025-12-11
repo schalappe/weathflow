@@ -28,7 +28,7 @@
 
 14. [x] Advice Generation Service — Implement Claude API integration that analyzes the last 3 months and generates personalized recommendations with trend analysis `M`
 
-15. [ ] Advice API and Storage — Create endpoints to generate and retrieve advice, storing generated advice in the database for the month `S`
+15. [x] Advice API and Storage — Create endpoints to generate and retrieve advice, storing generated advice in the database for the month `S`
 
 16. [ ] Advice Panel UI — Build the advice display component showing analysis, problem areas, recommendations, and encouragement with a regenerate button `M`
 
