@@ -1,6 +1,7 @@
 """Tests for AdviceGenerator service."""
 
 import unittest
+from typing import cast
 from unittest.mock import MagicMock
 
 import anthropic
@@ -177,7 +178,7 @@ class TestAdviceGeneratorValidation(unittest.TestCase):
         mock_response.content = [
             MagicMock(text='{"analysis": "Test", "problem_areas": [], "recommendations": [], "encouragement": "Good"}')
         ]
-        self.generator._client.messages.create.return_value = mock_response
+        self.generator._client.messages.create.return_value = mock_response  # type: ignore[attr-defined]
 
         result = self.generator.generate_advice(current, history)
         self.assertIsInstance(result, AdviceResponse)
