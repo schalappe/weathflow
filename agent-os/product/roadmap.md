@@ -24,7 +24,7 @@
 
 12. [x] Spending Breakdown Chart — Create a stacked bar chart showing Core/Choice/Compound distribution month-over-month `S`
 
-13. [ ] History Page UI — Combine evolution charts into a dedicated history page with period selector `M`
+13. [x] History Page UI — Combine evolution charts into a dedicated history page with period selector `M`
 
 14. [ ] Advice Generation Service — Implement Claude API integration that analyzes the last 3 months and generates personalized recommendations with trend analysis `M`
 
