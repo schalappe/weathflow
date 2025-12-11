@@ -34,14 +34,18 @@ function CustomTooltip({
   label,
 }: {
   active?: boolean;
-  payload?: Array<{ name: string; value: number; color: string }>;
+  payload?: Array<{
+    name: string;
+    value: number;
+    color: string;
+    payload: BreakdownChartDataPoint;
+  }>;
   label?: string;
 }) {
   if (!active || !payload?.length) return null;
 
-  // [>]: Find fullLabel from first payload item's data.
-  const data = payload[0]?.payload as BreakdownChartDataPoint | undefined;
-  const displayLabel = data?.fullLabel ?? label;
+  // [>]: Access fullLabel from first payload item's data.
+  const displayLabel = payload[0]?.payload.fullLabel ?? label;
 
   return (
     <div className="rounded-md border bg-background p-2 shadow-md">
@@ -62,7 +66,9 @@ function CustomTooltip({
 }
 
 // [>]: Filter empty months, sort chronologically, map to chart format.
-function transformToChartData(months: MonthHistory[]): BreakdownChartDataPoint[] {
+function transformToChartData(
+  months: MonthHistory[],
+): BreakdownChartDataPoint[] {
   // [>]: Filter out months where all percentages are zero.
   const validMonths = months.filter(
     (m) =>
