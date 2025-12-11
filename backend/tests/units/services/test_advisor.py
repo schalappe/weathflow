@@ -1,7 +1,6 @@
 """Tests for AdviceGenerator service."""
 
 import unittest
-from typing import cast
 from unittest.mock import MagicMock
 
 import anthropic
