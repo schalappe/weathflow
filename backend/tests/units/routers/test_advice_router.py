@@ -11,7 +11,7 @@ from app.db.models.advice import Advice
 from app.db.models.month import Month
 from app.main import app
 from app.services.dto.advice import AdviceResponse, ProblemArea
-from app.services.exceptions import InsufficientDataError
+from app.services.exceptions import AdviceQueryError, InsufficientDataError
 
 client = TestClient(app)
 
@@ -204,6 +204,60 @@ class TestPostGenerateAdvice(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("Not enough historical data", response.json()["detail"])
 
+    @patch("app.routers.advice.advice_service")
+    @patch("app.routers.advice.months_service")
+    def test_returns_500_when_cached_advice_is_corrupted(
+        self,
+        mock_months_service: MagicMock,
+        mock_advice_service: MagicMock,
+    ) -> None:
+        """POST returns 500 with helpful message when cached advice JSON is corrupted."""
+        mock_month = _create_mock_month()
+        mock_months_service.get_month_by_year_month.return_value = mock_month
+
+        mock_advice = MagicMock(spec=Advice)
+        mock_advice.advice_text = "invalid json {"
+        mock_advice_service.get_advice_by_month_id.return_value = mock_advice
+
+        response = client.post("/api/advice/generate", json={"year": 2025, "month": 10})
+
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("corrupted", response.json()["detail"].lower())
+        self.assertIn("regenerate", response.json()["detail"].lower())
+
+    @patch("app.routers.advice.advice_service")
+    @patch("app.routers.advice.months_service")
+    @patch("app.routers.advice.AdviceGenerator")
+    @patch("app.routers.advice.get_settings")
+    def test_returns_503_when_database_error_during_storage(
+        self,
+        mock_settings: MagicMock,
+        mock_generator_class: MagicMock,
+        mock_months_service: MagicMock,
+        mock_advice_service: MagicMock,
+    ) -> None:
+        """POST returns 503 when database fails during advice storage."""
+        mock_settings.return_value.anthropic_api_key.get_secret_value.return_value = "test-key"
+        mock_settings.return_value.anthropic_base_url = None
+
+        mock_month = _create_mock_month()
+        mock_months_service.get_month_by_year_month.return_value = mock_month
+        mock_months_service.get_months_history.return_value = [mock_month]
+        mock_advice_service.get_advice_by_month_id.return_value = None
+        mock_advice_service.month_to_month_data.return_value = MagicMock()
+        mock_advice_service.advice_response_to_json.return_value = "{}"
+
+        mock_generator = MagicMock()
+        mock_generator.generate_advice.return_value = _create_advice_response()
+        mock_generator_class.return_value = mock_generator
+
+        mock_advice_service.create_or_update_advice.side_effect = AdviceQueryError(1, "Connection lost")
+
+        response = client.post("/api/advice/generate", json={"year": 2025, "month": 10})
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("Database temporarily unavailable", response.json()["detail"])
+
 
 class TestGetAdvice(unittest.TestCase):
     """Tests for GET /api/advice/{year}/{month} endpoint."""
@@ -257,3 +311,23 @@ class TestGetAdvice(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertIn("No data found", response.json()["detail"])
+
+    @patch("app.routers.advice.advice_service")
+    @patch("app.routers.advice.months_service")
+    def test_returns_500_when_stored_advice_is_corrupted(
+        self,
+        mock_months_service: MagicMock,
+        mock_advice_service: MagicMock,
+    ) -> None:
+        """GET returns 500 with helpful message when advice JSON is corrupted."""
+        mock_month = _create_mock_month()
+        mock_months_service.get_month_by_year_month.return_value = mock_month
+
+        mock_advice = MagicMock(spec=Advice)
+        mock_advice.advice_text = "not valid json"
+        mock_advice_service.get_advice_by_month_id.return_value = mock_advice
+
+        response = client.get("/api/advice/2025/10")
+
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("corrupted", response.json()["detail"].lower())
