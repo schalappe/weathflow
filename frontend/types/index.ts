@@ -175,3 +175,44 @@ export interface UpdateTransactionResponse {
   transaction: TransactionResponse;
   updated_month_stats: MonthSummary;
 }
+
+// [>]: Historical data API response types - mirroring backend/app/responses/history.py.
+
+export type ScoreTrend = "improving" | "declining" | "stable";
+
+// [>]: Score value constrained to 0-3 matching backend Field(ge=0, le=3).
+export type Score = 0 | 1 | 2 | 3;
+
+export interface MonthHistory {
+  year: number;
+  month: number;
+  total_income: number;
+  total_core: number;
+  total_choice: number;
+  total_compound: number;
+  core_percentage: number;
+  choice_percentage: number;
+  compound_percentage: number;
+  score: Score;
+  score_label: ScoreLabel | null;
+  month_label: string;
+}
+
+export interface MonthReference {
+  year: number;
+  month: number;
+  score: Score;
+}
+
+export interface HistorySummary {
+  total_months: number;
+  average_score: number;
+  score_trend: ScoreTrend;
+  best_month: MonthReference | null;
+  worst_month: MonthReference | null;
+}
+
+export interface HistoryResponse {
+  months: MonthHistory[];
+  summary: HistorySummary;
+}
