@@ -316,3 +316,31 @@ export async function generateAdvice(
 
   return safeParseJson<GenerateAdviceResponse>(response);
 }
+
+export type ExportFormat = "json" | "csv";
+
+export async function exportMonthData(
+  year: number,
+  month: number,
+  format: ExportFormat,
+): Promise<Blob> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${API_BASE}/api/months/${year}/${month}/export/${format}`,
+    );
+  } catch (networkError) {
+    console.error("Network error during export:", networkError);
+    throw new Error(
+      "Unable to connect to server. Please check your network connection.",
+    );
+  }
+
+  if (!response.ok) {
+    const message = await extractErrorMessage(response, "Export failed");
+    console.error(`Export failed with status ${response.status}: ${message}`);
+    throw new Error(message);
+  }
+
+  return response.blob();
+}

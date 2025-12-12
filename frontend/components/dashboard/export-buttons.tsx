@@ -4,8 +4,7 @@ import { useState } from "react";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { exportMonthData, type ExportFormat } from "@/lib/api-client";
 
 interface ExportButtonsProps {
   year: number;
@@ -14,29 +13,16 @@ interface ExportButtonsProps {
 }
 
 export function ExportButtons({ year, month, disabled }: ExportButtonsProps) {
-  const [isExportingJson, setIsExportingJson] = useState(false);
-  const [isExportingCsv, setIsExportingCsv] = useState(false);
+  // [>]: Track which format is currently exporting (null when idle).
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(
+    null,
+  );
 
-  const handleExport = async (format: "json" | "csv") => {
-    const setLoading =
-      format === "json" ? setIsExportingJson : setIsExportingCsv;
-    setLoading(true);
+  async function handleExport(format: ExportFormat) {
+    setExportingFormat(format);
 
     try {
-      const response = await fetch(
-        `${API_BASE}/api/months/${year}/${month}/export/${format}`,
-      );
-
-      if (!response.ok) {
-        // [>]: Extract error message from response body if available.
-        const error = await response
-          .json()
-          .catch(() => ({ detail: "Export failed" }));
-        throw new Error(error.detail);
-      }
-
-      // [>]: Create blob and trigger download via hidden anchor element.
-      const blob = await response.blob();
+      const blob = await exportMonthData(year, month, format);
       const url = window.URL.createObjectURL(blob);
       try {
         const a = document.createElement("a");
@@ -47,7 +33,6 @@ export function ExportButtons({ year, month, disabled }: ExportButtonsProps) {
         document.body.removeChild(a);
         toast.success(`${format.toUpperCase()} exported successfully`);
       } finally {
-        // [>]: Always cleanup blob URL to prevent memory leaks.
         window.URL.revokeObjectURL(url);
       }
     } catch (error) {
@@ -59,32 +44,30 @@ export function ExportButtons({ year, month, disabled }: ExportButtonsProps) {
             : "An unexpected error occurred",
       });
     } finally {
-      setLoading(false);
+      setExportingFormat(null);
     }
-  };
+  }
 
-  const isExporting = isExportingJson || isExportingCsv;
+  function renderExportButton(format: ExportFormat) {
+    const isExporting = exportingFormat === format;
+
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handleExport(format)}
+        disabled={disabled || exportingFormat !== null}
+      >
+        <Download className="h-4 w-4" />
+        {isExporting ? "Exporting..." : format.toUpperCase()}
+      </Button>
+    );
+  }
 
   return (
     <div className="flex gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => handleExport("json")}
-        disabled={disabled || isExporting}
-      >
-        <Download className="h-4 w-4" />
-        {isExportingJson ? "Exporting..." : "JSON"}
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => handleExport("csv")}
-        disabled={disabled || isExporting}
-      >
-        <Download className="h-4 w-4" />
-        {isExportingCsv ? "Exporting..." : "CSV"}
-      </Button>
+      {renderExportButton("json")}
+      {renderExportButton("csv")}
     </div>
   );
 }

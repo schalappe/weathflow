@@ -3,6 +3,7 @@
 import csv
 from datetime import date
 from io import StringIO
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
+from app.services.exceptions import TransactionQueryError
 
 
 class TestExportJsonEndpoint:
@@ -461,3 +463,89 @@ class TestExportCsvEndpoint:
         assert row[5] == "'@Formula"
         # ##>: Normal subcategory should not be prefixed.
         assert row[7] == "Normal"
+
+
+class TestExportValidation:
+    """Tests for export endpoint validation (422 responses)."""
+
+    def test_json_invalid_month_above_12_returns_422(self, client: TestClient) -> None:
+        """Should return 422 for month number greater than 12."""
+        response = client.get("/api/months/2025/13/export/json")
+
+        assert response.status_code == 422
+
+    def test_json_invalid_month_below_1_returns_422(self, client: TestClient) -> None:
+        """Should return 422 for month number less than 1."""
+        response = client.get("/api/months/2025/0/export/json")
+
+        assert response.status_code == 422
+
+    def test_json_invalid_year_below_2000_returns_422(self, client: TestClient) -> None:
+        """Should return 422 for year below valid range."""
+        response = client.get("/api/months/1999/10/export/json")
+
+        assert response.status_code == 422
+
+    def test_json_invalid_year_above_2100_returns_422(self, client: TestClient) -> None:
+        """Should return 422 for year above valid range."""
+        response = client.get("/api/months/2101/10/export/json")
+
+        assert response.status_code == 422
+
+    def test_csv_invalid_month_above_12_returns_422(self, client: TestClient) -> None:
+        """Should return 422 for month number greater than 12."""
+        response = client.get("/api/months/2025/13/export/csv")
+
+        assert response.status_code == 422
+
+    def test_csv_invalid_month_below_1_returns_422(self, client: TestClient) -> None:
+        """Should return 422 for month number less than 1."""
+        response = client.get("/api/months/2025/0/export/csv")
+
+        assert response.status_code == 422
+
+    def test_csv_invalid_year_below_2000_returns_422(self, client: TestClient) -> None:
+        """Should return 422 for year below valid range."""
+        response = client.get("/api/months/1999/10/export/csv")
+
+        assert response.status_code == 422
+
+    def test_csv_invalid_year_above_2100_returns_422(self, client: TestClient) -> None:
+        """Should return 422 for year above valid range."""
+        response = client.get("/api/months/2101/10/export/csv")
+
+        assert response.status_code == 422
+
+
+class TestExportDatabaseErrors:
+    """Tests for export endpoint database error handling (503 responses)."""
+
+    def test_json_returns_503_on_database_error(self, client: TestClient, db_session: Session) -> None:
+        """Should return 503 when database query fails during JSON export."""
+        month = Month(year=2025, month=10, score=3, score_label="Great")
+        db_session.add(month)
+        db_session.commit()
+
+        with patch(
+            "app.services.export.months_service.get_all_transactions_for_month",
+            side_effect=TransactionQueryError(month.id, "Connection refused"),
+        ):
+            response = client.get("/api/months/2025/10/export/json")
+
+        assert response.status_code == 503
+        assert "unavailable" in response.json()["detail"].lower()
+
+    def test_csv_returns_503_on_database_error(self, client: TestClient, db_session: Session) -> None:
+        """Should return 503 when database query fails during CSV export."""
+        month = Month(year=2025, month=10, score=3, score_label="Great")
+        db_session.add(month)
+        db_session.commit()
+
+        with patch(
+            "app.services.export.months_service.get_all_transactions_for_month",
+            side_effect=TransactionQueryError(month.id, "Connection refused"),
+        ):
+            response = client.get("/api/months/2025/10/export/csv")
+
+        assert response.status_code == 503
+        assert "unavailable" in response.json()["detail"].lower()
