@@ -152,6 +152,9 @@ class AdviceGenerator:
         """
         Build user prompt with financial data for Claude.
 
+        Embeds system instructions in the user message to ensure compatibility
+        with Claude Pro proxies that may not properly forward system prompts.
+
         Parameters
         ----------
         current_month : MonthData
@@ -162,7 +165,7 @@ class AdviceGenerator:
         Returns
         -------
         str
-            Formatted user prompt.
+            Formatted user prompt with embedded instructions.
         """
         all_months = [*history, current_month]
 
@@ -187,7 +190,10 @@ class AdviceGenerator:
 
             months_data.append(month_dict)
 
+        # ##>: Embed system instructions in user message for Claude Pro compatibility.
         return (
+            f"{ADVICE_SYSTEM_PROMPT}\n\n"
+            "---\n\n"
             "Analyse les données financières suivantes et génère des conseils personnalisés. "
             "Retourne UNIQUEMENT un objet JSON, sans markdown ni texte additionnel.\n\n"
             f"{json.dumps(months_data, ensure_ascii=False, indent=2)}"

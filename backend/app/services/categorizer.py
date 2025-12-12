@@ -293,6 +293,9 @@ class TransactionCategorizer:
         """
         Build user prompt with transactions for Claude.
 
+        Embeds system instructions in the user message to ensure compatibility
+        with Claude Pro proxies that may not properly forward system prompts.
+
         Parameters
         ----------
         transactions : list[TransactionInput]
@@ -301,7 +304,7 @@ class TransactionCategorizer:
         Returns
         -------
         str
-            Formatted user prompt.
+            Formatted user prompt with embedded instructions.
         """
         tx_list = [
             {
@@ -315,7 +318,10 @@ class TransactionCategorizer:
             for tx in transactions
         ]
 
+        # ##>: Embed system instructions in user message for Claude Pro compatibility.
         return (
+            f"{CATEGORIZATION_SYSTEM_PROMPT}\n\n"
+            "---\n\n"
             "Catégorise les transactions suivantes. "
             "Retourne UNIQUEMENT un tableau JSON, sans markdown ni texte additionnel.\n\n"
             f"{json.dumps(tx_list, ensure_ascii=False, indent=2)}"
