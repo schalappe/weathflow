@@ -18,7 +18,7 @@ from app.responses.months import (
     TransactionResponse,
 )
 from app.services import months as months_service
-from app.services.exceptions import MonthDataError
+from app.services.exceptions import InvalidCategoryTypeError, MonthDataError
 
 # ruff: noqa: B008
 
@@ -181,7 +181,7 @@ def get_month_detail(
     Raises
     ------
     HTTPException 400
-        If start_date is after end_date.
+        If start_date is after end_date or invalid category types provided.
     HTTPException 404
         If month not found.
     HTTPException 503
@@ -242,6 +242,10 @@ def get_month_detail(
     except HTTPException:
         # ##>: Re-raise HTTPException (400, 404) without wrapping.
         raise
+    except InvalidCategoryTypeError as error:
+        # ##>: Return 400 for invalid category types with helpful message.
+        logger.warning("Invalid category types in request: %s", error.invalid_types)
+        raise HTTPException(status_code=400, detail=str(error)) from error
     except MonthDataError as error:
         logger.exception("Database error in get_month_detail for %d-%02d", year, month)
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error

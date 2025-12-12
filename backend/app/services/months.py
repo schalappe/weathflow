@@ -13,7 +13,7 @@ from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.responses._types import ScoreTrendLiteral
 from app.responses.history import HistorySummary, MonthReference
-from app.services.exceptions import MonthQueryError, TransactionQueryError
+from app.services.exceptions import InvalidCategoryTypeError, MonthQueryError, TransactionQueryError
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +147,8 @@ def get_transactions_filtered(
 
     Raises
     ------
+    InvalidCategoryTypeError
+        If any invalid category types are provided.
     TransactionQueryError
         If database query fails.
 
@@ -160,14 +162,13 @@ def get_transactions_filtered(
 
         # ##>: Apply optional filters with AND logic.
         if category_types is not None and len(category_types) > 0:
-            # ##>: Validate category types and log warnings for invalid values.
+            # ##>: Validate category types and raise error for invalid values.
             valid_types = {e.value for e in MoneyMapType}
             invalid_types = [c for c in category_types if c not in valid_types]
             if invalid_types:
-                logger.warning("Invalid category_types ignored: %s", invalid_types)
-            valid_categories = [c for c in category_types if c in valid_types]
-            if valid_categories:
-                query = query.filter(Transaction.money_map_type.in_(valid_categories))
+                logger.warning("Invalid category_types received: %s", invalid_types)
+                raise InvalidCategoryTypeError(invalid_types, list(valid_types))
+            query = query.filter(Transaction.money_map_type.in_(category_types))
 
         if search is not None and search.strip():
             escaped_search = _escape_like_pattern(search.strip())

@@ -170,8 +170,8 @@ class TestGetMonthDetailEndpoint:
 
         assert response.status_code == 422
 
-    def test_invalid_category_is_silently_ignored(self, client: TestClient, db_session: Session) -> None:
-        """Should ignore invalid category values and return all transactions."""
+    def test_invalid_category_returns_400(self, client: TestClient, db_session: Session) -> None:
+        """Should return 400 with clear error message for invalid category values."""
         month = Month(year=2025, month=10, score=3, score_label="Great")
         db_session.add(month)
         db_session.commit()
@@ -186,13 +186,15 @@ class TestGetMonthDetailEndpoint:
         db_session.add(tx)
         db_session.commit()
 
-        # ##>: Invalid category should be silently ignored.
+        # ##>: Invalid category should return 400 with helpful error message.
         response = client.get("/api/months/2025/10", params={"category": "INVALID_TYPE"})
 
-        assert response.status_code == 200
-        data = response.json()
-        # ##>: With only invalid categories, no filter is applied.
-        assert data["pagination"]["total_items"] == 1
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        # ##>: Error message should include the invalid type and valid options.
+        assert "INVALID_TYPE" in detail
+        assert "Valid types" in detail
+        assert "CORE" in detail
 
     def test_search_filter(self, client: TestClient, db_session: Session) -> None:
         """Should filter transactions by search query parameter."""

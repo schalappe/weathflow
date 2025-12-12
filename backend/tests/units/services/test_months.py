@@ -2,11 +2,55 @@
 
 from datetime import date
 
+import pytest
+
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.services import months as months_service
+from app.services.exceptions import InvalidCategoryTypeError
+from app.services.months import _escape_like_pattern
 from tests.conftest import DatabaseTestCase
+
+
+class TestEscapeLikePattern:
+    """Tests for _escape_like_pattern SQL LIKE escape function."""
+
+    def test_escapes_percent_wildcard(self) -> None:
+        """Should escape % to prevent SQL wildcard matching."""
+        result = _escape_like_pattern("100%")
+        assert result == "100\\%"
+
+    def test_escapes_underscore_wildcard(self) -> None:
+        """Should escape _ to prevent single-char wildcard matching."""
+        result = _escape_like_pattern("test_user")
+        assert result == "test\\_user"
+
+    def test_escapes_backslash(self) -> None:
+        """Should escape backslash before escaping wildcards."""
+        result = _escape_like_pattern("path\\file")
+        assert result == "path\\\\file"
+
+    def test_preserves_normal_characters(self) -> None:
+        """Should not modify strings without special characters."""
+        result = _escape_like_pattern("normal search")
+        assert result == "normal search"
+
+    def test_handles_mixed_special_characters(self) -> None:
+        """Should escape all special chars in correct order."""
+        result = _escape_like_pattern("50%_discount\\sale")
+        # ##>: Backslash escaped first, then % and _.
+        assert result == "50\\%\\_discount\\\\sale"
+
+    def test_handles_empty_string(self) -> None:
+        """Should return empty string unchanged."""
+        result = _escape_like_pattern("")
+        assert result == ""
+
+    def test_handles_multiple_consecutive_wildcards(self) -> None:
+        """Should escape multiple consecutive wildcard characters."""
+        result = _escape_like_pattern("%%__")
+        assert result == "\\%\\%\\_\\_"
 
 
 class TestGetAllMonthsWithCounts(DatabaseTestCase):
@@ -251,15 +295,30 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
         self.assertEqual(total_count, 5)
         self.assertEqual(len(transactions), 5)
 
-    def test_invalid_category_values_are_ignored(self) -> None:
-        """Should ignore invalid category values and filter only valid ones."""
-        transactions, total_count = months_service.get_transactions_filtered(
-            self.session,
-            month_id=self.month.id,
-            category_types=["INVALID_TYPE", MoneyMapType.CORE.value],
-        )
+    def test_invalid_category_values_raise_error(self) -> None:
+        """Should raise InvalidCategoryTypeError when invalid category values provided."""
+        with pytest.raises(InvalidCategoryTypeError) as exc_info:
+            months_service.get_transactions_filtered(
+                self.session,
+                month_id=self.month.id,
+                category_types=["INVALID_TYPE", MoneyMapType.CORE.value],
+            )
 
-        # ##>: Invalid type should be ignored, only CORE transactions returned.
-        self.assertEqual(total_count, 2)
-        for tx in transactions:
-            self.assertEqual(tx.money_map_type, MoneyMapType.CORE.value)
+        # ##>: Error should contain the invalid type and list valid types.
+        error = exc_info.value
+        self.assertEqual(error.invalid_types, ["INVALID_TYPE"])
+        self.assertIn("CORE", error.valid_types)
+        self.assertIn("INCOME", error.valid_types)
+
+    def test_all_invalid_categories_raise_error(self) -> None:
+        """Should raise InvalidCategoryTypeError when all category values are invalid."""
+        with pytest.raises(InvalidCategoryTypeError) as exc_info:
+            months_service.get_transactions_filtered(
+                self.session,
+                month_id=self.month.id,
+                category_types=["INVALID1", "INVALID2"],
+            )
+
+        # ##>: Error should list all invalid types.
+        error = exc_info.value
+        self.assertEqual(set(error.invalid_types), {"INVALID1", "INVALID2"})
