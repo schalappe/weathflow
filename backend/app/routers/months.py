@@ -9,7 +9,6 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.db.enums import MoneyMapType
 from app.responses.history import HistoryResponse, MonthHistory
 from app.responses.months import (
     MonthDetailResponse,
@@ -19,7 +18,7 @@ from app.responses.months import (
     TransactionResponse,
 )
 from app.services import months as months_service
-from app.services.exceptions import MonthDataError
+from app.services.exceptions import InvalidCategoryTypeError, MonthDataError
 
 # ruff: noqa: B008
 
@@ -144,7 +143,7 @@ def get_history(
 def get_month_detail(
     year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
     month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
-    category_type: MoneyMapType | None = Query(None, description="Filter by money_map_type"),
+    category: str | None = Query(None, description="Comma-separated category types (e.g., CORE,CHOICE)"),
     search: str | None = Query(None, description="Case-insensitive search in description"),
     start_date: date | None = Query(None, description="Filter transactions from this date"),
     end_date: date | None = Query(None, description="Filter transactions until this date"),
@@ -161,8 +160,8 @@ def get_month_detail(
         Year (e.g., 2025).
     month : int
         Month number (1-12).
-    category_type : MoneyMapType | None
-        Filter transactions by Money Map type.
+    category : str | None
+        Comma-separated category types (e.g., "CORE,CHOICE").
     search : str | None
         Case-insensitive search in transaction descriptions.
     start_date : date | None
@@ -182,7 +181,7 @@ def get_month_detail(
     Raises
     ------
     HTTPException 400
-        If start_date is after end_date.
+        If start_date is after end_date or invalid category types provided.
     HTTPException 404
         If month not found.
     HTTPException 503
@@ -204,11 +203,12 @@ def get_month_detail(
                 detail=f"No data found for {year}-{month:02d}. Please upload transactions for this month first.",
             )
 
-        # ##>: Pass enum value to service (string comparison in database).
+        # ##>: Parse comma-separated categories to list for service layer.
+        category_types = [c.strip() for c in category.split(",") if c.strip()] if category else None
         transactions, total_items = months_service.get_transactions_filtered(
             db,
             month_id=month_record.id,
-            category_type=category_type.value if category_type else None,
+            category_types=category_types,
             search=search,
             start_date=start_date,
             end_date=end_date,
@@ -218,7 +218,7 @@ def get_month_detail(
 
         # ##>: Use total_items (filtered count) for transaction_count when filters are applied.
         # This provides consistency between transaction_count and pagination.total_items.
-        has_filters = any([category_type, search, start_date, end_date])
+        has_filters = any([category, search, start_date, end_date])
         transaction_count = total_items if has_filters else len(month_record.transactions)
 
         month_summary = MonthSummary.from_model(month_record, transaction_count)
@@ -242,6 +242,10 @@ def get_month_detail(
     except HTTPException:
         # ##>: Re-raise HTTPException (400, 404) without wrapping.
         raise
+    except InvalidCategoryTypeError as error:
+        # ##>: Return 400 for invalid category types with helpful message.
+        logger.warning("Invalid category types in request: %s", error.invalid_types)
+        raise HTTPException(status_code=400, detail=str(error)) from error
     except MonthDataError as error:
         logger.exception("Database error in get_month_detail for %d-%02d", year, month)
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error

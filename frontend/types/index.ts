@@ -88,6 +88,22 @@ export type MoneyMapType =
   | "COMPOUND"
   | "EXCLUDED";
 
+// [>]: Transaction filter state for dashboard filtering.
+export interface TransactionFilters {
+  categoryTypes: MoneyMapType[];
+  dateFrom: string | null;
+  dateTo: string | null;
+  searchQuery: string;
+}
+
+// [>]: Default empty filters constant.
+export const DEFAULT_FILTERS: TransactionFilters = {
+  categoryTypes: [],
+  dateFrom: null,
+  dateTo: null,
+  searchQuery: "",
+};
+
 export interface MonthSummary {
   id: number;
   year: number;
@@ -149,6 +165,7 @@ export interface DashboardState {
   currentPage: number;
   error: string | null;
   editingTransaction: TransactionResponse | null;
+  filters: TransactionFilters;
 }
 
 export type DashboardAction =
@@ -157,6 +174,7 @@ export type DashboardAction =
   | { type: "MONTH_DETAIL_LOADED"; payload: MonthDetailResponse }
   | { type: "SELECT_MONTH"; payload: { year: number; month: number } }
   | { type: "SET_PAGE"; payload: number }
+  | { type: "SET_FILTERS"; payload: TransactionFilters }
   | { type: "LOAD_ERROR"; payload: string }
   | { type: "RETRY" }
   | { type: "OPEN_EDIT_MODAL"; payload: TransactionResponse }

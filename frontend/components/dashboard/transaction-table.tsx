@@ -23,8 +23,18 @@ import {
   formatTransactionDate,
   CATEGORY_BADGE_CLASSES,
   cn,
+  getActiveFilterCount,
 } from "@/lib/utils";
-import type { TransactionResponse, PaginationInfo } from "@/types";
+import {
+  TransactionFilters,
+  getMonthBounds,
+} from "@/components/dashboard/transaction-filters";
+import type {
+  TransactionResponse,
+  PaginationInfo,
+  TransactionFilters as TFilters,
+} from "@/types";
+import { DEFAULT_FILTERS } from "@/types";
 
 interface TransactionTableProps {
   transactions: TransactionResponse[];
@@ -32,6 +42,9 @@ interface TransactionTableProps {
   onPageChange: (page: number) => void;
   onTransactionClick: (transaction: TransactionResponse) => void;
   isLoading: boolean;
+  filters: TFilters;
+  onFiltersChange: (filters: TFilters) => void;
+  selectedMonth: { year: number; month: number };
 }
 
 export function TransactionTable({
@@ -40,39 +53,65 @@ export function TransactionTable({
   onPageChange,
   onTransactionClick,
   isLoading,
+  filters,
+  onFiltersChange,
+  selectedMonth,
 }: TransactionTableProps) {
   const { page, total_pages } = pagination;
+  const monthBounds = getMonthBounds(selectedMonth.year, selectedMonth.month);
+  const hasActiveFilters = getActiveFilterCount(filters) > 0;
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Transactions</CardTitle>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
-            Page {page} of {total_pages || 1}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(page - 1)}
-            disabled={page <= 1 || isLoading}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(page + 1)}
-            disabled={page >= total_pages || isLoading}
-          >
-            Next
-          </Button>
+      <CardHeader className="flex flex-col gap-4">
+        <div className="flex flex-row items-center justify-between">
+          <CardTitle>Transactions</CardTitle>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              Page {page} of {total_pages || 1}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(page - 1)}
+              disabled={page <= 1 || isLoading}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(page + 1)}
+              disabled={page >= total_pages || isLoading}
+            >
+              Next
+            </Button>
+          </div>
         </div>
+        <TransactionFilters
+          filters={filters}
+          onFiltersChange={onFiltersChange}
+          monthBounds={monthBounds}
+          disabled={isLoading}
+        />
       </CardHeader>
       <CardContent className={cn("relative", isLoading && "opacity-50")}>
         {transactions.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">
-            No transactions
+            {hasActiveFilters ? (
+              <div className="space-y-2">
+                <p>No transactions match your filters</p>
+                <button
+                  type="button"
+                  onClick={() => onFiltersChange(DEFAULT_FILTERS)}
+                  className="text-sm text-violet-600 hover:underline"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            ) : (
+              "No transactions"
+            )}
           </div>
         ) : (
           <Table>

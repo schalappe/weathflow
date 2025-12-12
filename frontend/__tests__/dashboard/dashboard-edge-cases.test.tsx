@@ -5,6 +5,7 @@ import { TransactionTable } from "@/components/dashboard/transaction-table";
 import * as apiClient from "@/lib/api-client";
 import { meetsThreshold } from "@/lib/utils";
 import type { PaginationInfo } from "@/types";
+import { DEFAULT_FILTERS } from "@/types";
 
 // [>]: Mock the API client module.
 vi.mock("@/lib/api-client", () => ({
@@ -64,6 +65,7 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
       total_items: 0,
       total_pages: 0,
     };
+    const mockSelectedMonth = { year: 2025, month: 10 };
 
     it("shows 'No transactions' message when list is empty", () => {
       render(
@@ -73,6 +75,9 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
           onPageChange={vi.fn()}
           onTransactionClick={vi.fn()}
           isLoading={false}
+          filters={DEFAULT_FILTERS}
+          onFiltersChange={vi.fn()}
+          selectedMonth={mockSelectedMonth}
         />,
       );
 
@@ -87,6 +92,9 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
           onPageChange={vi.fn()}
           onTransactionClick={vi.fn()}
           isLoading={true}
+          filters={DEFAULT_FILTERS}
+          onFiltersChange={vi.fn()}
+          selectedMonth={mockSelectedMonth}
         />,
       );
 

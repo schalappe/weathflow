@@ -8,11 +8,12 @@ from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.responses._types import ScoreTrendLiteral
 from app.responses.history import HistorySummary, MonthReference
-from app.services.exceptions import MonthQueryError, TransactionQueryError
+from app.services.exceptions import InvalidCategoryTypeError, MonthQueryError, TransactionQueryError
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +111,7 @@ def get_transactions_filtered(
     db: Session,
     month_id: int,
     *,
-    category_type: str | None = None,
+    category_types: list[str] | None = None,
     search: str | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
@@ -126,8 +127,8 @@ def get_transactions_filtered(
         Database session.
     month_id : int
         Month ID to filter transactions.
-    category_type : str | None
-        Filter by money_map_type (e.g., "INCOME", "CORE").
+    category_types : list[str] | None
+        Filter by money_map_type (e.g., ["INCOME", "CORE"]).
     search : str | None
         Case-insensitive partial match on description.
     start_date : date | None
@@ -146,6 +147,8 @@ def get_transactions_filtered(
 
     Raises
     ------
+    InvalidCategoryTypeError
+        If any invalid category types are provided.
     TransactionQueryError
         If database query fails.
 
@@ -158,8 +161,14 @@ def get_transactions_filtered(
         query = db.query(Transaction).filter(Transaction.month_id == month_id)
 
         # ##>: Apply optional filters with AND logic.
-        if category_type is not None:
-            query = query.filter(Transaction.money_map_type == category_type)
+        if category_types is not None and len(category_types) > 0:
+            # ##>: Validate category types and raise error for invalid values.
+            valid_types = {e.value for e in MoneyMapType}
+            invalid_types = [c for c in category_types if c not in valid_types]
+            if invalid_types:
+                logger.warning("Invalid category_types received: %s", invalid_types)
+                raise InvalidCategoryTypeError(invalid_types, list(valid_types))
+            query = query.filter(Transaction.money_map_type.in_(category_types))
 
         if search is not None and search.strip():
             escaped_search = _escape_like_pattern(search.strip())
@@ -178,12 +187,12 @@ def get_transactions_filtered(
         transactions = query.order_by(Transaction.date.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
         logger.info(
-            "Retrieved %d/%d transactions for month_id=%d (page=%d, filters: category=%s, search=%s)",
+            "Retrieved %d/%d transactions for month_id=%d (page=%d, filters: categories=%s, search=%s)",
             len(transactions),
             total_count,
             month_id,
             page,
-            category_type,
+            category_types,
             search[:20] if search else None,
         )
 

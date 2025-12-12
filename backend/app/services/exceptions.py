@@ -275,6 +275,34 @@ class TransactionQueryError(MonthDataError):
         super().__init__(f"Failed to query transactions for month {month_id}: {reason}")
 
 
+class InvalidCategoryTypeError(MonthDataError):
+    """
+    Raised when invalid category types are provided in filter.
+
+    Parameters
+    ----------
+    invalid_types : list[str]
+        List of invalid category type values.
+    valid_types : list[str]
+        List of valid category type values.
+
+    Attributes
+    ----------
+    invalid_types : list[str]
+        The invalid types for programmatic access.
+    valid_types : list[str]
+        The valid types for user feedback.
+    """
+
+    def __init__(self, invalid_types: list[str], valid_types: list[str]) -> None:
+        self.invalid_types = invalid_types
+        self.valid_types = valid_types
+        super().__init__(
+            f"Invalid category types: {', '.join(invalid_types)}. "
+            f"Valid types are: {', '.join(sorted(valid_types))}"
+        )
+
+
 class InvalidMonthFormatError(UploadError):
     """
     Raised when month format is not YYYY-MM.

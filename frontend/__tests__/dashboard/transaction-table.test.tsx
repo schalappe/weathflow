@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { TransactionTable } from "@/components/dashboard/transaction-table";
 import type { TransactionResponse, PaginationInfo } from "@/types";
+import { DEFAULT_FILTERS } from "@/types";
 
 const mockTransactions: TransactionResponse[] = [
   {
@@ -50,6 +51,10 @@ const mockPagination: PaginationInfo = {
   total_pages: 2,
 };
 
+// [>]: Default props for filter-related requirements.
+const mockSelectedMonth = { year: 2025, month: 10 };
+const mockFiltersChange = vi.fn();
+
 describe("TransactionTable", () => {
   it("renders table with correct columns", () => {
     render(
@@ -59,6 +64,9 @@ describe("TransactionTable", () => {
         onPageChange={vi.fn()}
         onTransactionClick={vi.fn()}
         isLoading={false}
+        filters={DEFAULT_FILTERS}
+        onFiltersChange={mockFiltersChange}
+        selectedMonth={mockSelectedMonth}
       />,
     );
 
@@ -76,6 +84,9 @@ describe("TransactionTable", () => {
         onPageChange={vi.fn()}
         onTransactionClick={vi.fn()}
         isLoading={false}
+        filters={DEFAULT_FILTERS}
+        onFiltersChange={mockFiltersChange}
+        selectedMonth={mockSelectedMonth}
       />,
     );
 
@@ -92,6 +103,9 @@ describe("TransactionTable", () => {
         onPageChange={vi.fn()}
         onTransactionClick={vi.fn()}
         isLoading={false}
+        filters={DEFAULT_FILTERS}
+        onFiltersChange={mockFiltersChange}
+        selectedMonth={mockSelectedMonth}
       />,
     );
 
@@ -115,6 +129,9 @@ describe("TransactionTable", () => {
         onPageChange={onPageChange}
         onTransactionClick={vi.fn()}
         isLoading={false}
+        filters={DEFAULT_FILTERS}
+        onFiltersChange={mockFiltersChange}
+        selectedMonth={mockSelectedMonth}
       />,
     );
 
@@ -136,6 +153,9 @@ describe("TransactionTable", () => {
           onPageChange={vi.fn()}
           onTransactionClick={onTransactionClick}
           isLoading={false}
+          filters={DEFAULT_FILTERS}
+          onFiltersChange={mockFiltersChange}
+          selectedMonth={mockSelectedMonth}
         />,
       );
 
@@ -162,6 +182,9 @@ describe("TransactionTable", () => {
           onPageChange={vi.fn()}
           onTransactionClick={onTransactionClick}
           isLoading={false}
+          filters={DEFAULT_FILTERS}
+          onFiltersChange={mockFiltersChange}
+          selectedMonth={mockSelectedMonth}
         />,
       );
 
@@ -189,6 +212,9 @@ describe("TransactionTable", () => {
           onPageChange={vi.fn()}
           onTransactionClick={vi.fn()}
           isLoading={false}
+          filters={DEFAULT_FILTERS}
+          onFiltersChange={mockFiltersChange}
+          selectedMonth={mockSelectedMonth}
         />,
       );
 
@@ -208,6 +234,9 @@ describe("TransactionTable", () => {
           onPageChange={vi.fn()}
           onTransactionClick={vi.fn()}
           isLoading={false}
+          filters={DEFAULT_FILTERS}
+          onFiltersChange={mockFiltersChange}
+          selectedMonth={mockSelectedMonth}
         />,
       );
 
@@ -228,6 +257,9 @@ describe("TransactionTable", () => {
           onPageChange={vi.fn()}
           onTransactionClick={vi.fn()}
           isLoading={false}
+          filters={DEFAULT_FILTERS}
+          onFiltersChange={mockFiltersChange}
+          selectedMonth={mockSelectedMonth}
         />,
       );
 

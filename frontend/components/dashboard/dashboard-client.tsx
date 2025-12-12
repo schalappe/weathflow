@@ -27,9 +27,11 @@ import {
 import type {
   DashboardState,
   DashboardAction,
+  TransactionFilters,
   TransactionResponse,
   UpdateTransactionPayload,
 } from "@/types";
+import { DEFAULT_FILTERS } from "@/types";
 
 // [>]: Initial state for the dashboard reducer.
 const initialState: DashboardState = {
@@ -40,6 +42,7 @@ const initialState: DashboardState = {
   currentPage: 1,
   error: null,
   editingTransaction: null,
+  filters: DEFAULT_FILTERS,
 };
 
 // [>]: Reducer function handles all state transitions.
@@ -80,11 +83,12 @@ function dashboardReducer(
       };
 
     case "SELECT_MONTH":
-      // [>]: Reset to page 1 when changing months.
+      // [>]: Reset to page 1 and filters when changing months.
       return {
         ...state,
         selectedMonth: action.payload,
         currentPage: 1,
+        filters: DEFAULT_FILTERS,
         pageState: "loading",
       };
 
@@ -92,6 +96,15 @@ function dashboardReducer(
       return {
         ...state,
         currentPage: action.payload,
+        pageState: "loading",
+      };
+
+    case "SET_FILTERS":
+      // [>]: Reset to page 1 when filters change.
+      return {
+        ...state,
+        filters: action.payload,
+        currentPage: 1,
         pageState: "loading",
       };
 
@@ -175,7 +188,7 @@ export function DashboardClient() {
     };
   }, [state.pageState, state.monthsList.length]);
 
-  // [>]: Fetch month detail when selectedMonth or currentPage changes with cleanup.
+  // [>]: Fetch month detail when selectedMonth, currentPage, or filters change with cleanup.
   useEffect(() => {
     let isMounted = true;
 
@@ -188,6 +201,7 @@ export function DashboardClient() {
           state.selectedMonth.month,
           state.currentPage,
           TRANSACTIONS_PER_PAGE,
+          state.filters,
         );
         if (isMounted) {
           dispatch({ type: "MONTH_DETAIL_LOADED", payload: response });
@@ -209,7 +223,7 @@ export function DashboardClient() {
     return () => {
       isMounted = false;
     };
-  }, [state.selectedMonth, state.currentPage, state.pageState]);
+  }, [state.selectedMonth, state.currentPage, state.pageState, state.filters]);
 
   // [>]: Handle month change from selector.
   const handleMonthChange = useCallback((year: number, month: number) => {
@@ -219,6 +233,11 @@ export function DashboardClient() {
   // [>]: Handle pagination change.
   const handlePageChange = useCallback((page: number) => {
     dispatch({ type: "SET_PAGE", payload: page });
+  }, []);
+
+  // [>]: Handle filter changes.
+  const handleFiltersChange = useCallback((filters: TransactionFilters) => {
+    dispatch({ type: "SET_FILTERS", payload: filters });
   }, []);
 
   // [>]: Handle retry after error.
@@ -432,6 +451,9 @@ export function DashboardClient() {
                     onPageChange={handlePageChange}
                     onTransactionClick={handleTransactionClick}
                     isLoading={isLoading}
+                    filters={state.filters}
+                    onFiltersChange={handleFiltersChange}
+                    selectedMonth={state.selectedMonth}
                   />
                 </div>
               </div>

@@ -2,11 +2,55 @@
 
 from datetime import date
 
+import pytest
+
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.services import months as months_service
+from app.services.exceptions import InvalidCategoryTypeError
+from app.services.months import _escape_like_pattern
 from tests.conftest import DatabaseTestCase
+
+
+class TestEscapeLikePattern:
+    """Tests for _escape_like_pattern SQL LIKE escape function."""
+
+    def test_escapes_percent_wildcard(self) -> None:
+        """Should escape % to prevent SQL wildcard matching."""
+        result = _escape_like_pattern("100%")
+        assert result == "100\\%"
+
+    def test_escapes_underscore_wildcard(self) -> None:
+        """Should escape _ to prevent single-char wildcard matching."""
+        result = _escape_like_pattern("test_user")
+        assert result == "test\\_user"
+
+    def test_escapes_backslash(self) -> None:
+        """Should escape backslash before escaping wildcards."""
+        result = _escape_like_pattern("path\\file")
+        assert result == "path\\\\file"
+
+    def test_preserves_normal_characters(self) -> None:
+        """Should not modify strings without special characters."""
+        result = _escape_like_pattern("normal search")
+        assert result == "normal search"
+
+    def test_handles_mixed_special_characters(self) -> None:
+        """Should escape all special chars in correct order."""
+        result = _escape_like_pattern("50%_discount\\sale")
+        # ##>: Backslash escaped first, then % and _.
+        assert result == "50\\%\\_discount\\\\sale"
+
+    def test_handles_empty_string(self) -> None:
+        """Should return empty string unchanged."""
+        result = _escape_like_pattern("")
+        assert result == ""
+
+    def test_handles_multiple_consecutive_wildcards(self) -> None:
+        """Should escape multiple consecutive wildcard characters."""
+        result = _escape_like_pattern("%%__")
+        assert result == "\\%\\%\\_\\_"
 
 
 class TestGetAllMonthsWithCounts(DatabaseTestCase):
@@ -130,11 +174,11 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
         self.session.commit()
 
     def test_applies_category_filter_correctly(self) -> None:
-        """Should filter transactions by category_type."""
+        """Should filter transactions by category_types (single category)."""
         transactions, total_count = months_service.get_transactions_filtered(
             self.session,
             month_id=self.month.id,
-            category_type=MoneyMapType.CORE.value,
+            category_types=[MoneyMapType.CORE.value],
         )
 
         self.assertEqual(total_count, 2)
@@ -207,7 +251,7 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
         transactions, total_count = months_service.get_transactions_filtered(
             self.session,
             month_id=self.month.id,
-            category_type=MoneyMapType.CHOICE.value,
+            category_types=[MoneyMapType.CHOICE.value],
             search="netflix",
         )
 
@@ -224,3 +268,57 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
         # ##>: Latest transaction (20th) should be first.
         self.assertEqual(transactions[0].date, date(2025, 10, 20))
         self.assertEqual(transactions[-1].date, date(2025, 10, 1))
+
+    def test_multi_category_filter_returns_union(self) -> None:
+        """Should return transactions matching any of the specified categories (union)."""
+        transactions, total_count = months_service.get_transactions_filtered(
+            self.session,
+            month_id=self.month.id,
+            category_types=[MoneyMapType.CORE.value, MoneyMapType.CHOICE.value],
+        )
+
+        # ##>: Should return 2 CORE + 2 CHOICE = 4 transactions.
+        self.assertEqual(total_count, 4)
+        self.assertEqual(len(transactions), 4)
+        category_types = {tx.money_map_type for tx in transactions}
+        self.assertEqual(category_types, {MoneyMapType.CORE.value, MoneyMapType.CHOICE.value})
+
+    def test_empty_category_list_returns_all(self) -> None:
+        """Should return all transactions when category_types is empty list."""
+        transactions, total_count = months_service.get_transactions_filtered(
+            self.session,
+            month_id=self.month.id,
+            category_types=[],
+        )
+
+        # ##>: Empty list means no filter, should return all 5 transactions.
+        self.assertEqual(total_count, 5)
+        self.assertEqual(len(transactions), 5)
+
+    def test_invalid_category_values_raise_error(self) -> None:
+        """Should raise InvalidCategoryTypeError when invalid category values provided."""
+        with pytest.raises(InvalidCategoryTypeError) as exc_info:
+            months_service.get_transactions_filtered(
+                self.session,
+                month_id=self.month.id,
+                category_types=["INVALID_TYPE", MoneyMapType.CORE.value],
+            )
+
+        # ##>: Error should contain the invalid type and list valid types.
+        error = exc_info.value
+        self.assertEqual(error.invalid_types, ["INVALID_TYPE"])
+        self.assertIn("CORE", error.valid_types)
+        self.assertIn("INCOME", error.valid_types)
+
+    def test_all_invalid_categories_raise_error(self) -> None:
+        """Should raise InvalidCategoryTypeError when all category values are invalid."""
+        with pytest.raises(InvalidCategoryTypeError) as exc_info:
+            months_service.get_transactions_filtered(
+                self.session,
+                month_id=self.month.id,
+                category_types=["INVALID1", "INVALID2"],
+            )
+
+        # ##>: Error should list all invalid types.
+        error = exc_info.value
+        self.assertEqual(set(error.invalid_types), {"INVALID1", "INVALID2"})

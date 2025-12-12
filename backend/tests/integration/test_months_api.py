@@ -125,8 +125,8 @@ class TestGetMonthDetailEndpoint:
         assert data["pagination"]["total_items"] == 5
         assert data["pagination"]["total_pages"] == 3
 
-    def test_filters_by_category_type(self, client: TestClient, db_session: Session) -> None:
-        """Should filter transactions by category_type query parameter."""
+    def test_filters_by_category(self, client: TestClient, db_session: Session) -> None:
+        """Should filter transactions by category query parameter."""
         month = Month(year=2025, month=10, score=3, score_label="Great")
         db_session.add(month)
         db_session.commit()
@@ -156,7 +156,7 @@ class TestGetMonthDetailEndpoint:
         db_session.add_all([tx_income, tx_core, tx_choice])
         db_session.commit()
 
-        response = client.get("/api/months/2025/10", params={"category_type": "CORE"})
+        response = client.get("/api/months/2025/10", params={"category": "CORE"})
 
         assert response.status_code == 200
         data = response.json()
@@ -170,15 +170,31 @@ class TestGetMonthDetailEndpoint:
 
         assert response.status_code == 422
 
-    def test_invalid_category_type_returns_422(self, client: TestClient, db_session: Session) -> None:
-        """Should return 422 for invalid category_type enum value."""
+    def test_invalid_category_returns_400(self, client: TestClient, db_session: Session) -> None:
+        """Should return 400 with clear error message for invalid category values."""
         month = Month(year=2025, month=10, score=3, score_label="Great")
         db_session.add(month)
         db_session.commit()
 
-        response = client.get("/api/months/2025/10", params={"category_type": "INVALID_TYPE"})
+        tx = Transaction(
+            month_id=month.id,
+            date=date(2025, 10, 1),
+            description="Test",
+            amount=100.0,
+            money_map_type=MoneyMapType.CORE.value,
+        )
+        db_session.add(tx)
+        db_session.commit()
 
-        assert response.status_code == 422
+        # ##>: Invalid category should return 400 with helpful error message.
+        response = client.get("/api/months/2025/10", params={"category": "INVALID_TYPE"})
+
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        # ##>: Error message should include the invalid type and valid options.
+        assert "INVALID_TYPE" in detail
+        assert "Valid types" in detail
+        assert "CORE" in detail
 
     def test_search_filter(self, client: TestClient, db_session: Session) -> None:
         """Should filter transactions by search query parameter."""
@@ -296,7 +312,7 @@ class TestGetMonthDetailEndpoint:
         # ##>: Filter by CORE category AND "grocery" search.
         response = client.get(
             "/api/months/2025/10",
-            params={"category_type": "CORE", "search": "grocery"},
+            params={"category": "CORE", "search": "grocery"},
         )
 
         assert response.status_code == 200
