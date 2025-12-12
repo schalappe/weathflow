@@ -32,7 +32,7 @@
 
 16. [x] Advice Panel UI — Build the advice display component showing analysis, problem areas, recommendations, and encouragement with a regenerate button `M`
 
-17. [ ] Transaction Filters — Add filtering by category type, date range, and search by description to the transaction table `S`
+17. [x] Transaction Filters — Add filtering by category type, date range, and search by description to the transaction table `S`
 
 18. [ ] Data Export — Implement JSON and CSV export of monthly data for backup purposes `XS`
 
