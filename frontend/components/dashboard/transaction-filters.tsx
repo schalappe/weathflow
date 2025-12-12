@@ -97,6 +97,11 @@ export function TransactionFilters({
   const formatDateDisplay = (dateStr: string | null) => {
     if (!dateStr) return null;
     const date = new Date(dateStr);
+    // [!]: Validate date to avoid displaying "Invalid Date" to users.
+    if (isNaN(date.getTime())) {
+      console.warn(`[formatDateDisplay] Invalid date string: "${dateStr}"`);
+      return null;
+    }
     return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
   };
 
