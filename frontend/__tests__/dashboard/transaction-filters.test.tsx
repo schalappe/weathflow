@@ -254,7 +254,9 @@ describe("TransactionFilters", () => {
     it("disables all controls when disabled prop is true", () => {
       renderFilters(DEFAULT_FILTERS, { disabled: true });
 
-      expect(screen.getByText("All Categories").closest("button")).toBeDisabled();
+      expect(
+        screen.getByText("All Categories").closest("button"),
+      ).toBeDisabled();
       expect(screen.getByText("From").closest("button")).toBeDisabled();
       expect(screen.getByText("To").closest("button")).toBeDisabled();
       expect(

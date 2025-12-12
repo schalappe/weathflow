@@ -298,8 +298,7 @@ class InvalidCategoryTypeError(MonthDataError):
         self.invalid_types = invalid_types
         self.valid_types = valid_types
         super().__init__(
-            f"Invalid category types: {', '.join(invalid_types)}. "
-            f"Valid types are: {', '.join(sorted(valid_types))}"
+            f"Invalid category types: {', '.join(invalid_types)}. Valid types are: {', '.join(sorted(valid_types))}"
         )
 
 

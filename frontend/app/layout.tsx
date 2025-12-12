@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -62,6 +63,7 @@ export default function RootLayout({
       >
         <NavBar />
         <main className="container mx-auto px-4 py-8">{children}</main>
+        <Toaster richColors position="bottom-right" />
       </body>
     </html>
   );

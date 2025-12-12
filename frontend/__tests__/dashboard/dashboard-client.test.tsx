@@ -322,7 +322,9 @@ describe("DashboardClient", () => {
       fireEvent.click(selector);
 
       // [>]: Select September 2025.
-      const septOption = await screen.findByRole("option", { name: /Sep 2025/i });
+      const septOption = await screen.findByRole("option", {
+        name: /Sep 2025/i,
+      });
       fireEvent.click(septOption);
 
       // [>]: Verify new month is fetched with DEFAULT_FILTERS (reset).

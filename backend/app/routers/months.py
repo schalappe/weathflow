@@ -1,14 +1,21 @@
 """FastAPI router for Monthly Data API endpoints."""
 
+import csv
+import io
+import json
 import logging
-from datetime import date
+from datetime import UTC, date, datetime
 from math import ceil
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.db.models.month import Month
+from app.db.models.transaction import Transaction
 from app.responses.history import HistoryResponse, MonthHistory
 from app.responses.months import (
     MonthDetailResponse,
@@ -24,6 +31,105 @@ from app.services.exceptions import InvalidCategoryTypeError, MonthDataError
 
 router = APIRouter(prefix="/api", tags=["months"])
 logger = logging.getLogger(__name__)
+
+# ##>: CSV field headers for export (used by both JSON and CSV exports).
+_EXPORT_HEADERS = [
+    "Date",
+    "Description",
+    "Account",
+    "Amount",
+    "Bankin Category",
+    "Bankin Subcategory",
+    "Money Map Type",
+    "Money Map Subcategory",
+    "Manually Corrected",
+]
+
+
+def _sanitize_csv_field(value: str | None) -> str:
+    """
+    Sanitize a string field to prevent CSV injection attacks.
+
+    Excel and LibreOffice interpret cells starting with =, +, -, @ as formulas.
+    Prefixing with a single quote prevents formula execution.
+
+    Parameters
+    ----------
+    value : str | None
+        Field value to sanitize.
+
+    Returns
+    -------
+    str
+        Sanitized value safe for CSV export.
+    """
+    if value is None:
+        return ""
+    if value and value[0] in ("=", "+", "-", "@"):
+        return "'" + value
+    return value
+
+
+def _serialize_transaction(t: Transaction) -> dict[str, Any]:
+    """
+    Serialize a transaction to a dictionary for export.
+
+    Parameters
+    ----------
+    t : Transaction
+        Transaction model instance.
+
+    Returns
+    -------
+    dict[str, Any]
+        Dictionary with all export fields.
+    """
+    return {
+        "date": t.date.isoformat(),
+        "description": t.description,
+        "amount": t.amount,
+        "account": t.account,
+        "bankin_category": t.bankin_category,
+        "bankin_subcategory": t.bankin_subcategory,
+        "money_map_type": t.money_map_type,
+        "money_map_subcategory": t.money_map_subcategory,
+        "is_manually_corrected": t.is_manually_corrected,
+    }
+
+
+def _get_month_export_data(db: Session, year: int, month: int) -> tuple[Month, list[Transaction]]:
+    """
+    Fetch month and transactions for export.
+
+    Parameters
+    ----------
+    db : Session
+        Database session.
+    year : int
+        Year (e.g., 2025).
+    month : int
+        Month number (1-12).
+
+    Returns
+    -------
+    tuple[Month, list[Transaction]]
+        Month record and list of all transactions.
+
+    Raises
+    ------
+    HTTPException 404
+        If month not found.
+    """
+    month_record = months_service.get_month_by_year_month(db, year, month)
+
+    if month_record is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No data found for {year}-{month:02d}. Please upload transactions for this month first.",
+        )
+
+    transactions = months_service.get_all_transactions_for_month(db, month_record.id)
+    return month_record, transactions
 
 
 def _http_detail_for_db_error(error: MonthDataError) -> str:
@@ -252,5 +358,148 @@ def get_month_detail(
     except Exception as error:
         logger.exception(
             "Unexpected error in get_month_detail for %d-%02d: error_type=%s", year, month, type(error).__name__
+        )
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
+
+
+@router.get("/months/{year}/{month}/export/json")
+def export_month_json(
+    year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
+    month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """
+    Export month data as JSON file.
+
+    Returns a downloadable JSON file containing month summary and all transactions.
+
+    Parameters
+    ----------
+    year : int
+        Year (e.g., 2025).
+    month : int
+        Month number (1-12).
+
+    Returns
+    -------
+    StreamingResponse
+        JSON file download with month summary and transactions.
+
+    Raises
+    ------
+    HTTPException 404
+        If month not found.
+    HTTPException 503
+        If database is temporarily unavailable.
+    """
+    try:
+        month_record, transactions = _get_month_export_data(db, year, month)
+
+        export_data = {
+            "exported_at": datetime.now(UTC).isoformat(),
+            "month": {
+                "year": month_record.year,
+                "month": month_record.month,
+                "total_income": month_record.total_income,
+                "total_core": month_record.total_core,
+                "total_choice": month_record.total_choice,
+                "total_compound": month_record.total_compound,
+                "core_percentage": month_record.core_percentage,
+                "choice_percentage": month_record.choice_percentage,
+                "compound_percentage": month_record.compound_percentage,
+                "score": month_record.score,
+                "score_label": month_record.score_label,
+            },
+            "transactions": [_serialize_transaction(t) for t in transactions],
+            "transaction_count": len(transactions),
+        }
+
+        json_content = json.dumps(export_data, ensure_ascii=False, indent=2)
+        filename = f"moneymap-{year}-{month:02d}.json"
+
+        return StreamingResponse(
+            io.BytesIO(json_content.encode("utf-8")),
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except HTTPException:
+        raise
+    except MonthDataError as error:
+        logger.exception("Database error in export_month_json for %d-%02d", year, month)
+        raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
+    except Exception as error:
+        logger.exception(
+            "Unexpected error in export_month_json for %d-%02d: error_type=%s", year, month, type(error).__name__
+        )
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
+
+
+@router.get("/months/{year}/{month}/export/csv")
+def export_month_csv(
+    year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
+    month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """
+    Export month transactions as CSV file.
+
+    Returns a downloadable CSV file with transaction list (semicolon-separated).
+
+    Parameters
+    ----------
+    year : int
+        Year (e.g., 2025).
+    month : int
+        Month number (1-12).
+
+    Returns
+    -------
+    StreamingResponse
+        CSV file download with transaction list.
+
+    Raises
+    ------
+    HTTPException 404
+        If month not found.
+    HTTPException 503
+        If database is temporarily unavailable.
+    """
+    try:
+        _, transactions = _get_month_export_data(db, year, month)
+
+        output = io.StringIO()
+        writer = csv.writer(output, delimiter=";")
+        writer.writerow(_EXPORT_HEADERS)
+
+        for t in transactions:
+            writer.writerow(
+                [
+                    t.date.isoformat(),
+                    _sanitize_csv_field(t.description),
+                    _sanitize_csv_field(t.account),
+                    t.amount,
+                    _sanitize_csv_field(t.bankin_category),
+                    _sanitize_csv_field(t.bankin_subcategory),
+                    t.money_map_type,
+                    _sanitize_csv_field(t.money_map_subcategory),
+                    str(t.is_manually_corrected).lower(),
+                ]
+            )
+
+        filename = f"moneymap-{year}-{month:02d}.csv"
+
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except HTTPException:
+        raise
+    except MonthDataError as error:
+        logger.exception("Database error in export_month_csv for %d-%02d", year, month)
+        raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
+    except Exception as error:
+        logger.exception(
+            "Unexpected error in export_month_csv for %d-%02d: error_type=%s", year, month, type(error).__name__
         )
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
