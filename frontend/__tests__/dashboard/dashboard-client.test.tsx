@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DashboardClient } from "@/components/dashboard/dashboard-client";
 import * as apiClient from "@/lib/api-client";
+import { DEFAULT_FILTERS } from "@/types";
 
 // [>]: Mock the API client module.
 vi.mock("@/lib/api-client", () => ({
@@ -124,7 +125,13 @@ describe("DashboardClient", () => {
 
     // [>]: Wait for data to load.
     await waitFor(() => {
-      expect(apiClient.getMonthDetail).toHaveBeenCalledWith(2025, 10, 1, 50);
+      expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
+        2025,
+        10,
+        1,
+        50,
+        DEFAULT_FILTERS,
+      );
     });
 
     // [>]: Should display the most recent month (October 2025).
@@ -151,7 +158,13 @@ describe("DashboardClient", () => {
     expect(selector).toBeInTheDocument();
 
     // [>]: Verify getMonthDetail was called with the most recent month.
-    expect(apiClient.getMonthDetail).toHaveBeenCalledWith(2025, 10, 1, 50);
+    expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
+      2025,
+      10,
+      1,
+      50,
+      DEFAULT_FILTERS,
+    );
 
     // [>]: Verify "Oct 2025" appears (in both selector and score card).
     expect(screen.getAllByText("Oct 2025").length).toBeGreaterThanOrEqual(1);
@@ -174,7 +187,13 @@ describe("DashboardClient", () => {
 
     // [>]: Should fetch page 2.
     await waitFor(() => {
-      expect(apiClient.getMonthDetail).toHaveBeenCalledWith(2025, 10, 2, 50);
+      expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
+        2025,
+        10,
+        2,
+        50,
+        DEFAULT_FILTERS,
+      );
     });
   });
 

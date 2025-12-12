@@ -134,6 +134,21 @@ export function getErrorMessage(error: unknown, fallback: string): string {
 // [>]: Pagination constants.
 export const TRANSACTIONS_PER_PAGE = 50;
 
+// [>]: Count active filters for badge display.
+export function getActiveFilterCount(filters: {
+  categoryTypes: string[];
+  dateFrom: string | null;
+  dateTo: string | null;
+  searchQuery: string;
+}): number {
+  let count = 0;
+  if (filters.categoryTypes.length > 0) count++;
+  if (filters.dateFrom) count++;
+  if (filters.dateTo) count++;
+  if (filters.searchQuery.trim()) count++;
+  return count;
+}
+
 // [>]: Format advice timestamp with French locale.
 // Uses relative time for <24h, absolute date otherwise.
 export function formatAdviceTimestamp(isoString: string): string {

@@ -130,11 +130,11 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
         self.session.commit()
 
     def test_applies_category_filter_correctly(self) -> None:
-        """Should filter transactions by category_type."""
+        """Should filter transactions by category_types (single category)."""
         transactions, total_count = months_service.get_transactions_filtered(
             self.session,
             month_id=self.month.id,
-            category_type=MoneyMapType.CORE.value,
+            category_types=[MoneyMapType.CORE.value],
         )
 
         self.assertEqual(total_count, 2)
@@ -207,7 +207,7 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
         transactions, total_count = months_service.get_transactions_filtered(
             self.session,
             month_id=self.month.id,
-            category_type=MoneyMapType.CHOICE.value,
+            category_types=[MoneyMapType.CHOICE.value],
             search="netflix",
         )
 
@@ -224,3 +224,42 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
         # ##>: Latest transaction (20th) should be first.
         self.assertEqual(transactions[0].date, date(2025, 10, 20))
         self.assertEqual(transactions[-1].date, date(2025, 10, 1))
+
+    def test_multi_category_filter_returns_union(self) -> None:
+        """Should return transactions matching any of the specified categories (union)."""
+        transactions, total_count = months_service.get_transactions_filtered(
+            self.session,
+            month_id=self.month.id,
+            category_types=[MoneyMapType.CORE.value, MoneyMapType.CHOICE.value],
+        )
+
+        # ##>: Should return 2 CORE + 2 CHOICE = 4 transactions.
+        self.assertEqual(total_count, 4)
+        self.assertEqual(len(transactions), 4)
+        category_types = {tx.money_map_type for tx in transactions}
+        self.assertEqual(category_types, {MoneyMapType.CORE.value, MoneyMapType.CHOICE.value})
+
+    def test_empty_category_list_returns_all(self) -> None:
+        """Should return all transactions when category_types is empty list."""
+        transactions, total_count = months_service.get_transactions_filtered(
+            self.session,
+            month_id=self.month.id,
+            category_types=[],
+        )
+
+        # ##>: Empty list means no filter, should return all 5 transactions.
+        self.assertEqual(total_count, 5)
+        self.assertEqual(len(transactions), 5)
+
+    def test_invalid_category_values_are_ignored(self) -> None:
+        """Should ignore invalid category values and filter only valid ones."""
+        transactions, total_count = months_service.get_transactions_filtered(
+            self.session,
+            month_id=self.month.id,
+            category_types=["INVALID_TYPE", MoneyMapType.CORE.value],
+        )
+
+        # ##>: Invalid type should be ignored, only CORE transactions returned.
+        self.assertEqual(total_count, 2)
+        for tx in transactions:
+            self.assertEqual(tx.money_map_type, MoneyMapType.CORE.value)

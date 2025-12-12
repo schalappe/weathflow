@@ -8,6 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.responses._types import ScoreTrendLiteral
@@ -110,7 +111,7 @@ def get_transactions_filtered(
     db: Session,
     month_id: int,
     *,
-    category_type: str | None = None,
+    category_types: list[str] | None = None,
     search: str | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
@@ -126,8 +127,8 @@ def get_transactions_filtered(
         Database session.
     month_id : int
         Month ID to filter transactions.
-    category_type : str | None
-        Filter by money_map_type (e.g., "INCOME", "CORE").
+    category_types : list[str] | None
+        Filter by money_map_type (e.g., ["INCOME", "CORE"]).
     search : str | None
         Case-insensitive partial match on description.
     start_date : date | None
@@ -158,8 +159,15 @@ def get_transactions_filtered(
         query = db.query(Transaction).filter(Transaction.month_id == month_id)
 
         # ##>: Apply optional filters with AND logic.
-        if category_type is not None:
-            query = query.filter(Transaction.money_map_type == category_type)
+        if category_types is not None and len(category_types) > 0:
+            # ##>: Validate category types and log warnings for invalid values.
+            valid_types = {e.value for e in MoneyMapType}
+            invalid_types = [c for c in category_types if c not in valid_types]
+            if invalid_types:
+                logger.warning("Invalid category_types ignored: %s", invalid_types)
+            valid_categories = [c for c in category_types if c in valid_types]
+            if valid_categories:
+                query = query.filter(Transaction.money_map_type.in_(valid_categories))
 
         if search is not None and search.strip():
             escaped_search = _escape_like_pattern(search.strip())
@@ -178,12 +186,12 @@ def get_transactions_filtered(
         transactions = query.order_by(Transaction.date.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
         logger.info(
-            "Retrieved %d/%d transactions for month_id=%d (page=%d, filters: category=%s, search=%s)",
+            "Retrieved %d/%d transactions for month_id=%d (page=%d, filters: categories=%s, search=%s)",
             len(transactions),
             total_count,
             month_id,
             page,
-            category_type,
+            category_types,
             search[:20] if search else None,
         )
 

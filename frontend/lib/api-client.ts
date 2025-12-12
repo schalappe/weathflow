@@ -6,6 +6,7 @@ import type {
   ImportMode,
   MonthDetailResponse,
   MonthsListResponse,
+  TransactionFilters,
   UpdateTransactionPayload,
   UpdateTransactionResponse,
   UploadResponse,
@@ -149,10 +150,25 @@ export async function getMonthDetail(
   month: number,
   page: number = 1,
   pageSize: number = 50,
+  filters?: TransactionFilters,
 ): Promise<MonthDetailResponse> {
   const url = new URL(`${API_BASE}/api/months/${year}/${month}`);
   url.searchParams.set("page", page.toString());
   url.searchParams.set("page_size", pageSize.toString());
+
+  // [>]: Add filter parameters if provided.
+  if (filters?.categoryTypes.length) {
+    url.searchParams.set("category", filters.categoryTypes.join(","));
+  }
+  if (filters?.dateFrom) {
+    url.searchParams.set("start_date", filters.dateFrom);
+  }
+  if (filters?.dateTo) {
+    url.searchParams.set("end_date", filters.dateTo);
+  }
+  if (filters?.searchQuery.trim()) {
+    url.searchParams.set("search", filters.searchQuery.trim());
+  }
 
   let response: Response;
   try {
