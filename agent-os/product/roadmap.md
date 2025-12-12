@@ -34,7 +34,7 @@
 
 17. [x] Transaction Filters — Add filtering by category type, date range, and search by description to the transaction table `S`
 
-18. [ ] Data Export — Implement JSON and CSV export of monthly data for backup purposes `XS`
+18. [x] Data Export — Implement JSON and CSV export of monthly data for backup purposes `XS`
 
 > Notes
 >
