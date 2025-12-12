@@ -342,5 +342,10 @@ export async function exportMonthData(
     throw new Error(message);
   }
 
-  return response.blob();
+  try {
+    return await response.blob();
+  } catch (blobError) {
+    console.error("Failed to process export response as blob:", blobError);
+    throw new Error("Failed to download export file. Please try again.");
+  }
 }

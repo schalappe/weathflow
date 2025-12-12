@@ -36,7 +36,10 @@ export function ExportButtons({ year, month, disabled }: ExportButtonsProps) {
         window.URL.revokeObjectURL(url);
       }
     } catch (error) {
-      console.error("Export error:", error);
+      console.error(
+        `Export error for ${year}-${String(month).padStart(2, "0")} (${format}):`,
+        error,
+      );
       toast.error("Export failed", {
         description:
           error instanceof Error

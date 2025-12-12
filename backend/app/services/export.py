@@ -13,11 +13,11 @@ from sqlalchemy.orm import Session
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.services import months as months_service
-from app.services.exceptions import MonthNotFoundError
+from app.services.exceptions import ExportSerializationError, MonthNotFoundError
 
 logger = logging.getLogger(__name__)
 
-# ##>: CSV field headers for export (used by both JSON and CSV exports).
+# ##>: CSV column headers for CSV export output.
 EXPORT_HEADERS = [
     "Date",
     "Description",
@@ -159,8 +159,10 @@ def export_month_to_json(db: Session, year: int, month: int) -> ExportResult:
     ------
     MonthNotFoundError
         If month not found.
-    TransactionQueryError
-        If database query fails.
+    MonthDataError
+        If database query fails (includes TransactionQueryError).
+    ExportSerializationError
+        If JSON serialization fails due to non-serializable data.
     """
     month_record, transactions = _get_month_export_data(db, year, month)
 
@@ -183,7 +185,12 @@ def export_month_to_json(db: Session, year: int, month: int) -> ExportResult:
         "transaction_count": len(transactions),
     }
 
-    json_content = json.dumps(export_data, ensure_ascii=False, indent=2)
+    try:
+        json_content = json.dumps(export_data, ensure_ascii=False, indent=2)
+    except TypeError as error:
+        logger.error("JSON serialization failed for %d-%02d: %s", year, month, str(error))
+        raise ExportSerializationError(year, month, str(error)) from error
+
     filename = f"moneymap-{year}-{month:02d}.json"
 
     logger.info("Generated JSON export for %d-%02d with %d transactions", year, month, len(transactions))

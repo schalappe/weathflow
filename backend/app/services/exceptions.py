@@ -477,3 +477,42 @@ class AdviceQueryError(AdviceGenerationError):
         self.month_id = month_id
         self.reason = reason
         super().__init__(f"Failed to query advice for month {month_id}: {reason}")
+
+
+class ExportError(Exception):
+    """
+    Base exception for all export operation errors.
+
+    All export-specific exceptions inherit from this class, allowing
+    callers to catch all export errors with a single except clause.
+    """
+
+
+class ExportSerializationError(ExportError):
+    """
+    Raised when export data cannot be serialized to the target format.
+
+    Parameters
+    ----------
+    year : int
+        The year of the month being exported.
+    month : int
+        The month number being exported.
+    reason : str
+        Description of the serialization failure.
+
+    Attributes
+    ----------
+    year : int
+        The year for programmatic access.
+    month : int
+        The month for programmatic access.
+    reason : str
+        The failure reason for debugging.
+    """
+
+    def __init__(self, year: int, month: int, reason: str) -> None:
+        self.year = year
+        self.month = month
+        self.reason = reason
+        super().__init__(f"Failed to serialize export data for {year}-{month:02d}: {reason}")
