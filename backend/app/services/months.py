@@ -202,6 +202,38 @@ def get_transactions_filtered(
         raise TransactionQueryError(month_id, str(error)) from error
 
 
+def get_all_transactions_for_month(db: Session, month_id: int) -> list[Transaction]:
+    """
+    Retrieve all transactions for a month without pagination.
+
+    Used for export functionality where all transactions are needed.
+
+    Parameters
+    ----------
+    db : Session
+        Database session.
+    month_id : int
+        Month ID to filter transactions.
+
+    Returns
+    -------
+    list[Transaction]
+        All transactions for the month, ordered by date descending.
+
+    Raises
+    ------
+    TransactionQueryError
+        If database query fails.
+    """
+    try:
+        result = db.query(Transaction).filter(Transaction.month_id == month_id).order_by(Transaction.date.desc()).all()
+        logger.info("Retrieved %d transactions for export (month_id=%d)", len(result), month_id)
+        return result
+    except SQLAlchemyError as error:
+        logger.error("Database error retrieving transactions for export (month_id=%d): %s", month_id, str(error))
+        raise TransactionQueryError(month_id, str(error)) from error
+
+
 def get_months_history(db: Session, limit: int) -> list[Month]:
     """
     Retrieve months for historical data, ordered chronologically (oldest first).

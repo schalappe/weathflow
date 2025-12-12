@@ -1,10 +1,12 @@
 """FastAPI router for Monthly Data API endpoints."""
 
+import io
 import logging
 from datetime import date
 from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
@@ -17,8 +19,9 @@ from app.responses.months import (
     PaginationInfo,
     TransactionResponse,
 )
+from app.services import export as export_service
 from app.services import months as months_service
-from app.services.exceptions import InvalidCategoryTypeError, MonthDataError
+from app.services.exceptions import InvalidCategoryTypeError, MonthDataError, MonthNotFoundError
 
 # ruff: noqa: B008
 
@@ -252,5 +255,109 @@ def get_month_detail(
     except Exception as error:
         logger.exception(
             "Unexpected error in get_month_detail for %d-%02d: error_type=%s", year, month, type(error).__name__
+        )
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
+
+
+@router.get("/months/{year}/{month}/export/json")
+def export_month_json(
+    year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
+    month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """
+    Export month data as JSON file.
+
+    Returns a downloadable JSON file containing month summary and all transactions.
+
+    Parameters
+    ----------
+    year : int
+        Year (e.g., 2025).
+    month : int
+        Month number (1-12).
+
+    Returns
+    -------
+    StreamingResponse
+        JSON file download with month summary and transactions.
+
+    Raises
+    ------
+    HTTPException 404
+        If month not found.
+    HTTPException 503
+        If database is temporarily unavailable.
+    """
+    try:
+        result = export_service.export_month_to_json(db, year, month)
+        return StreamingResponse(
+            io.BytesIO(result.content),
+            media_type=result.media_type,
+            headers={"Content-Disposition": f"attachment; filename={result.filename}"},
+        )
+    except MonthNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No data found for {year}-{month:02d}. Please upload transactions for this month first.",
+        ) from error
+    except MonthDataError as error:
+        logger.exception("Database error in export_month_json for %d-%02d", year, month)
+        raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
+    except Exception as error:
+        logger.exception(
+            "Unexpected error in export_month_json for %d-%02d: error_type=%s", year, month, type(error).__name__
+        )
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
+
+
+@router.get("/months/{year}/{month}/export/csv")
+def export_month_csv(
+    year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
+    month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """
+    Export month transactions as CSV file.
+
+    Returns a downloadable CSV file with transaction list (semicolon-separated).
+
+    Parameters
+    ----------
+    year : int
+        Year (e.g., 2025).
+    month : int
+        Month number (1-12).
+
+    Returns
+    -------
+    StreamingResponse
+        CSV file download with transaction list.
+
+    Raises
+    ------
+    HTTPException 404
+        If month not found.
+    HTTPException 503
+        If database is temporarily unavailable.
+    """
+    try:
+        result = export_service.export_month_to_csv(db, year, month)
+        return StreamingResponse(
+            io.BytesIO(result.content),
+            media_type=result.media_type,
+            headers={"Content-Disposition": f"attachment; filename={result.filename}"},
+        )
+    except MonthNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No data found for {year}-{month:02d}. Please upload transactions for this month first.",
+        ) from error
+    except MonthDataError as error:
+        logger.exception("Database error in export_month_csv for %d-%02d", year, month)
+        raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
+    except Exception as error:
+        logger.exception(
+            "Unexpected error in export_month_csv for %d-%02d: error_type=%s", year, month, type(error).__name__
         )
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error

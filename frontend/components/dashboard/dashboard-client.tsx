@@ -12,6 +12,7 @@ import { SpendingPieChart } from "./spending-pie-chart";
 import { MonthSelector } from "./month-selector";
 import { TransactionTable } from "./transaction-table";
 import { TransactionEditModal } from "./transaction-edit-modal";
+import { ExportButtons } from "./export-buttons";
 import {
   getMonthsList,
   getMonthDetail,
@@ -297,6 +298,14 @@ export function DashboardClient() {
             Money Map Manager
           </h1>
           <nav className="flex items-center gap-4">
+            {/* [>]: Show export buttons when a month is selected and data is loaded. */}
+            {state.selectedMonth && state.monthDetail && (
+              <ExportButtons
+                year={state.selectedMonth.year}
+                month={state.selectedMonth.month}
+                disabled={isLoading}
+              />
+            )}
             <Link
               href="/import"
               className="flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
