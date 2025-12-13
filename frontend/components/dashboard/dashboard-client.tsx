@@ -401,14 +401,14 @@ export function DashboardClient() {
               {/* Income - Row 1, Col 1 */}
               <div className="animate-fade-in-up opacity-0 stagger-1 h-full">
                 <MetricCard
-                  title="Income"
+                  category="Income"
                   amount={state.monthDetail.month.total_income}
                 />
               </div>
               {/* Compound - Row 1, Col 2 */}
               <div className="animate-fade-in-up opacity-0 stagger-2 h-full">
                 <MetricCard
-                  title="Compound"
+                  category="Compound"
                   amount={Math.abs(state.monthDetail.month.total_compound)}
                   percentage={state.monthDetail.month.compound_percentage}
                   isSuccess={meetsThreshold(
@@ -433,7 +433,7 @@ export function DashboardClient() {
               {/* Core - Row 2, Col 1 */}
               <div className="animate-fade-in-up opacity-0 stagger-4 h-full">
                 <MetricCard
-                  title="Core"
+                  category="Core"
                   amount={Math.abs(state.monthDetail.month.total_core)}
                   percentage={state.monthDetail.month.core_percentage}
                   isSuccess={meetsThreshold(
@@ -445,7 +445,7 @@ export function DashboardClient() {
               {/* Choice - Row 2, Col 2 */}
               <div className="animate-fade-in-up opacity-0 stagger-5 h-full">
                 <MetricCard
-                  title="Choice"
+                  category="Choice"
                   amount={Math.abs(state.monthDetail.month.total_choice)}
                   percentage={state.monthDetail.month.choice_percentage}
                   isSuccess={meetsThreshold(

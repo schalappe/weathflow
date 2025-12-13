@@ -329,6 +329,13 @@ export const t = {
     select: "Sélectionner",
     of: "sur",
   },
+
+  // Error Boundary
+  errorBoundary: {
+    title: "Une erreur est survenue",
+    description: "Une erreur inattendue s'est produite. Veuillez réessayer.",
+    retry: "Réessayer",
+  },
 } as const;
 
 // [>]: Type-safe translation access.

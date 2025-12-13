@@ -14,8 +14,11 @@ import {
 import { formatCurrency, cn } from "@/lib/utils";
 import { t } from "@/lib/translations";
 
+// [>]: Union type ensures only valid category keys are accepted at compile time.
+export type CategoryKey = "Income" | "Core" | "Choice" | "Compound";
+
 interface MetricCardProps {
-  title: string;
+  category: CategoryKey;
   amount: number;
   percentage?: number;
   isSuccess?: boolean;
@@ -24,7 +27,7 @@ interface MetricCardProps {
 
 // [>]: Neutra theme category configuration with French labels.
 const CATEGORY_CONFIG: Record<
-  string,
+  CategoryKey,
   {
     icon: React.ReactNode;
     glowClass: string;
@@ -68,13 +71,13 @@ const CATEGORY_CONFIG: Record<
 };
 
 export function MetricCard({
-  title,
+  category,
   amount,
   percentage,
   isSuccess,
   compoundDirection,
 }: MetricCardProps) {
-  const config = CATEGORY_CONFIG[title] || CATEGORY_CONFIG.Income;
+  const config = CATEGORY_CONFIG[category];
 
   return (
     <Card

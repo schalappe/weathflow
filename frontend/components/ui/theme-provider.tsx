@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useState } from "react";
+import { createContext, useCallback, useSyncExternalStore } from "react";
 
 export type Theme = "light" | "dark";
 
@@ -14,48 +14,52 @@ export const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 const STORAGE_KEY = "theme";
 
-// [>]: Read initial theme from localStorage. Runs once during state initialization.
-function getInitialTheme(): Theme {
-  if (typeof window === "undefined") return "light";
+// [>]: Subscribers notified when theme changes.
+let listeners: Array<() => void> = [];
+
+function subscribe(listener: () => void): () => void {
+  listeners = [...listeners, listener];
+  return () => {
+    listeners = listeners.filter((l) => l !== listener);
+  };
+}
+
+function getSnapshot(): Theme {
   try {
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
     if (stored === "light" || stored === "dark") {
       return stored;
     }
-  } catch (error) {
+  } catch {
     // [>]: localStorage unavailable (private browsing), use default.
-    if (process.env.NODE_ENV === "development") {
-      console.warn(
-        "[ThemeProvider] Failed to read theme from localStorage:",
-        error,
-      );
-    }
   }
   return "light";
 }
 
+// [>]: Server always returns "light" to match initial client render.
+function getServerSnapshot(): Theme {
+  return "light";
+}
+
+function setTheme(theme: Theme): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, theme);
+  } catch {
+    // [>]: localStorage unavailable, theme still works in-memory.
+  }
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  // [>]: Notify all subscribers of the change.
+  listeners.forEach((listener) => listener());
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // [>]: Lazy initialization reads localStorage once, avoids cascading renders.
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  // [>]: useSyncExternalStore handles hydration correctly without causing cascading renders.
+  const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const toggleTheme = useCallback(() => {
-    setTheme((prev) => {
-      const next = prev === "light" ? "dark" : "light";
-      try {
-        localStorage.setItem(STORAGE_KEY, next);
-      } catch (error) {
-        // [>]: localStorage unavailable, theme still works in-memory.
-        if (process.env.NODE_ENV === "development") {
-          console.warn(
-            "[ThemeProvider] Failed to persist theme to localStorage:",
-            error,
-          );
-        }
-      }
-      document.documentElement.classList.toggle("dark", next === "dark");
-      return next;
-    });
-  }, []);
+    const next = theme === "light" ? "dark" : "light";
+    setTheme(next);
+  }, [theme]);
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>

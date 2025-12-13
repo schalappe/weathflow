@@ -4,6 +4,7 @@ import { Component, type ReactNode } from "react";
 import { Card, CardContent } from "./card";
 import { Button } from "./button";
 import { AlertCircle } from "lucide-react";
+import { t } from "@/lib/translations";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -50,12 +51,12 @@ export class ErrorBoundary extends Component<
               <AlertCircle className="h-6 w-6 text-red-500" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Something went wrong</h2>
+              <h2 className="text-lg font-semibold">{t.errorBoundary.title}</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                An unexpected error occurred. Please try again.
+                {t.errorBoundary.description}
               </p>
             </div>
-            <Button onClick={this.handleRetry}>Try Again</Button>
+            <Button onClick={this.handleRetry}>{t.errorBoundary.retry}</Button>
           </CardContent>
         </Card>
       );
