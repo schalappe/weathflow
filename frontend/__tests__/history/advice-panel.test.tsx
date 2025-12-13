@@ -60,12 +60,12 @@ describe("AdvicePanel - State Management", () => {
 
     expect(
       screen.getByText(
-        "Generez des conseils personnalises bases sur vos 3 derniers mois de transactions.",
+        "Générez des conseils personnalisés basés sur vos 3 derniers mois de transactions.",
       ),
     ).toBeInTheDocument();
 
     expect(
-      screen.getByRole("button", { name: "Generer des conseils" }),
+      screen.getByRole("button", { name: /Générer des conseils/i }),
     ).toBeInTheDocument();
   });
 
@@ -87,9 +87,9 @@ describe("AdvicePanel - State Management", () => {
 
     // [>]: All sections should be visible.
     expect(screen.getByText(mockAdvice.analysis)).toBeInTheDocument();
-    expect(screen.getByText("Points d'attention")).toBeInTheDocument();
+    expect(screen.getByText("Points de vigilance")).toBeInTheDocument();
     expect(screen.getByText("Recommandations")).toBeInTheDocument();
-    expect(screen.getByText("Encouragement")).toBeInTheDocument();
+    expect(screen.getByText("Continuez comme ça !")).toBeInTheDocument();
     expect(screen.getByText(mockAdvice.encouragement)).toBeInTheDocument();
   });
 
@@ -103,7 +103,7 @@ describe("AdvicePanel - State Management", () => {
     });
 
     expect(
-      screen.getByRole("button", { name: "Reessayer" }),
+      screen.getByRole("button", { name: /Réessayer/i }),
     ).toBeInTheDocument();
   });
 
@@ -128,13 +128,13 @@ describe("AdvicePanel - State Management", () => {
       expect(screen.getByText("+20%")).toBeInTheDocument();
     });
 
-    // [>]: Positive trend (+20%) should have red color class.
+    // [>]: Positive trend (+20%) should have red color class (Neutra theme).
     const positiveTrend = screen.getByText("+20%");
-    expect(positiveTrend).toHaveClass("text-red-600");
+    expect(positiveTrend).toHaveClass("text-red-700");
 
-    // [>]: Negative trend (-15%) should have green color class.
+    // [>]: Negative trend (-15%) should have emerald color class.
     const negativeTrend = screen.getByText("-15%");
-    expect(negativeTrend).toHaveClass("text-green-600");
+    expect(negativeTrend).toHaveClass("text-emerald-700");
   });
 
   it("regenerate button shows spinner while loading", async () => {
@@ -169,15 +169,15 @@ describe("AdvicePanel - State Management", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /Regenerer/ }),
+        screen.getByRole("button", { name: /Régénérer/i }),
       ).toBeInTheDocument();
     });
 
     // [>]: Click regenerate button.
-    await user.click(screen.getByRole("button", { name: /Regenerer/ }));
+    await user.click(screen.getByRole("button", { name: /Régénérer/i }));
 
     // [>]: Should show loading state with spinner.
-    expect(screen.getByText("Regeneration...")).toBeInTheDocument();
+    expect(screen.getByText("Régénération...")).toBeInTheDocument();
   });
 });
 
@@ -208,12 +208,12 @@ describe("AdvicePanel - User Interactions", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Generer des conseils" }),
+        screen.getByRole("button", { name: /Générer des conseils/i }),
       ).toBeInTheDocument();
     });
 
     await user.click(
-      screen.getByRole("button", { name: "Generer des conseils" }),
+      screen.getByRole("button", { name: /Générer des conseils/i }),
     );
 
     // [>]: Should call generateAdvice with regenerate=false.
@@ -249,11 +249,11 @@ describe("AdvicePanel - User Interactions", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /Regenerer/ }),
+        screen.getByRole("button", { name: /Régénérer/i }),
       ).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: /Regenerer/ }));
+    await user.click(screen.getByRole("button", { name: /Régénérer/i }));
 
     // [>]: Should call generateAdvice with regenerate=true (existing advice).
     await waitFor(() => {
@@ -280,7 +280,7 @@ describe("AdvicePanel - User Interactions", () => {
       expect(screen.getByText("Network error")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Reessayer" }));
+    await user.click(screen.getByRole("button", { name: /Réessayer/i }));
 
     await waitFor(() => {
       expect(mockGetAdvice).toHaveBeenCalledTimes(2);
@@ -330,7 +330,7 @@ describe("AdvicePanel - User Interactions", () => {
     });
 
     // [>]: Click regenerate button.
-    await user.click(screen.getByRole("button", { name: /Regenerer/ }));
+    await user.click(screen.getByRole("button", { name: /Régénérer/i }));
 
     // [>]: Error banner should appear.
     await waitFor(() => {
@@ -361,7 +361,7 @@ describe("AdvicePanel - User Interactions", () => {
     });
 
     // [>]: Problem areas section should not be visible when empty.
-    expect(screen.queryByText("Points d'attention")).not.toBeInTheDocument();
+    expect(screen.queryByText("Points de vigilance")).not.toBeInTheDocument();
   });
 
   it("hides recommendations section when array is empty", async () => {
@@ -406,7 +406,7 @@ describe("AdvicePanel - User Interactions", () => {
 
     // [>]: Neutral trend should have gray color class.
     const neutralTrend = screen.getByText("0%");
-    expect(neutralTrend).toHaveClass("text-slate-500");
+    expect(neutralTrend).toHaveClass("text-gray-600");
   });
 
   it("disables regenerate button during regeneration to prevent double-submit", async () => {
@@ -441,15 +441,17 @@ describe("AdvicePanel - User Interactions", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /Regenerer/ }),
+        screen.getByRole("button", { name: /Régénérer/i }),
       ).toBeInTheDocument();
     });
 
-    const button = screen.getByRole("button", { name: /Regenerer/ });
+    const button = screen.getByRole("button", { name: /Régénérer/i });
     await user.click(button);
 
     // [>]: Button should be disabled during regeneration.
-    expect(screen.getByRole("button", { name: /Regeneration/ })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /Régénération/i }),
+    ).toBeDisabled();
   });
 });
 
@@ -468,10 +470,10 @@ describe("AdvicePanel - Error State Actionable Guidance", () => {
     });
 
     // [>]: Data-related error should show import link instead of retry.
-    const importLink = screen.getByRole("link", { name: /Importer/ });
+    const importLink = screen.getByRole("link", { name: /Importer/i });
     expect(importLink).toHaveAttribute("href", "/import");
     expect(
-      screen.queryByRole("button", { name: "Reessayer" }),
+      screen.queryByRole("button", { name: /Réessayer/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -489,7 +491,7 @@ describe("AdvicePanel - Error State Actionable Guidance", () => {
     });
 
     // [>]: Insufficient data should prompt import.
-    const importLink = screen.getByRole("link", { name: /Importer/ });
+    const importLink = screen.getByRole("link", { name: /Importer/i });
     expect(importLink).toHaveAttribute("href", "/import");
   });
 
@@ -504,10 +506,10 @@ describe("AdvicePanel - Error State Actionable Guidance", () => {
 
     // [>]: Network errors should show retry, not import link.
     expect(
-      screen.getByRole("button", { name: "Reessayer" }),
+      screen.getByRole("button", { name: /Réessayer/i }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /Importer/ }),
+      screen.queryByRole("link", { name: /Importer/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -522,7 +524,7 @@ describe("AdvicePanel - Error State Actionable Guidance", () => {
 
     // [>]: Server errors can be retried.
     expect(
-      screen.getByRole("button", { name: "Reessayer" }),
+      screen.getByRole("button", { name: /Réessayer/i }),
     ).toBeInTheDocument();
   });
 });

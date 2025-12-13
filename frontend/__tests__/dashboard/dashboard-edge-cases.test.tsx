@@ -48,12 +48,12 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
       render(<DashboardClient />);
 
       await waitFor(() => {
-        expect(screen.getByText("No months imported yet")).toBeInTheDocument();
+        expect(screen.getByText("Aucune donnée")).toBeInTheDocument();
       });
 
-      // [>]: Should have CTA to import page (button says "Import Transactions").
+      // [>]: Should have CTA to import page (button says "Importer des transactions").
       expect(
-        screen.getByRole("link", { name: /import transactions/i }),
+        screen.getByRole("link", { name: /Importer des transactions/i }),
       ).toHaveAttribute("href", "/import");
     });
   });
@@ -81,7 +81,7 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
         />,
       );
 
-      expect(screen.getByText("No transactions")).toBeInTheDocument();
+      expect(screen.getByText("Aucune transaction")).toBeInTheDocument();
     });
 
     it("applies loading overlay when isLoading is true", () => {
@@ -180,22 +180,24 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
       render(<DashboardClient />);
 
       // [>]: Wait for full render.
+      // [>]: New UI shows score and /3 as separate elements.
       await waitFor(() => {
-        expect(screen.getByText("Score: 3/3")).toBeInTheDocument();
+        expect(screen.getByText("3")).toBeInTheDocument();
+        expect(screen.getByText("/3")).toBeInTheDocument();
       });
 
-      // [>]: Verify all metric cards rendered.
-      expect(screen.getByText("Income")).toBeInTheDocument();
-      expect(screen.getByText("Core")).toBeInTheDocument();
-      expect(screen.getByText("Choice")).toBeInTheDocument();
-      expect(screen.getByText("Compound")).toBeInTheDocument();
+      // [>]: Verify all metric cards rendered (use getAllByText since categories may appear multiple times).
+      expect(screen.getAllByText("Revenus").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Essentiel").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Plaisir").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Épargne").length).toBeGreaterThan(0);
 
       // [>]: Verify transaction table.
       expect(screen.getByText("Transactions")).toBeInTheDocument();
       expect(screen.getByText("Test Transaction")).toBeInTheDocument();
 
       // [>]: Verify pie chart.
-      expect(screen.getByText("Spending Distribution")).toBeInTheDocument();
+      expect(screen.getByText("Répartition des dépenses")).toBeInTheDocument();
     });
   });
 });

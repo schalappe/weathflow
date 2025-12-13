@@ -77,25 +77,25 @@ describe("TransactionEditModal", () => {
       const user = userEvent.setup();
       render(<TransactionEditModal {...createDefaultProps()} />);
 
-      // [>]: Open the type dropdown and select CHOICE.
+      // [>]: Open the type dropdown and select CHOICE (Plaisir).
       const typeSelect = screen.getByRole("combobox", {
-        name: /category type/i,
+        name: /Type de catégorie/i,
       });
       await user.click(typeSelect);
-      await user.click(screen.getByRole("option", { name: "CHOICE" }));
+      await user.click(screen.getByRole("option", { name: "Plaisir" }));
 
       // [>]: Open subcategory dropdown and verify CHOICE options are present.
       const subcategorySelect = screen.getByRole("combobox", {
-        name: /subcategory/i,
+        name: /Sous-catégorie/i,
       });
       await user.click(subcategorySelect);
 
       // [>]: First CHOICE subcategory should be auto-selected and visible in options.
       expect(
-        screen.getByRole("option", { name: "Dining out" }),
+        screen.getByRole("option", { name: "Restaurant" }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("option", { name: "Entertainment" }),
+        screen.getByRole("option", { name: "Divertissement" }),
       ).toBeInTheDocument();
     });
 
@@ -104,14 +104,14 @@ describe("TransactionEditModal", () => {
       render(<TransactionEditModal {...createDefaultProps()} />);
 
       const typeSelect = screen.getByRole("combobox", {
-        name: /category type/i,
+        name: /Type de catégorie/i,
       });
       await user.click(typeSelect);
-      await user.click(screen.getByRole("option", { name: "EXCLUDED" }));
+      await user.click(screen.getByRole("option", { name: "Exclu" }));
 
       // [>]: EXCLUDED has no subcategories, so the select should not be present.
       expect(
-        screen.queryByRole("combobox", { name: /subcategory/i }),
+        screen.queryByRole("combobox", { name: /Sous-catégorie/i }),
       ).not.toBeInTheDocument();
     });
   });
@@ -120,7 +120,7 @@ describe("TransactionEditModal", () => {
     it("disables save button when no changes made", () => {
       render(<TransactionEditModal {...createDefaultProps()} />);
       expect(
-        screen.getByRole("button", { name: /save changes/i }),
+        screen.getByRole("button", { name: /Enregistrer/i }),
       ).toBeDisabled();
     });
 
@@ -129,13 +129,13 @@ describe("TransactionEditModal", () => {
       render(<TransactionEditModal {...createDefaultProps()} />);
 
       const typeSelect = screen.getByRole("combobox", {
-        name: /category type/i,
+        name: /Type de catégorie/i,
       });
       await user.click(typeSelect);
-      await user.click(screen.getByRole("option", { name: "CHOICE" }));
+      await user.click(screen.getByRole("option", { name: "Plaisir" }));
 
       expect(
-        screen.getByRole("button", { name: /save changes/i }),
+        screen.getByRole("button", { name: /Enregistrer/i }),
       ).not.toBeDisabled();
     });
 
@@ -145,15 +145,15 @@ describe("TransactionEditModal", () => {
 
       // [>]: Change only the subcategory within same type.
       const subcategorySelect = screen.getByRole("combobox", {
-        name: /subcategory/i,
+        name: /Sous-catégorie/i,
       });
       await user.click(subcategorySelect);
 
-      // [>]: Select a different CORE subcategory.
-      await user.click(screen.getByRole("option", { name: "Housing" }));
+      // [>]: Select a different CORE subcategory (Housing → Logement).
+      await user.click(screen.getByRole("option", { name: "Logement" }));
 
       expect(
-        screen.getByRole("button", { name: /save changes/i }),
+        screen.getByRole("button", { name: /Enregistrer/i }),
       ).not.toBeDisabled();
     });
 
@@ -165,14 +165,14 @@ describe("TransactionEditModal", () => {
 
       // [>]: Make a change first to enable the button.
       const typeSelect = screen.getByRole("combobox", {
-        name: /category type/i,
+        name: /Type de catégorie/i,
       });
       await user.click(typeSelect);
-      await user.click(screen.getByRole("option", { name: "CHOICE" }));
+      await user.click(screen.getByRole("option", { name: "Plaisir" }));
 
       // [>]: Verify enabled before checking disabled state.
       expect(
-        screen.getByRole("button", { name: /save changes/i }),
+        screen.getByRole("button", { name: /Enregistrer/i }),
       ).not.toBeDisabled();
 
       // [>]: Re-render with isSaving=true to test disabled state during save.
@@ -186,7 +186,7 @@ describe("TransactionEditModal", () => {
       );
 
       expect(
-        screen.getByRole("button", { name: /save changes/i }),
+        screen.getByRole("button", { name: /Enregistrer/i }),
       ).toBeDisabled();
     });
   });
@@ -197,15 +197,15 @@ describe("TransactionEditModal", () => {
       const onSave = vi.fn().mockResolvedValue(undefined);
       render(<TransactionEditModal {...createDefaultProps({ onSave })} />);
 
-      // [>]: Change type to COMPOUND.
+      // [>]: Change type to COMPOUND (Épargne).
       const typeSelect = screen.getByRole("combobox", {
-        name: /category type/i,
+        name: /Type de catégorie/i,
       });
       await user.click(typeSelect);
-      await user.click(screen.getByRole("option", { name: "COMPOUND" }));
+      await user.click(screen.getByRole("option", { name: "Épargne" }));
 
       // [>]: First subcategory of COMPOUND is auto-selected: "Emergency Fund".
-      await user.click(screen.getByRole("button", { name: /save changes/i }));
+      await user.click(screen.getByRole("button", { name: /Enregistrer/i }));
 
       await waitFor(() => {
         expect(onSave).toHaveBeenCalledWith({
@@ -221,12 +221,12 @@ describe("TransactionEditModal", () => {
       render(<TransactionEditModal {...createDefaultProps({ onSave })} />);
 
       const typeSelect = screen.getByRole("combobox", {
-        name: /category type/i,
+        name: /Type de catégorie/i,
       });
       await user.click(typeSelect);
-      await user.click(screen.getByRole("option", { name: "EXCLUDED" }));
+      await user.click(screen.getByRole("option", { name: "Exclu" }));
 
-      await user.click(screen.getByRole("button", { name: /save changes/i }));
+      await user.click(screen.getByRole("button", { name: /Enregistrer/i }));
 
       await waitFor(() => {
         expect(onSave).toHaveBeenCalledWith({
@@ -243,7 +243,7 @@ describe("TransactionEditModal", () => {
       const onClose = vi.fn();
       render(<TransactionEditModal {...createDefaultProps({ onClose })} />);
 
-      await user.click(screen.getByRole("button", { name: /cancel/i }));
+      await user.click(screen.getByRole("button", { name: /Annuler/i }));
 
       expect(onClose).toHaveBeenCalledOnce();
     });

@@ -34,8 +34,8 @@ describe("MonthPreviewTable", () => {
     );
 
     // [>]: Check that both months are rendered.
-    expect(screen.getByText("Jan 2025")).toBeInTheDocument();
-    expect(screen.getByText("Feb 2025")).toBeInTheDocument();
+    expect(screen.getByText("janvier 2025")).toBeInTheDocument();
+    expect(screen.getByText("février 2025")).toBeInTheDocument();
 
     // [>]: Check transaction counts.
     expect(screen.getByText("89")).toBeInTheDocument();
@@ -77,10 +77,12 @@ describe("MonthPreviewTable", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Select All" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tout sélectionner" }));
     expect(onSelectAll).toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Deselect All" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Tout désélectionner" }),
+    );
     expect(onDeselectAll).toHaveBeenCalled();
   });
 });

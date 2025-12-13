@@ -1,17 +1,22 @@
 "use client";
 
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  Tooltip,
-  Legend,
-} from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  ChartContainer,
+  ChartTooltip,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { CATEGORY_COLORS, sortMonthsChronologically, cn } from "@/lib/utils";
+import { t } from "@/lib/translations";
+import { BarChart3, Home, ShoppingBag, PiggyBank } from "lucide-react";
 import type { MonthHistory } from "@/types";
 
 interface SpendingBreakdownChartProps {
@@ -19,73 +24,46 @@ interface SpendingBreakdownChartProps {
   className?: string;
 }
 
-// [>]: Chart data point with percentage values for stacked bars.
 interface BreakdownChartDataPoint {
   label: string;
   fullLabel: string;
   core: number;
   choice: number;
   compound: number;
-  // [>]: Original values preserved for tooltip display.
   originalCore: number;
   originalChoice: number;
   originalCompound: number;
 }
 
-// [>]: Map dataKey to original value field for tooltip display.
-const ORIGINAL_VALUE_MAP: Record<string, keyof BreakdownChartDataPoint> = {
-  core: "originalCore",
-  choice: "originalChoice",
-  compound: "originalCompound",
-};
+// [>]: Chart config with icons for tooltip display.
+const chartConfig = {
+  core: {
+    label: t.metrics.Core,
+    color: CATEGORY_COLORS.CORE,
+    icon: Home,
+  },
+  choice: {
+    label: t.metrics.Choice,
+    color: CATEGORY_COLORS.CHOICE,
+    icon: ShoppingBag,
+  },
+  compound: {
+    label: t.metrics.Compound,
+    color: CATEGORY_COLORS.COMPOUND,
+    icon: PiggyBank,
+  },
+} satisfies ChartConfig;
 
-// [>]: Custom tooltip matching app styling, shows original percentages.
-function CustomTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: Array<{
-    name: string;
-    value: number;
-    dataKey: string;
-    color: string;
-    payload: BreakdownChartDataPoint;
-  }>;
-  label?: string;
-}) {
-  if (!active || !payload?.length) return null;
+const LEGEND_ITEMS = [
+  { name: t.metrics.Core, color: CATEGORY_COLORS.CORE, icon: Home },
+  { name: t.metrics.Choice, color: CATEGORY_COLORS.CHOICE, icon: ShoppingBag },
+  {
+    name: t.metrics.Compound,
+    color: CATEGORY_COLORS.COMPOUND,
+    icon: PiggyBank,
+  },
+];
 
-  // [>]: Access fullLabel from first payload item's data.
-  const displayLabel = payload[0]?.payload.fullLabel ?? label;
-
-  return (
-    <div className="rounded-md border bg-background p-2 shadow-md">
-      <p className="font-medium">{displayLabel}</p>
-      {payload.map((entry) => {
-        // [>]: Use original value for display, not normalized value.
-        const originalKey = ORIGINAL_VALUE_MAP[entry.dataKey];
-        const displayValue = originalKey
-          ? (entry.payload[originalKey] as number)
-          : entry.value;
-        return (
-          <div key={entry.name} className="flex items-center gap-2 text-sm">
-            <div
-              className="h-3 w-3 rounded"
-              style={{ backgroundColor: entry.color }}
-            />
-            <span className="text-muted-foreground">
-              {entry.name}: {displayValue.toFixed(1)}%
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// [>]: Validate month data has required numeric properties.
 function isValidMonthData(m: MonthHistory): boolean {
   return (
     typeof m?.year === "number" &&
@@ -98,16 +76,12 @@ function isValidMonthData(m: MonthHistory): boolean {
   );
 }
 
-// [>]: Normalize percentages for stacked bar display when compound is negative.
 function normalizePercentages(
   core: number,
   choice: number,
   compound: number,
 ): { core: number; choice: number; compound: number } {
-  // [>]: When compound is negative, spending exceeds income.
-  // Normalize to show relative proportions of spending categories.
   if (compound < 0) {
-    // [>]: Use absolute values of spending categories only.
     const totalSpending = core + choice;
     if (totalSpending === 0) return { core: 0, choice: 0, compound: 0 };
     return {
@@ -117,7 +91,6 @@ function normalizePercentages(
     };
   }
 
-  // [>]: Normal case: all positive, sum to ~100%.
   const total = core + choice + compound;
   if (total === 0) return { core: 0, choice: 0, compound: 0 };
   return {
@@ -127,11 +100,9 @@ function normalizePercentages(
   };
 }
 
-// [>]: Filter empty months, sort chronologically, map to chart format.
 function transformToChartData(
   months: MonthHistory[],
 ): BreakdownChartDataPoint[] {
-  // [!]: Guard against non-array input.
   if (!Array.isArray(months)) {
     console.warn(
       "[SpendingBreakdownChart] Invalid months data: expected array",
@@ -139,7 +110,6 @@ function transformToChartData(
     return [];
   }
 
-  // [>]: Filter out invalid months and months where all percentages are zero.
   const validMonths = months.filter((m) => {
     if (!isValidMonthData(m)) {
       console.warn("[SpendingBreakdownChart] Skipping invalid month data:", m);
@@ -162,8 +132,8 @@ function transformToChartData(
       m.compound_percentage,
     );
     return {
-      label: date.toLocaleDateString("en-US", { month: "short" }),
-      fullLabel: date.toLocaleDateString("en-US", {
+      label: date.toLocaleDateString("fr-FR", { month: "short" }),
+      fullLabel: date.toLocaleDateString("fr-FR", {
         month: "long",
         year: "numeric",
       }),
@@ -177,15 +147,75 @@ function transformToChartData(
   });
 }
 
-// [>]: Chart error fallback displayed when Recharts encounters an error.
 const chartErrorFallback = (
   <div
     className="flex h-[250px] items-center justify-center text-muted-foreground"
     data-testid="chart-error"
   >
-    Unable to display chart
+    {t.breakdownChart.error}
   </div>
 );
+
+// [>]: Custom tooltip with icons matching the category colors.
+function CustomTooltipContent({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    dataKey: string;
+    color: string;
+    payload: BreakdownChartDataPoint;
+  }>;
+}) {
+  if (!active || !payload?.length) return null;
+
+  const data = payload[0]?.payload;
+  if (!data) return null;
+
+  const categories = [
+    {
+      key: "core",
+      label: t.metrics.Core,
+      icon: Home,
+      color: CATEGORY_COLORS.CORE,
+      value: data.originalCore,
+    },
+    {
+      key: "choice",
+      label: t.metrics.Choice,
+      icon: ShoppingBag,
+      color: CATEGORY_COLORS.CHOICE,
+      value: data.originalChoice,
+    },
+    {
+      key: "compound",
+      label: t.metrics.Compound,
+      icon: PiggyBank,
+      color: CATEGORY_COLORS.COMPOUND,
+      value: data.originalCompound,
+    },
+  ];
+
+  return (
+    <div className="grid min-w-[10rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
+      <div className="font-medium">{data.fullLabel}</div>
+      <div className="grid gap-1">
+        {categories.map(({ key, label, icon: Icon, color, value }) => (
+          <div key={key} className="flex items-center gap-2">
+            <Icon className="h-3.5 w-3.5" style={{ color }} />
+            <span className="text-muted-foreground">{label}:</span>
+            <span className="font-mono font-medium tabular-nums text-foreground">
+              {value.toFixed(1)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function SpendingBreakdownChart({
   months,
@@ -195,9 +225,35 @@ export function SpendingBreakdownChart({
   const isEmpty = chartData.length === 0;
 
   return (
-    <Card className={cn(className)}>
-      <CardHeader>
-        <CardTitle>Spending Breakdown by Month</CardTitle>
+    <Card className={cn("border-0 shadow-lg", className)}>
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#d97757]/10 to-[#6a9bcc]/20">
+              <BarChart3 className="h-5 w-5 text-[#d97757] dark:text-[#e08363]" />
+            </div>
+            <div>
+              <CardTitle className="text-base">
+                {t.breakdownChart.title}
+              </CardTitle>
+              <CardDescription>{t.breakdownChart.subtitle}</CardDescription>
+            </div>
+          </div>
+          {/* [>]: Custom legend with icons matching the chart. */}
+          <div className="flex items-center gap-4">
+            {LEGEND_ITEMS.map((item) => (
+              <div key={item.name} className="flex items-center gap-1.5">
+                <item.icon
+                  className="h-3.5 w-3.5"
+                  style={{ color: item.color }}
+                />
+                <span className="text-xs text-muted-foreground">
+                  {item.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <ErrorBoundary fallback={chartErrorFallback}>
@@ -206,40 +262,63 @@ export function SpendingBreakdownChart({
               className="flex h-[250px] items-center justify-center text-muted-foreground"
               data-testid="empty-state"
             >
-              No spending data available
+              {t.breakdownChart.empty}
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={chartData}>
-                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+            <ChartContainer
+              config={chartConfig}
+              className="aspect-auto h-[250px] w-full"
+            >
+              <BarChart
+                accessibilityLayer
+                data={chartData}
+                margin={{ left: 12, right: 12, top: 12, bottom: 12 }}
+              >
+                {/* [>]: Horizontal grid lines only for cleaner look. */}
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                />
                 <YAxis
                   domain={[0, 100]}
                   ticks={[0, 25, 50, 75, 100]}
                   tickFormatter={(v) => `${v}%`}
                   width={40}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend />
+                <ChartTooltip
+                  cursor={false}
+                  content={<CustomTooltipContent />}
+                />
                 <Bar
                   dataKey="core"
                   name="Core"
                   stackId="spending"
-                  fill={CATEGORY_COLORS.CORE}
+                  fill="var(--color-core)"
+                  radius={[0, 0, 0, 0]}
                 />
                 <Bar
                   dataKey="choice"
                   name="Choice"
                   stackId="spending"
-                  fill={CATEGORY_COLORS.CHOICE}
+                  fill="var(--color-choice)"
+                  radius={[0, 0, 0, 0]}
                 />
                 <Bar
                   dataKey="compound"
                   name="Compound"
                   stackId="spending"
-                  fill={CATEGORY_COLORS.COMPOUND}
+                  fill="var(--color-compound)"
+                  radius={[4, 4, 0, 0]}
                 />
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           )}
         </ErrorBoundary>
       </CardContent>

@@ -2,12 +2,16 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ImportPageClient } from "@/components/import/import-page-client";
 import * as apiClient from "@/lib/api-client";
+import { useRouter } from "next/navigation";
 
 // [>]: Mock the API client module.
 vi.mock("@/lib/api-client", () => ({
   uploadCSV: vi.fn(),
   categorize: vi.fn(),
 }));
+
+// [>]: Get mocked router for assertions.
+vi.mock("next/navigation");
 
 const mockUploadResponse = {
   success: true,
@@ -59,7 +63,9 @@ describe("ImportPageClient", () => {
     render(<ImportPageClient />);
 
     // [>]: Initially shows dropzone.
-    expect(screen.getByText(/drag your csv file here/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Glissez votre fichier CSV ici/i),
+    ).toBeInTheDocument();
 
     // [>]: Simulate file upload.
     const input = document.querySelector(
@@ -75,7 +81,7 @@ describe("ImportPageClient", () => {
 
     // [>]: Should show preview state with months.
     await waitFor(() => {
-      expect(screen.getByText("Jan 2025")).toBeInTheDocument();
+      expect(screen.getByText("janvier 2025")).toBeInTheDocument();
     });
   });
 
@@ -94,18 +100,18 @@ describe("ImportPageClient", () => {
 
     // [>]: Wait for preview state.
     await waitFor(() => {
-      expect(screen.getByText("Jan 2025")).toBeInTheDocument();
+      expect(screen.getByText("janvier 2025")).toBeInTheDocument();
     });
 
     // [>]: Click categorize button.
     const categorizeButton = screen.getByRole("button", {
-      name: /categorize selected months/i,
+      name: /Catégoriser avec l'IA/i,
     });
     fireEvent.click(categorizeButton);
 
     // [>]: Wait for results.
     await waitFor(() => {
-      expect(screen.getByText(/import complete/i)).toBeInTheDocument();
+      expect(screen.getByText(/Import terminé/i)).toBeInTheDocument();
     });
   });
 
@@ -128,20 +134,31 @@ describe("ImportPageClient", () => {
       expect(screen.getAllByText(/network error/i).length).toBeGreaterThan(0);
     });
 
-    // [>]: Should show Try Again button.
+    // [>]: Should show Réessayer button.
     expect(
-      screen.getByRole("button", { name: /try again/i }),
+      screen.getByRole("button", { name: /Réessayer/i }),
     ).toBeInTheDocument();
   });
 
   it("state transitions follow correct flow", async () => {
+    const mockPush = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({
+      push: mockPush,
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      prefetch: vi.fn(),
+    });
     vi.mocked(apiClient.uploadCSV).mockResolvedValue(mockUploadResponse);
     vi.mocked(apiClient.categorize).mockResolvedValue(mockCategorizeResponse);
 
     render(<ImportPageClient />);
 
     // [>]: Initial: empty state - dropzone visible.
-    expect(screen.getByText(/drag your csv file here/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Glissez votre fichier CSV ici/i),
+    ).toBeInTheDocument();
 
     // [>]: Upload file -> uploading -> preview.
     const input = document.querySelector(
@@ -152,25 +169,23 @@ describe("ImportPageClient", () => {
 
     // [>]: Preview state - months table visible.
     await waitFor(() => {
-      expect(screen.getByText("Jan 2025")).toBeInTheDocument();
+      expect(screen.getByText("janvier 2025")).toBeInTheDocument();
     });
 
     // [>]: Click categorize -> categorizing -> results.
     fireEvent.click(
-      screen.getByRole("button", { name: /categorize selected months/i }),
+      screen.getByRole("button", { name: /Catégoriser avec l'IA/i }),
     );
 
     // [>]: Results state - success message visible.
     await waitFor(() => {
-      expect(screen.getByText(/import complete/i)).toBeInTheDocument();
+      expect(screen.getByText(/Import terminé/i)).toBeInTheDocument();
     });
 
-    // [>]: Click finish -> back to empty.
-    fireEvent.click(screen.getByRole("button", { name: /finish import/i }));
+    // [>]: Click finish -> navigates to homepage.
+    fireEvent.click(screen.getByRole("button", { name: /Terminer l'import/i }));
 
-    await waitFor(() => {
-      expect(screen.getByText(/drag your csv file here/i)).toBeInTheDocument();
-    });
+    expect(mockPush).toHaveBeenCalledWith("/");
   });
 
   it("categorization API error displays error with retry option", async () => {
@@ -190,12 +205,12 @@ describe("ImportPageClient", () => {
 
     // [>]: Wait for preview state.
     await waitFor(() => {
-      expect(screen.getByText("Jan 2025")).toBeInTheDocument();
+      expect(screen.getByText("janvier 2025")).toBeInTheDocument();
     });
 
     // [>]: Click categorize button.
     fireEvent.click(
-      screen.getByRole("button", { name: /categorize selected months/i }),
+      screen.getByRole("button", { name: /Catégoriser avec l'IA/i }),
     );
 
     // [>]: Error shows in both Alert and FileDropzone, use getAllByText.
@@ -206,7 +221,7 @@ describe("ImportPageClient", () => {
     });
 
     expect(
-      screen.getByRole("button", { name: /try again/i }),
+      screen.getByRole("button", { name: /Réessayer/i }),
     ).toBeInTheDocument();
   });
 });

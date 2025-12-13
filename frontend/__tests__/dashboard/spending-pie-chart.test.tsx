@@ -17,7 +17,7 @@ describe("SpendingPieChart", () => {
 
     // [>]: Chart should render without empty state.
     expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
-    expect(screen.getByText("Spending Distribution")).toBeInTheDocument();
+    expect(screen.getByText("Répartition des dépenses")).toBeInTheDocument();
   });
 
   it("displays chart container with recharts", () => {
@@ -35,6 +35,6 @@ describe("SpendingPieChart", () => {
     render(<SpendingPieChart core={0} choice={0} compound={0} />);
 
     expect(screen.getByTestId("empty-state")).toBeInTheDocument();
-    expect(screen.getByText("No spending data available")).toBeInTheDocument();
+    expect(screen.getByText("Aucune donnée de dépenses")).toBeInTheDocument();
   });
 });

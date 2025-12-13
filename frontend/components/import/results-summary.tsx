@@ -11,10 +11,10 @@ import {
 } from "@/components/ui/tooltip";
 import {
   formatMonthDisplay,
-  pluralize,
   SCORE_COLORS,
   sortMonthsChronologically,
 } from "@/lib/utils";
+import { t } from "@/lib/translations";
 import { CheckCircle, AlertTriangle } from "lucide-react";
 import type { MonthResult } from "@/types";
 
@@ -45,11 +45,13 @@ export function ResultsSummary({
         <CheckCircle className="h-6 w-6 text-emerald-600" />
         <div>
           <p className="font-medium text-emerald-800 dark:text-emerald-200">
-            Import Complete!
+            {t.results.complete}
           </p>
           <p className="text-sm text-emerald-700 dark:text-emerald-300">
-            {totalTransactions} transactions categorized across{" "}
-            {pluralize(results.length, "month")} ({totalApiCalls} API calls)
+            {totalTransactions} {t.results.transactionsCategorized}{" "}
+            {results.length}{" "}
+            {results.length === 1 ? t.progress.month : t.progress.months} (
+            {totalApiCalls} {t.results.apiCalls})
           </p>
         </div>
       </div>
@@ -70,7 +72,7 @@ export function ResultsSummary({
           <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
           <div>
             <p className="font-medium text-amber-800 dark:text-amber-200">
-              Some months were not found in the CSV
+              {t.results.monthsNotFound}
             </p>
             <p className="text-sm text-amber-700 dark:text-amber-300">
               {monthsNotFound.join(", ")}
@@ -85,16 +87,16 @@ export function ResultsSummary({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="outline" disabled>
-                View transactions to verify
+                {t.results.viewTransactions}
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Coming soon in Dashboard</p>
+              <p>{t.results.comingSoon}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
 
-        <Button onClick={onFinish}>Finish import</Button>
+        <Button onClick={onFinish}>{t.results.finish}</Button>
       </div>
     </div>
   );
@@ -102,6 +104,9 @@ export function ResultsSummary({
 
 function MonthResultCard({ result }: { result: MonthResult }) {
   const scoreColor = SCORE_COLORS[result.score] || "bg-gray-500";
+  const translatedLabel =
+    t.score.labels[result.score_label as keyof typeof t.score.labels] ||
+    result.score_label;
 
   return (
     <Card>
@@ -111,24 +116,26 @@ function MonthResultCard({ result }: { result: MonthResult }) {
             {formatMonthDisplay(result.year, result.month)}
           </CardTitle>
           <Badge className={`${scoreColor} text-white`}>
-            {result.score_label}
+            {translatedLabel}
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="text-lg font-semibold">Score: {result.score}/3</div>
+        <div className="text-lg font-semibold">
+          {t.results.score} : {result.score}/3
+        </div>
 
         {/* Stats */}
         <div className="flex flex-col gap-1 text-sm text-muted-foreground">
           <span>{result.transactions_categorized} transactions</span>
           {result.low_confidence_count > 0 && (
             <span className="text-amber-600">
-              {result.low_confidence_count} low confidence
+              {result.low_confidence_count} {t.results.lowConfidence}
             </span>
           )}
           {result.transactions_skipped > 0 && (
             <span className="text-red-600">
-              {result.transactions_skipped} skipped (categorization error)
+              {result.transactions_skipped} {t.results.skipped}
             </span>
           )}
         </div>

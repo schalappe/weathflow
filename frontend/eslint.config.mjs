@@ -13,6 +13,14 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // [>]: Disable no-page-custom-font for root layout.
+  // In App Router, root layout fonts apply to all pages.
+  {
+    files: ["app/layout.tsx"],
+    rules: {
+      "@next/next/no-page-custom-font": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

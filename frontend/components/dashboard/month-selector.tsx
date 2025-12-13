@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatMonthDisplay, formatMonthKey } from "@/lib/utils";
+import { t } from "@/lib/translations";
 import type { MonthSummary } from "@/types";
 
 interface MonthSelectorProps {
@@ -47,8 +48,8 @@ export function MonthSelector({
       onValueChange={handleValueChange}
       disabled={isDisabled}
     >
-      <SelectTrigger className="w-[180px]" aria-label="Select month">
-        <SelectValue placeholder="Select month" />
+      <SelectTrigger className="w-[180px]" aria-label={t.monthSelector.label}>
+        <SelectValue placeholder={t.monthSelector.placeholder} />
       </SelectTrigger>
       <SelectContent>
         {months.map((m) => (

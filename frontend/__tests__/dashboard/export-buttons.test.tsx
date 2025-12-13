@@ -99,9 +99,7 @@ describe("ExportButtons", () => {
 
       // [>]: Verify success toast was shown (indicates download completed).
       await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith(
-          "JSON exported successfully",
-        );
+        expect(toast.success).toHaveBeenCalledWith("JSON exporté avec succès");
       });
     });
   });
@@ -122,9 +120,7 @@ describe("ExportButtons", () => {
 
       // [>]: Both buttons should be disabled during export.
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /exporting/i }),
-        ).toBeDisabled();
+        expect(screen.getByRole("button", { name: /export/i })).toBeDisabled();
         expect(screen.getByRole("button", { name: /csv/i })).toBeDisabled();
       });
 
@@ -169,9 +165,7 @@ describe("ExportButtons", () => {
       fireEvent.click(screen.getByRole("button", { name: /json/i }));
 
       await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith(
-          "JSON exported successfully",
-        );
+        expect(toast.success).toHaveBeenCalledWith("JSON exporté avec succès");
       });
     });
 
@@ -184,7 +178,7 @@ describe("ExportButtons", () => {
       fireEvent.click(screen.getByRole("button", { name: /csv/i }));
 
       await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith("CSV exported successfully");
+        expect(toast.success).toHaveBeenCalledWith("CSV exporté avec succès");
       });
     });
   });
@@ -200,7 +194,7 @@ describe("ExportButtons", () => {
       fireEvent.click(screen.getByRole("button", { name: /json/i }));
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith("Export failed", {
+        expect(toast.error).toHaveBeenCalledWith("Échec de l'export", {
           description: "No data found for this month",
         });
       });
@@ -214,8 +208,8 @@ describe("ExportButtons", () => {
       fireEvent.click(screen.getByRole("button", { name: /csv/i }));
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith("Export failed", {
-          description: "An unexpected error occurred",
+        expect(toast.error).toHaveBeenCalledWith("Échec de l'export", {
+          description: "Une erreur est survenue",
         });
       });
     });
@@ -273,9 +267,7 @@ describe("ExportButtons", () => {
 
       // [>]: Verify export completed successfully.
       await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith(
-          "JSON exported successfully",
-        );
+        expect(toast.success).toHaveBeenCalledWith("JSON exporté avec succès");
       });
     });
   });

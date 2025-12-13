@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DashboardClient } from "@/components/dashboard/dashboard-client";
 import * as apiClient from "@/lib/api-client";
 import { DEFAULT_FILTERS } from "@/types";
+import { TRANSACTIONS_PER_PAGE } from "@/lib/utils";
 
 // [>]: Mock the API client module.
 vi.mock("@/lib/api-client", () => ({
@@ -91,9 +92,9 @@ const mockMonthDetail = {
   ],
   pagination: {
     page: 1,
-    page_size: 50,
+    page_size: 25,
     total_items: 89,
-    total_pages: 2,
+    total_pages: 4,
   },
 };
 
@@ -108,8 +109,9 @@ describe("DashboardClient", () => {
 
     render(<DashboardClient />);
 
-    // [>]: Should show loading state initially.
-    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+    // [>]: Should show loading skeleton initially (animate-pulse class).
+    const skeletons = document.querySelectorAll(".animate-pulse");
+    expect(skeletons.length).toBeGreaterThan(0);
 
     // [>]: Wait for API call.
     await waitFor(() => {
@@ -129,14 +131,16 @@ describe("DashboardClient", () => {
         2025,
         10,
         1,
-        50,
+        TRANSACTIONS_PER_PAGE,
         DEFAULT_FILTERS,
       );
     });
 
     // [>]: Should display the most recent month (October 2025).
+    // [>]: New UI shows score and /3 as separate elements.
     await waitFor(() => {
-      expect(screen.getByText("Score: 3/3")).toBeInTheDocument();
+      expect(screen.getByText("3")).toBeInTheDocument();
+      expect(screen.getByText("/3")).toBeInTheDocument();
     });
   });
 
@@ -150,11 +154,14 @@ describe("DashboardClient", () => {
 
     // [>]: Wait for initial load - most recent month (October 2025) should be auto-selected.
     await waitFor(() => {
-      expect(screen.getByText("Score: 3/3")).toBeInTheDocument();
+      expect(screen.getByText("3")).toBeInTheDocument();
+      expect(screen.getByText("/3")).toBeInTheDocument();
     });
 
     // [>]: Verify the month selector is rendered with correct options.
-    const selector = screen.getByRole("combobox", { name: /select month/i });
+    const selector = screen.getByRole("combobox", {
+      name: /sélectionner le mois/i,
+    });
     expect(selector).toBeInTheDocument();
 
     // [>]: Verify getMonthDetail was called with the most recent month.
@@ -162,12 +169,14 @@ describe("DashboardClient", () => {
       2025,
       10,
       1,
-      50,
+      TRANSACTIONS_PER_PAGE,
       DEFAULT_FILTERS,
     );
 
-    // [>]: Verify "Oct 2025" appears (in both selector and score card).
-    expect(screen.getAllByText("Oct 2025").length).toBeGreaterThanOrEqual(1);
+    // [>]: Verify "octobre 2025" appears (in both selector and score card).
+    expect(screen.getAllByText("octobre 2025").length).toBeGreaterThanOrEqual(
+      1,
+    );
   });
 
   it("pagination change fetches new page", async () => {
@@ -181,9 +190,13 @@ describe("DashboardClient", () => {
       expect(screen.getByText("Transactions")).toBeInTheDocument();
     });
 
-    // [>]: Click next page.
-    const nextButton = screen.getByRole("button", { name: /next/i });
-    fireEvent.click(nextButton);
+    // [>]: Click next page (icon button with ChevronRight).
+    const buttons = screen.getAllByRole("button");
+    const nextButton = buttons.find((btn) =>
+      btn.querySelector("svg.lucide-chevron-right"),
+    );
+    expect(nextButton).toBeDefined();
+    fireEvent.click(nextButton!);
 
     // [>]: Should fetch page 2.
     await waitFor(() => {
@@ -191,7 +204,7 @@ describe("DashboardClient", () => {
         2025,
         10,
         2,
-        50,
+        TRANSACTIONS_PER_PAGE,
         DEFAULT_FILTERS,
       );
     });
@@ -211,14 +224,14 @@ describe("DashboardClient", () => {
 
     // [>]: Should show retry button.
     expect(
-      screen.getByRole("button", { name: /try again/i }),
+      screen.getByRole("button", { name: /réessayer/i }),
     ).toBeInTheDocument();
 
     // [>]: Reset mock and click retry.
     vi.mocked(apiClient.getMonthsList).mockResolvedValue(mockMonthsList);
     vi.mocked(apiClient.getMonthDetail).mockResolvedValue(mockMonthDetail);
 
-    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    fireEvent.click(screen.getByRole("button", { name: /réessayer/i }));
 
     // [>]: Should retry loading.
     await waitFor(() => {
@@ -246,23 +259,29 @@ describe("DashboardClient", () => {
         expect(screen.getByText("Transactions")).toBeInTheDocument();
       });
 
-      // [>]: Navigate to page 2.
-      const nextButton = screen.getByRole("button", { name: /next/i });
-      fireEvent.click(nextButton);
+      // [>]: Navigate to page 2 (icon button with ChevronRight).
+      const buttons = screen.getAllByRole("button");
+      const nextButton = buttons.find((btn) =>
+        btn.querySelector("svg.lucide-chevron-right"),
+      );
+      expect(nextButton).toBeDefined();
+      fireEvent.click(nextButton!);
 
       await waitFor(() => {
         expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
           2025,
           10,
           2,
-          50,
+          TRANSACTIONS_PER_PAGE,
           DEFAULT_FILTERS,
         );
       });
 
       // [>]: Open category filter and select CORE.
-      fireEvent.click(screen.getByText("All Categories"));
-      const coreCheckbox = screen.getByRole("checkbox", { name: /CORE/i });
+      fireEvent.click(screen.getByText("Toutes les catégories"));
+      const coreCheckbox = await screen.findByRole("checkbox", {
+        name: /Essentiel/i,
+      });
       fireEvent.click(coreCheckbox);
 
       // [>]: Should reset to page 1 with new filter.
@@ -271,7 +290,7 @@ describe("DashboardClient", () => {
           2025,
           10,
           1,
-          50,
+          TRANSACTIONS_PER_PAGE,
           expect.objectContaining({ categoryTypes: ["CORE"] }),
         );
       });
@@ -284,7 +303,7 @@ describe("DashboardClient", () => {
         transactions: [],
         pagination: {
           page: 1,
-          page_size: 50,
+          page_size: 25,
           total_items: 0,
           total_pages: 1,
         },
@@ -303,8 +322,10 @@ describe("DashboardClient", () => {
       });
 
       // [>]: Apply a filter first.
-      fireEvent.click(screen.getByText("All Categories"));
-      const coreCheckbox = screen.getByRole("checkbox", { name: /CORE/i });
+      fireEvent.click(screen.getByText("Toutes les catégories"));
+      const coreCheckbox = await screen.findByRole("checkbox", {
+        name: /Essentiel/i,
+      });
       fireEvent.click(coreCheckbox);
 
       await waitFor(() => {
@@ -312,18 +333,20 @@ describe("DashboardClient", () => {
           2025,
           10,
           1,
-          50,
+          TRANSACTIONS_PER_PAGE,
           expect.objectContaining({ categoryTypes: ["CORE"] }),
         );
       });
 
       // [>]: Change month via selector.
-      const selector = screen.getByRole("combobox", { name: /select month/i });
+      const selector = screen.getByRole("combobox", {
+        name: /sélectionner le mois/i,
+      });
       fireEvent.click(selector);
 
       // [>]: Select September 2025.
       const septOption = await screen.findByRole("option", {
-        name: /Sep 2025/i,
+        name: /septembre 2025/i,
       });
       fireEvent.click(septOption);
 
@@ -333,7 +356,7 @@ describe("DashboardClient", () => {
           2025,
           9,
           1,
-          50,
+          TRANSACTIONS_PER_PAGE,
           DEFAULT_FILTERS,
         );
       });
@@ -354,15 +377,17 @@ describe("DashboardClient", () => {
       vi.mocked(apiClient.getMonthDetail).mockClear();
 
       // [>]: Select multiple categories.
-      fireEvent.click(screen.getByText("All Categories"));
-      fireEvent.click(screen.getByRole("checkbox", { name: /CORE/i }));
+      fireEvent.click(screen.getByText("Toutes les catégories"));
+      fireEvent.click(
+        await screen.findByRole("checkbox", { name: /Essentiel/i }),
+      );
 
       await waitFor(() => {
         expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
           2025,
           10,
           1,
-          50,
+          TRANSACTIONS_PER_PAGE,
           expect.objectContaining({
             categoryTypes: ["CORE"],
             dateFrom: null,
@@ -373,14 +398,16 @@ describe("DashboardClient", () => {
       });
 
       // [>]: Add another category.
-      fireEvent.click(screen.getByRole("checkbox", { name: /CHOICE/i }));
+      fireEvent.click(
+        await screen.findByRole("checkbox", { name: /Plaisir/i }),
+      );
 
       await waitFor(() => {
         expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
           2025,
           10,
           1,
-          50,
+          TRANSACTIONS_PER_PAGE,
           expect.objectContaining({
             categoryTypes: expect.arrayContaining(["CORE", "CHOICE"]),
           }),

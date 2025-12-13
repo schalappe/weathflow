@@ -13,6 +13,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn, CATEGORY_BADGE_CLASSES, getActiveFilterCount } from "@/lib/utils";
+import { t } from "@/lib/translations";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { MONEY_MAP_TYPES } from "@/lib/category-options";
 import type { TransactionFilters as TFilters, MoneyMapType } from "@/types";
@@ -106,7 +107,7 @@ export function TransactionFilters({
   };
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+    <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-center lg:gap-2">
       {/* Category Multi-Select */}
       <Popover>
         <PopoverTrigger asChild>
@@ -119,7 +120,9 @@ export function TransactionFilters({
             <span className="flex items-center gap-2">
               {filters.categoryTypes.length > 0 ? (
                 <>
-                  <span className="hidden sm:inline">Categories</span>
+                  <span className="hidden sm:inline">
+                    {t.filters.categories}
+                  </span>
                   <Badge
                     variant="secondary"
                     className="rounded-full px-2 py-0.5 text-xs"
@@ -128,7 +131,7 @@ export function TransactionFilters({
                   </Badge>
                 </>
               ) : (
-                "All Categories"
+                t.filters.allCategories
               )}
             </span>
             <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
@@ -136,14 +139,14 @@ export function TransactionFilters({
         </PopoverTrigger>
         <PopoverContent className="w-56 p-3" align="start">
           <div className="space-y-3">
-            <p className="text-sm font-medium text-slate-700">
-              Filter by category
+            <p className="text-sm font-medium text-foreground">
+              {t.filters.filterByCategory}
             </p>
             <div className="space-y-2">
               {MONEY_MAP_TYPES.map((category) => (
                 <label
                   key={category}
-                  className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-slate-50"
+                  className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-muted"
                 >
                   <Checkbox
                     checked={filters.categoryTypes.includes(category)}
@@ -159,7 +162,7 @@ export function TransactionFilters({
                           .trim(),
                       )}
                     />
-                    {category}
+                    {t.categories[category as keyof typeof t.categories]}
                   </span>
                 </label>
               ))}
@@ -181,7 +184,9 @@ export function TransactionFilters({
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {filters.dateFrom ? formatDateDisplay(filters.dateFrom) : "From"}
+            {filters.dateFrom
+              ? formatDateDisplay(filters.dateFrom)
+              : t.filters.from}
             {filters.dateFrom && (
               <X
                 className="ml-2 h-3 w-3 opacity-50 hover:opacity-100"
@@ -221,7 +226,7 @@ export function TransactionFilters({
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {filters.dateTo ? formatDateDisplay(filters.dateTo) : "To"}
+            {filters.dateTo ? formatDateDisplay(filters.dateTo) : t.filters.to}
             {filters.dateTo && (
               <X
                 className="ml-2 h-3 w-3 opacity-50 hover:opacity-100"
@@ -249,11 +254,11 @@ export function TransactionFilters({
       </Popover>
 
       {/* Search Input */}
-      <div className="relative w-full lg:flex-1">
+      <div className="relative w-full lg:w-48 xl:w-56">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="text"
-          placeholder="Search description..."
+          placeholder={t.filters.search}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           disabled={disabled}
@@ -277,13 +282,13 @@ export function TransactionFilters({
           size="sm"
           onClick={handleClearFilters}
           disabled={disabled}
-          className="w-full shrink-0 text-slate-600 hover:text-slate-900 lg:w-auto"
+          className="w-full shrink-0 text-muted-foreground hover:text-foreground lg:w-auto"
         >
           <X className="mr-1 h-4 w-4" />
-          Clear
+          {t.filters.clear}
           <Badge
             variant="secondary"
-            className="ml-1.5 rounded-full bg-slate-200 px-1.5 py-0 text-xs"
+            className="ml-1.5 rounded-full px-1.5 py-0 text-xs"
           >
             {activeCount}
           </Badge>

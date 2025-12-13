@@ -270,17 +270,17 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
         self.assertEqual(total_count, 1)
         self.assertIn("NETFLIX", transactions[0].description)
 
-    def test_returns_transactions_ordered_by_date_desc(self) -> None:
-        """Should return transactions ordered by date descending."""
+    def test_returns_transactions_ordered_by_date_asc(self) -> None:
+        """Should return transactions ordered by date ascending."""
         transaction_repo = TransactionRepository(self.session)
         transactions, _ = months_service.get_transactions_filtered(
             transaction_repo,
             month_id=self.month.id,
         )
 
-        # ##>: Latest transaction (20th) should be first.
-        self.assertEqual(transactions[0].date, date(2025, 10, 20))
-        self.assertEqual(transactions[-1].date, date(2025, 10, 1))
+        # ##>: Earliest transaction (1st) should be first.
+        self.assertEqual(transactions[0].date, date(2025, 10, 1))
+        self.assertEqual(transactions[-1].date, date(2025, 10, 20))
 
     def test_multi_category_filter_returns_union(self) -> None:
         """Should return transactions matching any of the specified categories (union)."""

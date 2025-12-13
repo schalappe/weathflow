@@ -41,30 +41,28 @@ describe("TransactionFilters", () => {
       renderFilters();
 
       // [>]: Category dropdown.
-      expect(screen.getByText("All Categories")).toBeInTheDocument();
+      expect(screen.getByText("Toutes les catégories")).toBeInTheDocument();
 
       // [>]: Date pickers.
-      expect(screen.getByText("From")).toBeInTheDocument();
-      expect(screen.getByText("To")).toBeInTheDocument();
+      expect(screen.getByText("Du")).toBeInTheDocument();
+      expect(screen.getByText("Au")).toBeInTheDocument();
 
       // [>]: Search input.
-      expect(
-        screen.getByPlaceholderText("Search description..."),
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Rechercher...")).toBeInTheDocument();
     });
 
     it("shows category count badge when categories selected", () => {
       renderFilters({ ...DEFAULT_FILTERS, categoryTypes: ["CORE", "CHOICE"] });
 
       expect(screen.getByText("2")).toBeInTheDocument();
-      expect(screen.getByText("Categories")).toBeInTheDocument();
+      expect(screen.getByText("Catégories")).toBeInTheDocument();
     });
 
     it("shows clear button only when filters are active", () => {
       const { rerender } = renderFilters();
 
       // [>]: No clear button with default filters.
-      expect(screen.queryByText("Clear")).not.toBeInTheDocument();
+      expect(screen.queryByText("Effacer")).not.toBeInTheDocument();
 
       // [>]: Clear button appears with active filters.
       rerender(
@@ -75,7 +73,7 @@ describe("TransactionFilters", () => {
         />,
       );
 
-      expect(screen.getByText("Clear")).toBeInTheDocument();
+      expect(screen.getByText("Effacer")).toBeInTheDocument();
     });
 
     it("displays formatted dates when set", () => {
@@ -95,10 +93,10 @@ describe("TransactionFilters", () => {
       renderFilters();
 
       // [>]: Open category dropdown.
-      fireEvent.click(screen.getByText("All Categories"));
+      fireEvent.click(screen.getByText("Toutes les catégories"));
 
-      // [>]: Click CORE checkbox.
-      const coreCheckbox = screen.getByRole("checkbox", { name: /CORE/i });
+      // [>]: Click Essentiel (CORE) checkbox.
+      const coreCheckbox = screen.getByRole("checkbox", { name: /Essentiel/i });
       fireEvent.click(coreCheckbox);
 
       expect(mockOnFiltersChange).toHaveBeenCalledWith({
@@ -111,10 +109,10 @@ describe("TransactionFilters", () => {
       renderFilters({ ...DEFAULT_FILTERS, categoryTypes: ["CORE", "CHOICE"] });
 
       // [>]: Open category dropdown.
-      fireEvent.click(screen.getByText("Categories"));
+      fireEvent.click(screen.getByText("Catégories"));
 
-      // [>]: Uncheck CORE.
-      const coreCheckbox = screen.getByRole("checkbox", { name: /CORE/i });
+      // [>]: Uncheck Essentiel (CORE).
+      const coreCheckbox = screen.getByRole("checkbox", { name: /Essentiel/i });
       fireEvent.click(coreCheckbox);
 
       expect(mockOnFiltersChange).toHaveBeenCalledWith({
@@ -128,7 +126,7 @@ describe("TransactionFilters", () => {
     it("debounces search input by 300ms", () => {
       renderFilters();
 
-      const searchInput = screen.getByPlaceholderText("Search description...");
+      const searchInput = screen.getByPlaceholderText("Rechercher...");
       fireEvent.change(searchInput, { target: { value: "grocery" } });
 
       // [>]: Should NOT call immediately.
@@ -153,7 +151,7 @@ describe("TransactionFilters", () => {
     it("resets debounce timer on rapid input changes", () => {
       renderFilters();
 
-      const searchInput = screen.getByPlaceholderText("Search description...");
+      const searchInput = screen.getByPlaceholderText("Rechercher...");
 
       // [>]: Type "abc" with pauses.
       fireEvent.change(searchInput, { target: { value: "a" } });
@@ -183,7 +181,7 @@ describe("TransactionFilters", () => {
     it("shows clear icon when search has value", () => {
       renderFilters();
 
-      const searchInput = screen.getByPlaceholderText("Search description...");
+      const searchInput = screen.getByPlaceholderText("Rechercher...");
       fireEvent.change(searchInput, { target: { value: "test" } });
 
       // [>]: Find the X button near search input.
@@ -202,7 +200,7 @@ describe("TransactionFilters", () => {
         searchQuery: "test",
       });
 
-      fireEvent.click(screen.getByText("Clear"));
+      fireEvent.click(screen.getByText("Effacer"));
 
       expect(mockOnFiltersChange).toHaveBeenCalledWith(DEFAULT_FILTERS);
     });
@@ -213,10 +211,10 @@ describe("TransactionFilters", () => {
         searchQuery: "test",
       });
 
-      const searchInput = screen.getByPlaceholderText("Search description...");
+      const searchInput = screen.getByPlaceholderText("Rechercher...");
       expect(searchInput).toHaveValue("test");
 
-      fireEvent.click(screen.getByText("Clear"));
+      fireEvent.click(screen.getByText("Effacer"));
 
       // [>]: After clicking clear, the input should be empty.
       // Note: The component resets local state, but we need to verify via re-render.
@@ -234,7 +232,7 @@ describe("TransactionFilters", () => {
         />,
       );
 
-      const searchInput = screen.getByPlaceholderText("Search description...");
+      const searchInput = screen.getByPlaceholderText("Rechercher...");
       expect(searchInput).toHaveValue("external");
 
       // [>]: Parent clears filters (simulating month change).
@@ -255,13 +253,11 @@ describe("TransactionFilters", () => {
       renderFilters(DEFAULT_FILTERS, { disabled: true });
 
       expect(
-        screen.getByText("All Categories").closest("button"),
+        screen.getByText("Toutes les catégories").closest("button"),
       ).toBeDisabled();
-      expect(screen.getByText("From").closest("button")).toBeDisabled();
-      expect(screen.getByText("To").closest("button")).toBeDisabled();
-      expect(
-        screen.getByPlaceholderText("Search description..."),
-      ).toBeDisabled();
+      expect(screen.getByText("Du").closest("button")).toBeDisabled();
+      expect(screen.getByText("Au").closest("button")).toBeDisabled();
+      expect(screen.getByPlaceholderText("Rechercher...")).toBeDisabled();
     });
   });
 });

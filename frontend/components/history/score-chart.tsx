@@ -1,33 +1,136 @@
 "use client";
 
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  Tooltip,
-  ReferenceArea,
-} from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  ChartContainer,
+  ChartTooltip,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { SCORE_COLORS_HEX } from "@/lib/utils";
+import { t } from "@/lib/translations";
+import {
+  TrendingUp,
+  Trophy,
+  Target,
+  AlertTriangle,
+  XCircle,
+} from "lucide-react";
 import type { MonthHistory } from "@/types";
 
 interface ScoreChartProps {
   months: MonthHistory[];
+  period: number;
 }
 
-// [>]: Chart data point with null score for missing months.
 interface ChartDataPoint {
   label: string;
   score: number | null;
   scoreLabel: string | null;
   fullLabel: string;
+  fill: string;
 }
 
-// [>]: Custom tooltip matching app styling.
-function CustomTooltip({
+// [>]: Map score to color for dynamic dot coloring.
+function getScoreColor(score: number | null): string {
+  if (score === null) return SCORE_COLORS_HEX[0];
+  if (score === 3) return SCORE_COLORS_HEX[3];
+  if (score === 2) return SCORE_COLORS_HEX[2];
+  if (score === 1) return SCORE_COLORS_HEX[1];
+  return SCORE_COLORS_HEX[0];
+}
+
+// [>]: Render score icon based on score value.
+function ScoreIcon({
+  score,
+  className,
+  style,
+}: {
+  score: number | null;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  if (score === 3) return <Trophy className={className} style={style} />;
+  if (score === 2) return <Target className={className} style={style} />;
+  if (score === 1) return <AlertTriangle className={className} style={style} />;
+  return <XCircle className={className} style={style} />;
+}
+
+// [>]: Line color - using a visible blue that works in both light and dark mode.
+const LINE_COLOR = "#6a9bcc";
+
+const chartConfig = {
+  score: {
+    label: t.scoreChart.tooltipScore,
+    color: LINE_COLOR,
+  },
+} satisfies ChartConfig;
+
+function transformToChartData(
+  months: MonthHistory[],
+  period: number,
+): ChartDataPoint[] {
+  if (!Array.isArray(months)) {
+    console.warn("[ScoreChart] Invalid months data: expected array");
+    return [];
+  }
+
+  const now = new Date();
+  const result: ChartDataPoint[] = [];
+
+  const monthMap = new Map<string, MonthHistory>();
+  for (const m of months) {
+    const key = `${m.year}-${m.month}`;
+    monthMap.set(key, m);
+  }
+
+  // [>]: Use period to determine how many months to display.
+  const monthCount = period === 0 ? 12 : period;
+  for (let i = monthCount - 1; i >= 0; i--) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const key = `${year}-${month}`;
+    const monthData = monthMap.get(key);
+
+    const label = date.toLocaleDateString("fr-FR", { month: "short" });
+    const fullLabel = date.toLocaleDateString("fr-FR", {
+      month: "long",
+      year: "numeric",
+    });
+
+    const score = monthData?.score ?? null;
+
+    result.push({
+      label,
+      score,
+      scoreLabel: monthData?.score_label ?? null,
+      fullLabel,
+      fill: getScoreColor(score),
+    });
+  }
+
+  return result;
+}
+
+const chartErrorFallback = (
+  <div
+    className="flex h-[250px] items-center justify-center text-muted-foreground"
+    data-testid="chart-error"
+  >
+    {t.scoreChart.error}
+  </div>
+);
+
+// [>]: Custom tooltip formatter to display score details with icons.
+function CustomTooltipContent({
   active,
   payload,
 }: {
@@ -39,77 +142,59 @@ function CustomTooltip({
   const data = payload[0].payload;
   if (data.score === null) return null;
 
+  const scoreColor = getScoreColor(data.score);
+
   return (
-    <div className="rounded-md border bg-background p-2 shadow-md">
-      <p className="font-medium">{data.fullLabel}</p>
-      <p className="text-sm text-muted-foreground">
-        Score: {data.score}/3 - {data.scoreLabel}
-      </p>
+    <div className="grid min-w-[10rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
+      <div className="font-medium">{data.fullLabel}</div>
+      <div className="flex items-center gap-2">
+        <ScoreIcon
+          score={data.score}
+          className="h-3.5 w-3.5"
+          style={{ color: scoreColor }}
+        />
+        <span className="text-muted-foreground">
+          {t.scoreChart.tooltipScore} :
+        </span>
+        <span
+          className="font-mono font-semibold tabular-nums"
+          style={{ color: scoreColor }}
+        >
+          {data.score}/3
+        </span>
+        <span className="text-muted-foreground">
+          —{" "}
+          {t.score.labels[data.scoreLabel as keyof typeof t.score.labels] ||
+            data.scoreLabel}
+        </span>
+      </div>
     </div>
   );
 }
 
-// [>]: Generate last 12 months range and fill gaps with null.
-function transformToChartData(months: MonthHistory[]): ChartDataPoint[] {
-  // [!]: Guard against non-array input.
-  if (!Array.isArray(months)) {
-    console.warn("[ScoreChart] Invalid months data: expected array");
-    return [];
-  }
-
-  const now = new Date();
-  const result: ChartDataPoint[] = [];
-
-  // [>]: Build lookup map for O(1) access.
-  const monthMap = new Map<string, MonthHistory>();
-  for (const m of months) {
-    const key = `${m.year}-${m.month}`;
-    monthMap.set(key, m);
-  }
-
-  // [>]: Generate 12 months going backwards from current month.
-  for (let i = 11; i >= 0; i--) {
-    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const key = `${year}-${month}`;
-    const monthData = monthMap.get(key);
-
-    const label = date.toLocaleDateString("en-US", { month: "short" });
-    const fullLabel = date.toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
-    });
-
-    result.push({
-      label,
-      score: monthData?.score ?? null,
-      scoreLabel: monthData?.score_label ?? null,
-      fullLabel,
-    });
-  }
-
-  return result;
+// [>]: Generate subtitle based on period selection.
+function getPeriodDescription(period: number): string {
+  if (period === 0) return t.scoreChart.allTime;
+  if (period === 1) return t.scoreChart.lastMonth;
+  return t.scoreChart.lastMonths.replace("{n}", String(period));
 }
 
-// [>]: Chart error fallback displayed when Recharts encounters an error.
-const chartErrorFallback = (
-  <div
-    className="flex h-[250px] items-center justify-center text-muted-foreground"
-    data-testid="chart-error"
-  >
-    Unable to display chart
-  </div>
-);
-
-export function ScoreChart({ months }: ScoreChartProps) {
-  const chartData = transformToChartData(months);
+export function ScoreChart({ months, period }: ScoreChartProps) {
+  const chartData = transformToChartData(months, period);
   const isEmpty = chartData.every((d) => d.score === null);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Score Evolution (Last 12 Months)</CardTitle>
+    <Card className="border-0 shadow-lg">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/20">
+            <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <CardTitle className="text-base">{t.scoreChart.title}</CardTitle>
+            <CardDescription>{getPeriodDescription(period)}</CardDescription>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <ErrorBoundary fallback={chartErrorFallback}>
@@ -118,45 +203,68 @@ export function ScoreChart({ months }: ScoreChartProps) {
               className="flex h-[250px] items-center justify-center text-muted-foreground"
               data-testid="empty-state"
             >
-              No historical data available
+              {t.scoreChart.empty}
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={chartData}>
-                {/* [>]: Background zones for score thresholds (10% opacity). */}
-                <ReferenceArea
-                  y1={0}
-                  y2={1}
-                  fill={SCORE_COLORS_HEX[0]}
-                  fillOpacity={0.1}
+            <ChartContainer
+              config={chartConfig}
+              className="aspect-auto h-[250px] w-full"
+            >
+              <LineChart
+                accessibilityLayer
+                data={chartData}
+                margin={{ left: 12, right: 12, top: 12, bottom: 12 }}
+              >
+                {/* [>]: Horizontal grid lines only for cleaner look. */}
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 />
-                <ReferenceArea
-                  y1={1}
-                  y2={2}
-                  fill={SCORE_COLORS_HEX[1]}
-                  fillOpacity={0.1}
+                <YAxis
+                  domain={[0, 3]}
+                  ticks={[0, 1, 2, 3]}
+                  width={30}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 />
-                <ReferenceArea
-                  y1={2}
-                  y2={3}
-                  fill={SCORE_COLORS_HEX[3]}
-                  fillOpacity={0.1}
+                <ChartTooltip
+                  cursor={false}
+                  content={<CustomTooltipContent />}
                 />
-
-                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                <YAxis domain={[0, 3]} ticks={[0, 1, 2, 3]} width={30} />
-                <Tooltip content={<CustomTooltip />} />
                 <Line
-                  type="monotone"
                   dataKey="score"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  dot={{ fill: "#3b82f6", r: 4 }}
-                  activeDot={{ r: 6 }}
+                  type="natural"
+                  stroke="var(--color-score)"
+                  strokeWidth={2.5}
+                  dot={({ cx, cy, payload }) => {
+                    if (payload.score === null)
+                      return <g key={payload.label} />;
+                    return (
+                      <circle
+                        key={payload.label}
+                        cx={cx}
+                        cy={cy}
+                        r={5}
+                        fill={payload.fill}
+                        stroke="hsl(var(--background))"
+                        strokeWidth={2}
+                      />
+                    );
+                  }}
+                  activeDot={{
+                    r: 7,
+                    stroke: "hsl(var(--background))",
+                    strokeWidth: 2,
+                  }}
                   connectNulls={false}
                 />
               </LineChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           )}
         </ErrorBoundary>
       </CardContent>
