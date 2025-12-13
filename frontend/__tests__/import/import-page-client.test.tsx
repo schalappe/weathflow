@@ -45,7 +45,7 @@ const mockCategorizeResponse = {
       transactions_skipped: 0,
       low_confidence_count: 3,
       score: 3,
-      score_label: "Excellent" as const,
+      score_label: "Great" as const,
     },
   ],
   months_not_found: [],

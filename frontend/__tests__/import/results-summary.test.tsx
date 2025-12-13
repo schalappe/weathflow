@@ -11,7 +11,7 @@ const mockResults: MonthResult[] = [
     transactions_skipped: 0,
     low_confidence_count: 3,
     score: 3,
-    score_label: "Excellent",
+    score_label: "Great",
   },
   {
     year: 2025,
@@ -20,7 +20,7 @@ const mockResults: MonthResult[] = [
     transactions_skipped: 0,
     low_confidence_count: 0,
     score: 1,
-    score_label: "À améliorer",
+    score_label: "Need Improvement",
   },
 ];
 
@@ -39,7 +39,7 @@ describe("ResultsSummary", () => {
     expect(screen.getByText("janvier 2025")).toBeInTheDocument();
     expect(screen.getByText("février 2025")).toBeInTheDocument();
 
-    // [>]: Check score labels are rendered.
+    // [>]: Check score labels are rendered (French translations).
     expect(screen.getByText("Excellent")).toBeInTheDocument();
     expect(screen.getByText("À améliorer")).toBeInTheDocument();
   });
@@ -118,7 +118,7 @@ describe("ResultsSummary", () => {
         transactions_skipped: 2,
         low_confidence_count: 0,
         score: 3,
-        score_label: "Excellent",
+        score_label: "Great",
       },
     ];
 
