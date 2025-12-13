@@ -10,8 +10,8 @@ from typing import Any
 
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
-from app.repositories.month_repository import MonthRepository
-from app.repositories.transaction_repository import TransactionRepository
+from app.repositories.month import MonthRepository
+from app.repositories.transaction import TransactionRepository
 from app.services.exceptions import ExportSerializationError, MonthNotFoundError
 
 logger = logging.getLogger(__name__)

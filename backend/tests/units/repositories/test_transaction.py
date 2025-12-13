@@ -5,7 +5,7 @@ from datetime import date
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
-from app.repositories.transaction_repository import TransactionRepository
+from app.repositories.transaction import TransactionRepository
 from tests.conftest import DatabaseTestCase
 
 

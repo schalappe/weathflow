@@ -9,8 +9,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
-from app.repositories.month_repository import MonthRepository
-from app.repositories.transaction_repository import TransactionRepository
+from app.repositories.month import MonthRepository
+from app.repositories.transaction import TransactionRepository
 from app.responses._types import ScoreTrendLiteral
 from app.responses.history import HistorySummary, MonthReference
 from app.services.exceptions import InvalidCategoryTypeError, MonthQueryError, TransactionQueryError

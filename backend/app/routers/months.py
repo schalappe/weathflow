@@ -11,8 +11,8 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.repositories.month_repository import MonthRepository
-from app.repositories.transaction_repository import TransactionRepository
+from app.repositories.month import MonthRepository
+from app.repositories.transaction import TransactionRepository
 from app.responses.history import HistoryResponse, MonthHistory
 from app.responses.months import (
     MonthDetailResponse,

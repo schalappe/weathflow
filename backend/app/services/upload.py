@@ -7,8 +7,8 @@ from typing import Any, Literal
 from app.config.settings import get_settings
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
-from app.repositories.month_repository import MonthRepository
-from app.repositories.transaction_repository import TransactionRepository
+from app.repositories.month import MonthRepository
+from app.repositories.transaction import TransactionRepository
 from app.services.calculator import calculate_and_update_month
 from app.services.categorizer import TransactionCategorizer
 from app.services.csv_parser import BankinCSVParser

@@ -2,7 +2,7 @@
 
 from app.db.models.advice import Advice
 from app.db.models.month import Month
-from app.repositories.advice_repository import AdviceRepository
+from app.repositories.advice import AdviceRepository
 from tests.conftest import DatabaseTestCase
 
 

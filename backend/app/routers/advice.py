@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.config.settings import get_settings
 from app.db.database import get_db
-from app.repositories.advice_repository import AdviceRepository
-from app.repositories.month_repository import MonthRepository
+from app.repositories.advice import AdviceRepository
+from app.repositories.month import MonthRepository
 from app.responses.advice import (
     AdviceData,
     GenerateAdviceRequest,

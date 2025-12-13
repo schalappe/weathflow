@@ -2,7 +2,7 @@
 
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
-from app.repositories.month_repository import MonthRepository
+from app.repositories.month import MonthRepository
 from tests.conftest import DatabaseTestCase
 
 

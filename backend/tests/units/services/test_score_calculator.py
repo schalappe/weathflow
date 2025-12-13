@@ -312,7 +312,7 @@ class TestTransactionRepositoryAggregateTotals(DatabaseTestCase):
 
     def test_aggregate_with_sample_transactions(self) -> None:
         """Should correctly aggregate totals by money_map_type."""
-        from app.repositories.transaction_repository import TransactionRepository
+        from app.repositories.transaction import TransactionRepository
 
         month = Month(year=2025, month=10)
         self.session.add(month)
@@ -361,7 +361,7 @@ class TestTransactionRepositoryAggregateTotals(DatabaseTestCase):
 
     def test_aggregate_with_no_transactions(self) -> None:
         """Should return (0, 0, 0) when month has no transactions."""
-        from app.repositories.transaction_repository import TransactionRepository
+        from app.repositories.transaction import TransactionRepository
 
         month = Month(year=2025, month=11)
         self.session.add(month)
@@ -376,7 +376,7 @@ class TestTransactionRepositoryAggregateTotals(DatabaseTestCase):
 
     def test_aggregate_ignores_excluded_transactions(self) -> None:
         """Should not include EXCLUDED transactions in totals."""
-        from app.repositories.transaction_repository import TransactionRepository
+        from app.repositories.transaction import TransactionRepository
 
         month = Month(year=2025, month=12)
         self.session.add(month)
@@ -423,8 +423,8 @@ class TestCalculateAndUpdateMonth(DatabaseTestCase):
 
     def test_updates_month_record_correctly(self) -> None:
         """Should update all Month fields with calculated stats."""
-        from app.repositories.month_repository import MonthRepository
-        from app.repositories.transaction_repository import TransactionRepository
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
         from app.services.calculator import calculate_and_update_month
 
         month = Month(year=2025, month=10)
@@ -474,8 +474,8 @@ class TestCalculateAndUpdateMonth(DatabaseTestCase):
 
     def test_raises_month_not_found_error(self) -> None:
         """Should raise MonthNotFoundError for non-existent month_id."""
-        from app.repositories.month_repository import MonthRepository
-        from app.repositories.transaction_repository import TransactionRepository
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
         from app.services.calculator import calculate_and_update_month
 
         month_repo = MonthRepository(self.session)
@@ -488,8 +488,8 @@ class TestCalculateAndUpdateMonth(DatabaseTestCase):
 
     def test_recalculation_after_category_change(self) -> None:
         """Should recalculate correctly after transaction category is changed."""
-        from app.repositories.month_repository import MonthRepository
-        from app.repositories.transaction_repository import TransactionRepository
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
         from app.services.calculator import calculate_and_update_month
 
         month = Month(year=2025, month=10)

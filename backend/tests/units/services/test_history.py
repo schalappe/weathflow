@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.models.month import Month
-from app.repositories.month_repository import MonthRepository
+from app.repositories.month import MonthRepository
 from app.services import months as months_service
 from app.services.exceptions import MonthQueryError
 from tests.conftest import DatabaseTestCase

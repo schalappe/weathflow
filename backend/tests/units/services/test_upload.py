@@ -182,8 +182,8 @@ class TestUploadServiceCategorization(DatabaseTestCase):
             1,
         )
 
-        from app.repositories.month_repository import MonthRepository
-        from app.repositories.transaction_repository import TransactionRepository
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
 
         month_repo = MonthRepository(self.session)
         transaction_repo = TransactionRepository(self.session)
@@ -267,8 +267,8 @@ class TestUploadServiceCategorization(DatabaseTestCase):
             1,
         )
 
-        from app.repositories.month_repository import MonthRepository
-        from app.repositories.transaction_repository import TransactionRepository
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
 
         month_repo = MonthRepository(self.session)
         transaction_repo = TransactionRepository(self.session)
@@ -327,8 +327,8 @@ class TestUploadServiceCategorization(DatabaseTestCase):
             2,  # Simulate 2 API calls
         )
 
-        from app.repositories.month_repository import MonthRepository
-        from app.repositories.transaction_repository import TransactionRepository
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
 
         month_repo = MonthRepository(self.session)
         transaction_repo = TransactionRepository(self.session)
@@ -410,8 +410,8 @@ class TestUploadServiceImportModes(DatabaseTestCase):
             1,
         )
 
-        from app.repositories.month_repository import MonthRepository
-        from app.repositories.transaction_repository import TransactionRepository
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
 
         month_repo = MonthRepository(self.session)
         transaction_repo = TransactionRepository(self.session)
@@ -513,8 +513,8 @@ class TestUploadServiceImportModes(DatabaseTestCase):
             1,
         )
 
-        from app.repositories.month_repository import MonthRepository
-        from app.repositories.transaction_repository import TransactionRepository
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
 
         month_repo = MonthRepository(self.session)
         transaction_repo = TransactionRepository(self.session)
@@ -586,8 +586,8 @@ class TestUploadServiceImportModes(DatabaseTestCase):
             1,
         )
 
-        from app.repositories.month_repository import MonthRepository
-        from app.repositories.transaction_repository import TransactionRepository
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
 
         month_repo = MonthRepository(self.session)
         transaction_repo = TransactionRepository(self.session)

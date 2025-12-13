@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db.models.transaction import Transaction
-from app.repositories.month_repository import MonthRepository
-from app.repositories.transaction_repository import TransactionRepository
+from app.repositories.month import MonthRepository
+from app.repositories.transaction import TransactionRepository
 from app.responses.months import MonthSummary, TransactionResponse
 from app.responses.transactions import UpdateTransactionRequest, UpdateTransactionResponse
 from app.services import transactions as transactions_service
