@@ -64,4 +64,24 @@ describe("ThemeProvider", () => {
 
     consoleSpy.mockRestore();
   });
+
+  it("persists theme changes to localStorage", () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <ThemeProvider>{children}</ThemeProvider>
+    );
+
+    const { result } = renderHook(() => useTheme(), { wrapper });
+
+    // [>]: Toggle to dark and verify persistence.
+    act(() => {
+      result.current.toggleTheme();
+    });
+    expect(localStorageMock.setItem).toHaveBeenCalledWith("theme", "dark");
+
+    // [>]: Toggle back to light and verify persistence.
+    act(() => {
+      result.current.toggleTheme();
+    });
+    expect(localStorageMock.setItem).toHaveBeenCalledWith("theme", "light");
+  });
 });

@@ -22,8 +22,14 @@ function getInitialTheme(): Theme {
     if (stored === "light" || stored === "dark") {
       return stored;
     }
-  } catch {
+  } catch (error) {
     // [>]: localStorage unavailable (private browsing), use default.
+    if (process.env.NODE_ENV === "development") {
+      console.warn(
+        "[ThemeProvider] Failed to read theme from localStorage:",
+        error,
+      );
+    }
   }
   return "light";
 }
@@ -37,8 +43,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const next = prev === "light" ? "dark" : "light";
       try {
         localStorage.setItem(STORAGE_KEY, next);
-      } catch {
+      } catch (error) {
         // [>]: localStorage unavailable, theme still works in-memory.
+        if (process.env.NODE_ENV === "development") {
+          console.warn(
+            "[ThemeProvider] Failed to persist theme to localStorage:",
+            error,
+          );
+        }
       }
       document.documentElement.classList.toggle("dark", next === "dark");
       return next;
