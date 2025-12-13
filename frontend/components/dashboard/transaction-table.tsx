@@ -85,8 +85,10 @@ export function TransactionTable({
 
   return (
     <Card className="border-0 shadow-sm h-full flex flex-col">
-      <CardHeader className="flex flex-col gap-4 pb-4">
-        <div className="flex flex-row items-center justify-between">
+      <CardHeader className="pb-4">
+        {/* [>]: Three-column grid layout for perfect centering: Title (left) | Filters (center) | Pagination (right). */}
+        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[auto_1fr_auto] lg:items-center lg:gap-4">
+          {/* [>]: Left section - Title with icon and count. */}
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
               <Receipt className="h-4.5 w-4.5 text-muted-foreground" />
@@ -100,7 +102,19 @@ export function TransactionTable({
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* [>]: Center section - Filters (perfectly centered in the grid). */}
+          <div className="flex justify-center">
+            <TransactionFilters
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              monthBounds={monthBounds}
+              disabled={isLoading}
+            />
+          </div>
+
+          {/* [>]: Right section - Pagination controls (aligned to the far right). */}
+          <div className="flex items-center justify-end gap-2">
             <span className="text-xs font-medium text-muted-foreground tabular-nums">
               {page} / {total_pages || 1}
             </span>
@@ -127,12 +141,6 @@ export function TransactionTable({
             </div>
           </div>
         </div>
-        <TransactionFilters
-          filters={filters}
-          onFiltersChange={onFiltersChange}
-          monthBounds={monthBounds}
-          disabled={isLoading}
-        />
       </CardHeader>
       <CardContent
         className={cn(

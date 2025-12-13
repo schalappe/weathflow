@@ -150,7 +150,7 @@ def get_month_detail(
     start_date: date | None = Query(None, description="Filter transactions from this date"),
     end_date: date | None = Query(None, description="Filter transactions until this date"),
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=100, description="Items per page"),
+    page_size: int = Query(25, ge=1, le=100, description="Items per page"),
 ) -> MonthDetailResponse:
     """
     Get detailed data for a specific month with filtered transactions.

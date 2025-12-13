@@ -106,7 +106,7 @@ export function TransactionFilters({
   };
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+    <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-center lg:gap-2">
       {/* Category Multi-Select */}
       <Popover>
         <PopoverTrigger asChild>
@@ -249,11 +249,11 @@ export function TransactionFilters({
       </Popover>
 
       {/* Search Input */}
-      <div className="relative w-full lg:flex-1">
+      <div className="relative w-full lg:w-48 xl:w-56">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="text"
-          placeholder="Search description..."
+          placeholder="Search..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           disabled={disabled}

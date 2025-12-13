@@ -132,7 +132,7 @@ export function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 // [>]: Pagination constants.
-export const TRANSACTIONS_PER_PAGE = 50;
+export const TRANSACTIONS_PER_PAGE = 25;
 
 // [>]: Count active filters for badge display.
 export function getActiveFilterCount(filters: {

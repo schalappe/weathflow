@@ -54,7 +54,7 @@ class TransactionRepository:
         start_date: date | None = None,
         end_date: date | None = None,
         page: int = 1,
-        page_size: int = 50,
+        page_size: int = 25,
     ) -> tuple[list[Transaction], int]:
         """
         Get filtered, paginated transactions for a month.
@@ -102,7 +102,8 @@ class TransactionRepository:
             query = query.filter(Transaction.date <= end_date)
 
         total_count = query.count()
-        transactions = query.order_by(Transaction.date.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        # [>]: Order by date ascending (start of month to end of month).
+        transactions = query.order_by(Transaction.date.asc()).offset((page - 1) * page_size).limit(page_size).all()
 
         return transactions, total_count
 
@@ -120,10 +121,11 @@ class TransactionRepository:
         Returns
         -------
         list[Transaction]
-            All transactions for the month, ordered by date descending.
+            All transactions for the month, ordered by date ascending.
         """
         query = self._db.query(Transaction).filter(Transaction.month_id == month_id)
-        return query.order_by(Transaction.date.desc()).all()
+        # [>]: Order by date ascending (start of month to end of month).
+        return query.order_by(Transaction.date.asc()).all()
 
     def aggregate_totals(self, month_id: int) -> tuple[float, float, float]:
         """
