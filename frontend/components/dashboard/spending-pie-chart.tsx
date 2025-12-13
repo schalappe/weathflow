@@ -212,7 +212,6 @@ export function SpendingPieChart({
                 <Label
                   content={({ viewBox }) => {
                     if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                      const activeData = chartData[activeIndex];
                       return (
                         <text
                           x={viewBox.cx}

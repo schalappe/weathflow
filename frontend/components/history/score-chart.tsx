@@ -11,7 +11,6 @@ import {
 import {
   ChartContainer,
   ChartTooltip,
-  ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
@@ -48,12 +47,20 @@ function getScoreColor(score: number | null): string {
   return SCORE_COLORS_HEX[0];
 }
 
-// [>]: Map score to icon for tooltip display.
-function getScoreIcon(score: number | null) {
-  if (score === 3) return Trophy;
-  if (score === 2) return Target;
-  if (score === 1) return AlertTriangle;
-  return XCircle;
+// [>]: Render score icon based on score value.
+function ScoreIcon({
+  score,
+  className,
+  style,
+}: {
+  score: number | null;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  if (score === 3) return <Trophy className={className} style={style} />;
+  if (score === 2) return <Target className={className} style={style} />;
+  if (score === 1) return <AlertTriangle className={className} style={style} />;
+  return <XCircle className={className} style={style} />;
 }
 
 // [>]: Line color - using a visible blue that works in both light and dark mode.
@@ -135,14 +142,17 @@ function CustomTooltipContent({
   const data = payload[0].payload;
   if (data.score === null) return null;
 
-  const Icon = getScoreIcon(data.score);
   const scoreColor = getScoreColor(data.score);
 
   return (
     <div className="grid min-w-[10rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
       <div className="font-medium">{data.fullLabel}</div>
       <div className="flex items-center gap-2">
-        <Icon className="h-3.5 w-3.5" style={{ color: scoreColor }} />
+        <ScoreIcon
+          score={data.score}
+          className="h-3.5 w-3.5"
+          style={{ color: scoreColor }}
+        />
         <span className="text-muted-foreground">
           {t.scoreChart.tooltipScore} :
         </span>
