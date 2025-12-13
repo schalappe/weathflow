@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Self
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from app.services.dto.advice import AdviceResponse as ServiceAdviceResponse
+    from app.services.advice.models import AdviceResponse as ServiceAdviceResponse
 
 
 class ProblemAreaResponse(BaseModel):

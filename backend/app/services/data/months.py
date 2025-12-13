@@ -1,42 +1,22 @@
 """Service functions for retrieving month and transaction data."""
 
-import logging
 from datetime import date
 from typing import Any
 
-from sqlalchemy import func
+from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
+from app.repositories.month import MonthRepository
+from app.repositories.transaction import TransactionRepository
 from app.responses._types import ScoreTrendLiteral
 from app.responses.history import HistorySummary, MonthReference
 from app.services.exceptions import InvalidCategoryTypeError, MonthQueryError, TransactionQueryError
 
-logger = logging.getLogger(__name__)
 
-
-def _escape_like_pattern(search: str) -> str:
-    """
-    Escape SQL LIKE wildcards to treat them as literal characters.
-
-    Parameters
-    ----------
-    search : str
-        The search string to escape.
-
-    Returns
-    -------
-    str
-        Search string with %, _, and \\ escaped.
-    """
-    # ##>: Escape backslash first, then wildcards, to avoid double-escaping.
-    return search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
-def get_all_months_with_counts(db: Session) -> list[Any]:
+def get_all_months_with_counts(month_repo: MonthRepository) -> list[Any]:
     """
     Retrieve all months with transaction counts, ordered by date (newest first).
 
@@ -44,8 +24,8 @@ def get_all_months_with_counts(db: Session) -> list[Any]:
 
     Parameters
     ----------
-    db : Session
-        Database session.
+    month_repo : MonthRepository
+        Repository for month data access.
 
     Returns
     -------
@@ -58,28 +38,22 @@ def get_all_months_with_counts(db: Session) -> list[Any]:
         If database query fails.
     """
     try:
-        result = (
-            db.query(Month, func.count(Transaction.id).label("tx_count"))
-            .outerjoin(Transaction, Month.id == Transaction.month_id)
-            .group_by(Month.id)
-            .order_by(Month.year.desc(), Month.month.desc())
-            .all()
-        )
-        logger.info("Retrieved %d months with transaction counts", len(result))
+        result = month_repo.get_all_with_transaction_counts()
+        logger.info("Retrieved {} months with transaction counts", len(result))
         return result
     except SQLAlchemyError as error:
-        logger.error("Database error retrieving months: %s", str(error))
+        logger.error("Database error retrieving months: {}", str(error))
         raise MonthQueryError(str(error)) from error
 
 
-def get_month_by_year_month(db: Session, year: int, month: int) -> Month | None:
+def get_month_by_year_month(month_repo: MonthRepository, year: int, month: int) -> Month | None:
     """
     Retrieve a single month by year and month number.
 
     Parameters
     ----------
-    db : Session
-        Database session.
+    month_repo : MonthRepository
+        Repository for month data access.
     year : int
         Year (e.g., 2025).
     month : int
@@ -96,19 +70,19 @@ def get_month_by_year_month(db: Session, year: int, month: int) -> Month | None:
         If database query fails.
     """
     try:
-        result = db.query(Month).filter(Month.year == year, Month.month == month).first()
+        result = month_repo.get_by_year_month(year, month)
         if result:
-            logger.info("Found month: %d-%02d (id=%d)", year, month, result.id)
+            logger.info("Found month: {}-{:02d} (id={})", year, month, result.id)
         else:
-            logger.info("Month not found: %d-%02d", year, month)
+            logger.info("Month not found: {}-{:02d}", year, month)
         return result
     except SQLAlchemyError as error:
-        logger.error("Database error retrieving month %d-%02d: %s", year, month, str(error))
+        logger.error("Database error retrieving month {}-{:02d}: {}", year, month, str(error))
         raise MonthQueryError(str(error)) from error
 
 
 def get_transactions_filtered(
-    db: Session,
+    transaction_repo: TransactionRepository,
     month_id: int,
     *,
     category_types: list[str] | None = None,
@@ -123,8 +97,8 @@ def get_transactions_filtered(
 
     Parameters
     ----------
-    db : Session
-        Database session.
+    transaction_repo : TransactionRepository
+        Repository for transaction data access.
     month_id : int
         Month ID to filter transactions.
     category_types : list[str] | None
@@ -158,36 +132,26 @@ def get_transactions_filtered(
     criteria to be included in the results.
     """
     try:
-        query = db.query(Transaction).filter(Transaction.month_id == month_id)
-
-        # ##>: Apply optional filters with AND logic.
+        # ##>: Validate category types before querying.
         if category_types is not None and len(category_types) > 0:
-            # ##>: Validate category types and raise error for invalid values.
             valid_types = {e.value for e in MoneyMapType}
             invalid_types = [c for c in category_types if c not in valid_types]
             if invalid_types:
-                logger.warning("Invalid category_types received: %s", invalid_types)
+                logger.warning("Invalid category_types received: {}", invalid_types)
                 raise InvalidCategoryTypeError(invalid_types, list(valid_types))
-            query = query.filter(Transaction.money_map_type.in_(category_types))
 
-        if search is not None and search.strip():
-            escaped_search = _escape_like_pattern(search.strip())
-            query = query.filter(Transaction.description.ilike(f"%{escaped_search}%", escape="\\"))
-
-        if start_date is not None:
-            query = query.filter(Transaction.date >= start_date)
-
-        if end_date is not None:
-            query = query.filter(Transaction.date <= end_date)
-
-        # ##>: Get total count before pagination.
-        total_count = query.count()
-
-        # ##>: Apply ordering and pagination.
-        transactions = query.order_by(Transaction.date.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        transactions, total_count = transaction_repo.get_filtered(
+            month_id,
+            category_types=category_types,
+            search=search,
+            start_date=start_date,
+            end_date=end_date,
+            page=page,
+            page_size=page_size,
+        )
 
         logger.info(
-            "Retrieved %d/%d transactions for month_id=%d (page=%d, filters: categories=%s, search=%s)",
+            "Retrieved {}/{} transactions for month_id={} (page={}, filters: categories={}, search={})",
             len(transactions),
             total_count,
             month_id,
@@ -197,12 +161,14 @@ def get_transactions_filtered(
         )
 
         return transactions, total_count
+    except InvalidCategoryTypeError:
+        raise
     except SQLAlchemyError as error:
-        logger.error("Database error retrieving transactions for month_id=%d: %s", month_id, str(error))
+        logger.error("Database error retrieving transactions for month_id={}: {}", month_id, str(error))
         raise TransactionQueryError(month_id, str(error)) from error
 
 
-def get_all_transactions_for_month(db: Session, month_id: int) -> list[Transaction]:
+def get_all_transactions_for_month(transaction_repo: TransactionRepository, month_id: int) -> list[Transaction]:
     """
     Retrieve all transactions for a month without pagination.
 
@@ -210,8 +176,8 @@ def get_all_transactions_for_month(db: Session, month_id: int) -> list[Transacti
 
     Parameters
     ----------
-    db : Session
-        Database session.
+    transaction_repo : TransactionRepository
+        Repository for transaction data access.
     month_id : int
         Month ID to filter transactions.
 
@@ -226,15 +192,15 @@ def get_all_transactions_for_month(db: Session, month_id: int) -> list[Transacti
         If database query fails.
     """
     try:
-        result = db.query(Transaction).filter(Transaction.month_id == month_id).order_by(Transaction.date.desc()).all()
-        logger.info("Retrieved %d transactions for export (month_id=%d)", len(result), month_id)
+        result = transaction_repo.get_all_for_month(month_id)
+        logger.info("Retrieved {} transactions for export (month_id={})", len(result), month_id)
         return result
     except SQLAlchemyError as error:
-        logger.error("Database error retrieving transactions for export (month_id=%d): %s", month_id, str(error))
+        logger.error("Database error retrieving transactions for export (month_id={}): {}", month_id, str(error))
         raise TransactionQueryError(month_id, str(error)) from error
 
 
-def get_months_history(db: Session, limit: int) -> list[Month]:
+def get_months_history(month_repo: MonthRepository, limit: int) -> list[Month]:
     """
     Retrieve months for historical data, ordered chronologically (oldest first).
 
@@ -242,8 +208,8 @@ def get_months_history(db: Session, limit: int) -> list[Month]:
 
     Parameters
     ----------
-    db : Session
-        Database session.
+    month_repo : MonthRepository
+        Repository for month data access.
     limit : int
         Maximum number of months to return (1-24).
 
@@ -258,13 +224,11 @@ def get_months_history(db: Session, limit: int) -> list[Month]:
         If database query fails.
     """
     try:
-        result = db.query(Month).order_by(Month.year.desc(), Month.month.desc()).limit(limit).all()
-        # ##>: Reverse to get chronological order (oldest first).
-        result.reverse()
-        logger.info("Retrieved %d months for history", len(result))
+        result = month_repo.get_recent(limit)
+        logger.info("Retrieved {} months for history", len(result))
         return result
     except SQLAlchemyError as error:
-        logger.error("Database error retrieving months for history: %s", str(error))
+        logger.error("Database error retrieving months for history: {}", str(error))
         raise MonthQueryError(str(error)) from error
 
 

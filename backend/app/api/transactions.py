@@ -1,16 +1,14 @@
 """FastAPI router for Transaction API endpoints."""
 
-import logging
-
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import HTTPException, Path
+from loguru import logger
 from sqlalchemy import func
-from sqlalchemy.orm import Session
 
-from app.db.database import get_db
+from app.api.deps import DbSession, MonthRepo, TransactionRepo, create_router
 from app.db.models.transaction import Transaction
 from app.responses.months import MonthSummary, TransactionResponse
 from app.responses.transactions import UpdateTransactionRequest, UpdateTransactionResponse
-from app.services import transactions as transactions_service
+from app.services.data import transactions as transactions_service
 from app.services.exceptions import (
     InvalidSubcategoryError,
     MonthNotFoundError,
@@ -18,17 +16,16 @@ from app.services.exceptions import (
     TransactionNotFoundError,
 )
 
-# ruff: noqa: B008
-
-router = APIRouter(prefix="/api/transactions", tags=["transactions"])
-logger = logging.getLogger(__name__)
+router = create_router("transactions")
 
 
 @router.patch("/{transaction_id}", response_model=UpdateTransactionResponse)
 def update_transaction(
     request: UpdateTransactionRequest,
+    db: DbSession,
+    month_repo: MonthRepo,
+    transaction_repo: TransactionRepo,
     transaction_id: int = Path(..., ge=1, description="Transaction ID"),
-    db: Session = Depends(get_db),
 ) -> UpdateTransactionResponse:
     """
     Update a transaction's Money Map category and subcategory.
@@ -59,7 +56,8 @@ def update_transaction(
     """
     try:
         transaction, month = transactions_service.update_transaction_category(
-            db=db,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
             transaction_id=transaction_id,
             money_map_type=request.money_map_type,
             money_map_subcategory=request.money_map_subcategory,
@@ -74,14 +72,14 @@ def update_transaction(
             updated_month_stats=MonthSummary.from_model(month, transaction_count),
         )
     except TransactionNotFoundError as error:
-        logger.warning("Transaction not found: transaction_id=%d", transaction_id)
+        logger.warning("Transaction not found: transaction_id={}", transaction_id)
         raise HTTPException(
             status_code=404,
             detail=f"Transaction with id={transaction_id} not found.",
         ) from error
     except InvalidSubcategoryError as error:
         logger.warning(
-            "Invalid subcategory: type=%s, subcategory=%s",
+            "Invalid subcategory: type={}, subcategory={}",
             error.money_map_type,
             error.subcategory,
         )
@@ -91,21 +89,21 @@ def update_transaction(
         ) from error
     except MonthNotFoundError as error:
         # ##>: Database inconsistency - transaction exists but its month does not.
-        logger.error("Month not found during recalculation: month_id=%d", error.month_id)
+        logger.error("Month not found during recalculation: month_id={}", error.month_id)
         raise HTTPException(
             status_code=500,
             detail="Failed to recalculate month statistics. Please contact support.",
         ) from error
     except ScoreCalculationError as error:
         # ##>: Catch all calculator errors (TransactionAggregationError, ScorePersistenceError).
-        logger.exception("Score calculation failed for transaction %d: %s", transaction_id, error)
+        logger.exception("Score calculation failed for transaction {}: {}", transaction_id, error)
         raise HTTPException(
             status_code=500,
             detail="Failed to recalculate month statistics. Please try again.",
         ) from error
     except Exception as error:
         logger.exception(
-            "Unexpected error updating transaction %d: error_type=%s",
+            "Unexpected error updating transaction {}: error_type={}",
             transaction_id,
             type(error).__name__,
         )

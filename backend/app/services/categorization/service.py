@@ -1,25 +1,23 @@
 """Transaction categorization service using Claude API."""
 
 import json
-import logging
 from typing import ClassVar
 
 import anthropic
 from anthropic import Anthropic
+from loguru import logger
 
 from app.db.enums import MoneyMapType
-from app.services.categorization_cache import CategorizationCache
-from app.services.categorization_prompt import CATEGORIZATION_SYSTEM_PROMPT
-from app.services.category_mapping import CategoryMapping
-from app.services.dto.categorization import CategorizationResult, TransactionInput
+from app.services.categorization.cache import CategorizationCache
+from app.services.categorization.mapping import CategoryMapping
+from app.services.categorization.models import CategorizationResult, TransactionInput
+from app.services.categorization.prompt import CATEGORIZATION_SYSTEM_PROMPT
 from app.services.exceptions import (
     APIConnectionError,
     BatchCategorizationError,
     CategorizationError,
     InvalidResponseError,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class TransactionCategorizer:
@@ -265,13 +263,13 @@ class TransactionCategorizer:
             raise APIConnectionError(retry_count=self.MAX_RETRIES) from e
         except anthropic.APIStatusError as e:
             # ##!: Catch-all for other API errors (500s, etc.).
-            logger.error("Anthropic API error (status %s): %s", e.status_code, e.message)
+            logger.error("Anthropic API error (status {}): {}", e.status_code, e.message)
             raise APIConnectionError(retry_count=self.MAX_RETRIES) from e
 
         # ##>: Extract text content from response. Type narrowing for mypy.
         if not response.content:
             logger.error(
-                "Claude API returned empty content array for batch of %d transactions",
+                "Claude API returned empty content array for batch of {} transactions",
                 len(batch),
             )
             raise InvalidResponseError("Claude API returned empty response content")
@@ -279,7 +277,7 @@ class TransactionCategorizer:
         content_block = response.content[0]
         if not hasattr(content_block, "text"):
             logger.error(
-                "Claude API returned unexpected content type: %s. Expected text block.",
+                "Claude API returned unexpected content type: {}. Expected text block.",
                 type(content_block).__name__,
             )
             raise InvalidResponseError(f"Unexpected response content type: {type(content_block).__name__}")
@@ -360,7 +358,7 @@ class TransactionCategorizer:
         try:
             data = json.loads(cleaned)
         except json.JSONDecodeError as e:
-            logger.error("JSON parse error: %s. Response text: %s", e, response_text[:1000])
+            logger.error("JSON parse error: {}. Response text: {}", e, response_text[:1000])
             raise InvalidResponseError(response_text) from e
 
         if not isinstance(data, list):
@@ -410,7 +408,7 @@ class TransactionCategorizer:
             if tx is None:
                 # ##!: This indicates a bug - API returned an ID we did not send.
                 logger.warning(
-                    "API returned result for unknown transaction ID %d. This may indicate a parsing bug.",
+                    "API returned result for unknown transaction ID {}. This may indicate a parsing bug.",
                     result.id,
                 )
                 continue

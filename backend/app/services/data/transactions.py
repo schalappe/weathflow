@@ -1,16 +1,14 @@
 """Service functions for transaction operations."""
 
-import logging
-
-from sqlalchemy.orm import Session
+from loguru import logger
 
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
-from app.services.calculator import calculate_and_update_month
+from app.repositories.month import MonthRepository
+from app.repositories.transaction import TransactionRepository
+from app.services.calculation.service import calculate_and_update_month
 from app.services.exceptions import InvalidSubcategoryError, TransactionNotFoundError
-
-logger = logging.getLogger(__name__)
 
 # ##>: Allowed subcategories per MoneyMapType from requirements.md.
 ALLOWED_SUBCATEGORIES: dict[MoneyMapType, list[str]] = {
@@ -80,7 +78,8 @@ def validate_subcategory(money_map_type: MoneyMapType, subcategory: str | None) 
 
 
 def update_transaction_category(
-    db: Session,
+    month_repo: MonthRepository,
+    transaction_repo: TransactionRepository,
     transaction_id: int,
     money_map_type: MoneyMapType,
     money_map_subcategory: str | None,
@@ -90,8 +89,10 @@ def update_transaction_category(
 
     Parameters
     ----------
-    db : Session
-        Database session.
+    month_repo : MonthRepository
+        Repository for month data access.
+    transaction_repo : TransactionRepository
+        Repository for transaction data access.
     transaction_id : int
         ID of the transaction to update.
     money_map_type : MoneyMapType
@@ -111,7 +112,7 @@ def update_transaction_category(
     InvalidSubcategoryError
         If subcategory is invalid for the type.
     """
-    transaction = db.get(Transaction, transaction_id)
+    transaction = transaction_repo.get_by_id(transaction_id)
     if transaction is None:
         raise TransactionNotFoundError(transaction_id)
 
@@ -124,13 +125,13 @@ def update_transaction_category(
         transaction.is_manually_corrected = True
 
         # ##>: Flush transaction changes so aggregation query sees updated values.
-        db.flush()
+        transaction_repo.flush()
 
         # ##>: Recalculate month stats using existing service.
-        updated_month = calculate_and_update_month(db, transaction.month_id)
+        updated_month = calculate_and_update_month(month_repo, transaction_repo, transaction.month_id)
 
         logger.info(
-            "Updated transaction %d: type=%s, subcategory=%s, month_id=%d",
+            "Updated transaction {}: type={}, subcategory={}, month_id={}",
             transaction_id,
             money_map_type.value,
             validated_subcategory,
@@ -140,5 +141,5 @@ def update_transaction_category(
         return transaction, updated_month
     except Exception:
         # ##>: Rollback on any failure to maintain session consistency.
-        db.rollback()
+        month_repo.rollback()
         raise

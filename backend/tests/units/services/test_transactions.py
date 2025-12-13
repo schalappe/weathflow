@@ -46,13 +46,18 @@ class TestUpdateTransactionCategory(DatabaseTestCase):
 
     def test_update_sets_is_manually_corrected_true(self) -> None:
         """Update sets is_manually_corrected to True."""
-        from app.services.transactions import update_transaction_category
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
+        from app.services.data.transactions import update_transaction_category
 
         _, transaction = self._create_month_with_transactions()
         assert transaction.is_manually_corrected is False
 
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
         updated_tx, _ = update_transaction_category(
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
             transaction_id=transaction.id,
             money_map_type=MoneyMapType.CORE,
             money_map_subcategory="Groceries",
@@ -62,14 +67,19 @@ class TestUpdateTransactionCategory(DatabaseTestCase):
 
     def test_update_changes_money_map_type_and_subcategory(self) -> None:
         """Update changes money_map_type and money_map_subcategory fields."""
-        from app.services.transactions import update_transaction_category
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
+        from app.services.data.transactions import update_transaction_category
 
         _, transaction = self._create_month_with_transactions()
         assert transaction.money_map_type == MoneyMapType.CHOICE.value
         assert transaction.money_map_subcategory == "Dining out"
 
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
         updated_tx, _ = update_transaction_category(
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
             transaction_id=transaction.id,
             money_map_type=MoneyMapType.CORE,
             money_map_subcategory="Groceries",
@@ -80,14 +90,19 @@ class TestUpdateTransactionCategory(DatabaseTestCase):
 
     def test_update_triggers_month_stats_recalculation(self) -> None:
         """Update triggers recalculation of month statistics."""
-        from app.services.transactions import update_transaction_category
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
+        from app.services.data.transactions import update_transaction_category
 
         month, transaction = self._create_month_with_transactions()
         original_choice_pct = month.choice_percentage
         original_core_pct = month.core_percentage
 
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
         _, updated_month = update_transaction_category(
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
             transaction_id=transaction.id,
             money_map_type=MoneyMapType.CORE,
             money_map_subcategory="Groceries",
@@ -99,13 +114,18 @@ class TestUpdateTransactionCategory(DatabaseTestCase):
 
     def test_update_raises_transaction_not_found_error_for_invalid_id(self) -> None:
         """Update raises TransactionNotFoundError for non-existent transaction."""
-        from app.services.transactions import update_transaction_category
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
+        from app.services.data.transactions import update_transaction_category
 
         self._create_month_with_transactions()
 
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
         with self.assertRaises(TransactionNotFoundError) as context:
             update_transaction_category(
-                db=self.session,
+                month_repo=month_repo,
+                transaction_repo=transaction_repo,
                 transaction_id=99999,
                 money_map_type=MoneyMapType.CORE,
                 money_map_subcategory="Groceries",
@@ -151,13 +171,18 @@ class TestSubcategoryValidation(DatabaseTestCase):
 
     def test_invalid_subcategory_raises_error(self) -> None:
         """Invalid subcategory for MoneyMapType raises InvalidSubcategoryError."""
-        from app.services.transactions import update_transaction_category
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
+        from app.services.data.transactions import update_transaction_category
 
         transaction = self._create_month_with_transaction()
 
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
         with self.assertRaises(InvalidSubcategoryError) as context:
             update_transaction_category(
-                db=self.session,
+                month_repo=month_repo,
+                transaction_repo=transaction_repo,
                 transaction_id=transaction.id,
                 money_map_type=MoneyMapType.CORE,
                 money_map_subcategory="Invalid Category",
@@ -168,12 +193,17 @@ class TestSubcategoryValidation(DatabaseTestCase):
 
     def test_excluded_type_auto_clears_subcategory(self) -> None:
         """EXCLUDED type automatically clears subcategory to null."""
-        from app.services.transactions import update_transaction_category
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
+        from app.services.data.transactions import update_transaction_category
 
         transaction = self._create_month_with_transaction()
 
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
         updated_tx, _ = update_transaction_category(
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
             transaction_id=transaction.id,
             money_map_type=MoneyMapType.EXCLUDED,
             money_map_subcategory="Should be cleared",

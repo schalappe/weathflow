@@ -1,22 +1,22 @@
 """Upload service for CSV processing and transaction categorization."""
 
-import logging
 import re
 from typing import Any, Literal
 
-from sqlalchemy.orm import Session
+from loguru import logger
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.config.settings import get_settings
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
-from app.services.calculator import calculate_and_update_month
-from app.services.categorizer import TransactionCategorizer
-from app.services.csv_parser import BankinCSVParser
-from app.services.dto.categorization import CategorizationResult, TransactionInput
-from app.services.dto.parsing import MonthData, ParsedTransaction
-from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError
-
-logger = logging.getLogger(__name__)
+from app.repositories.month import MonthRepository
+from app.repositories.transaction import TransactionRepository
+from app.services.calculation.service import calculate_and_update_month
+from app.services.categorization.models import CategorizationResult, TransactionInput
+from app.services.categorization.service import TransactionCategorizer
+from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError, UploadPersistenceError
+from app.services.upload.models import MonthData, ParsedTransaction
+from app.services.upload.parser import BankinCSVParser
 
 LOW_CONFIDENCE_THRESHOLD = 0.8
 MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
@@ -33,7 +33,7 @@ class UploadService:
     --------
     >>> service = UploadService()
     >>> preview = service.get_upload_preview(csv_bytes)
-    >>> result = service.process_categorization(csv_bytes, ["2025-01"], "replace", db)
+    >>> result = service.process_categorization(csv_bytes, ["2025-01"], "replace", month_repo, tx_repo)
     """
 
     def __init__(self) -> None:
@@ -118,7 +118,8 @@ class UploadService:
         file_content: bytes,
         months_to_process: list[str],
         import_mode: Literal["replace", "merge"],
-        db: Session,
+        month_repo: MonthRepository,
+        transaction_repo: TransactionRepository,
     ) -> dict[str, Any]:
         """
         Parse, categorize, and persist transactions for selected months.
@@ -132,8 +133,10 @@ class UploadService:
         import_mode : Literal["replace", "merge"]
             "replace" deletes existing month and all its transactions, creating fresh.
             "merge" preserves existing month and transactions, only adding new ones.
-        db : Session
-            Database session for persistence.
+        month_repo : MonthRepository
+            Repository for month data access.
+        transaction_repo : TransactionRepository
+            Repository for transaction data access.
 
         Returns
         -------
@@ -179,7 +182,8 @@ class UploadService:
 
             month_data = result.months[month_key]
             month_result, api_calls = self._process_single_month(
-                db=db,
+                month_repo=month_repo,
+                transaction_repo=transaction_repo,
                 month_data=month_data,
                 import_mode=import_mode,
             )
@@ -195,7 +199,8 @@ class UploadService:
 
     def _process_single_month(
         self,
-        db: Session,
+        month_repo: MonthRepository,
+        transaction_repo: TransactionRepository,
         month_data: MonthData,
         import_mode: Literal["replace", "merge"],
     ) -> tuple[dict[str, Any], int]:
@@ -206,34 +211,52 @@ class UploadService:
         -------
         tuple[dict[str, Any], int]
             Tuple of (month result dict, actual API call count).
+
+        Raises
+        ------
+        UploadPersistenceError
+            If database operations fail during processing.
+        CategorizationError
+            If transaction categorization fails.
+        ScoreCalculationError
+            If score calculation fails.
         """
         year, month = month_data.year, month_data.month
 
-        # ##>: Handle import mode and get month record.
-        if import_mode == "replace":
-            month_record = self._handle_replace_mode(db, year, month)
-            skip_keys: set[str] = set()
-        else:
-            month_record, skip_keys = self._handle_merge_mode(db, year, month)
+        try:
+            # ##>: Handle import mode and get month record.
+            if import_mode == "replace":
+                month_record = self._handle_replace_mode(month_repo, year, month)
+                skip_keys: set[str] = set()
+            else:
+                month_record, skip_keys = self._handle_merge_mode(month_repo, transaction_repo, year, month)
+        except SQLAlchemyError as error:
+            logger.error("Database error during month setup for {}-{:02d}: {}", year, month, error)
+            raise UploadPersistenceError(year, month, str(error)) from error
 
         # ##>: Transform and categorize transactions. IDs start at 1 for each month.
         inputs = self._transform_to_inputs(month_data.transactions, start_id=1)
         categorizer = self._get_categorizer()
         results, api_call_count = categorizer.categorize(inputs)
 
-        # ##>: Persist transactions and calculate score.
-        inserted_count, skipped_count = self._persist_transactions(
-            db=db,
-            month_id=month_record.id,
-            transactions=month_data.transactions,
-            results=results,
-            skip_keys=skip_keys,
-        )
+        try:
+            # ##>: Persist transactions and calculate score.
+            inserted_count, skipped_count, missing_count = self._persist_transactions(
+                transaction_repo=transaction_repo,
+                month_id=month_record.id,
+                transactions=month_data.transactions,
+                results=results,
+                skip_keys=skip_keys,
+            )
 
-        # ##>: Flush to make transactions visible for aggregation query, but don't commit yet.
-        db.flush()
+            # ##>: Flush to make transactions visible for aggregation query, but don't commit yet.
+            transaction_repo.flush()
+        except SQLAlchemyError as error:
+            logger.error("Database error during transaction persistence for {}-{:02d}: {}", year, month, error)
+            raise UploadPersistenceError(year, month, str(error)) from error
+
         # ##>: Let calculate_and_update_month handle the final commit for atomicity.
-        updated_month = calculate_and_update_month(db, month_record.id)
+        updated_month = calculate_and_update_month(month_repo, transaction_repo, month_record.id)
 
         low_confidence_count = self._count_low_confidence(results)
 
@@ -242,6 +265,7 @@ class UploadService:
             "month": month,
             "transactions_categorized": inserted_count,
             "transactions_skipped": skipped_count,
+            "transactions_missing_result": missing_count,
             "low_confidence_count": low_confidence_count,
             "score": updated_month.score,
             "score_label": updated_month.score_label,
@@ -271,60 +295,57 @@ class UploadService:
         """Generate unique key for duplicate detection."""
         return f"{t.date.isoformat()}_{t.description}_{float(t.amount)}_{t.account}"
 
-    def _handle_replace_mode(self, db: Session, year: int, month: int) -> Month:
+    def _handle_replace_mode(self, month_repo: MonthRepository, year: int, month: int) -> Month:
         """Delete existing month and create new one."""
-        existing = db.query(Month).filter(Month.year == year, Month.month == month).first()
+        existing = month_repo.get_by_year_month(year, month)
         if existing:
-            db.delete(existing)
-            db.flush()
+            month_repo.delete(existing)
 
-        new_month = Month(year=year, month=month)
-        db.add(new_month)
-        db.flush()
-        return new_month
+        return month_repo.create(year, month)
 
-    def _handle_merge_mode(self, db: Session, year: int, month: int) -> tuple[Month, set[str]]:
+    def _handle_merge_mode(
+        self,
+        month_repo: MonthRepository,
+        transaction_repo: TransactionRepository,
+        year: int,
+        month: int,
+    ) -> tuple[Month, set[str]]:
         """Get or create month and return existing transaction keys."""
-        existing = db.query(Month).filter(Month.year == year, Month.month == month).first()
+        existing = month_repo.get_by_year_month(year, month)
 
         if existing:
-            skip_keys = self._get_existing_transaction_keys(db, existing.id)
+            skip_keys = transaction_repo.get_keys_for_month(existing.id)
             return existing, skip_keys
 
-        new_month = Month(year=year, month=month)
-        db.add(new_month)
-        db.flush()
+        new_month = month_repo.create(year, month)
         return new_month, set()
-
-    def _get_existing_transaction_keys(self, db: Session, month_id: int) -> set[str]:
-        """Get transaction keys for duplicate detection."""
-        transactions = db.query(Transaction).filter(Transaction.month_id == month_id).all()
-        # ##>: Use float() to match key format from _generate_transaction_key.
-        return {f"{t.date.isoformat()}_{t.description}_{float(t.amount)}_{t.account}" for t in transactions}
 
     def _persist_transactions(
         self,
-        db: Session,
+        transaction_repo: TransactionRepository,
         month_id: int,
         transactions: list[ParsedTransaction],
         results: list[CategorizationResult],
         skip_keys: set[str],
-    ) -> tuple[int, int]:
+    ) -> tuple[int, int, int]:
         """
         Persist categorized transactions, skipping duplicates in merge mode.
 
         Returns
         -------
-        tuple[int, int]
-            Tuple of (inserted_count, skipped_count).
+        tuple[int, int, int]
+            Tuple of (inserted_count, skipped_count, missing_result_count).
+            missing_result_count > 0 indicates a bug in ID mapping or API response.
         """
         result_by_id: dict[int, CategorizationResult] = {r.id: r for r in results}
         new_transactions = []
         skipped_count = 0
+        missing_result_count = 0
 
         for i, t in enumerate(transactions):
             tx_key = self._generate_transaction_key(t)
             if tx_key in skip_keys:
+                skipped_count += 1
                 continue
 
             # ##>: IDs start at 1 for each month's batch, matching _transform_to_inputs.
@@ -332,13 +353,13 @@ class UploadService:
             if result is None:
                 # ##!: Missing result indicates a bug in ID mapping or API response.
                 logger.error(
-                    "Missing categorization result for transaction %d (date=%s, description='%s'). "
+                    "Missing categorization result for transaction {} (date={}, description='{}'). "
                     "This indicates a bug in ID mapping or API response.",
                     i + 1,
                     t.date,
                     t.description[:50],
                 )
-                skipped_count += 1
+                missing_result_count += 1
                 continue
 
             new_transactions.append(
@@ -355,7 +376,6 @@ class UploadService:
                 )
             )
 
-        if new_transactions:
-            db.add_all(new_transactions)
+        transaction_repo.add_bulk(new_transactions)
 
-        return len(new_transactions), skipped_count
+        return len(new_transactions), skipped_count, missing_result_count

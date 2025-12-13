@@ -6,8 +6,8 @@ import unittest
 from pydantic import ValidationError
 
 from app.responses.advice import AdviceData, GenerateAdviceRequest
-from app.services.dto.advice import AdviceResponse as ServiceAdviceResponse
-from app.services.dto.advice import ProblemArea as ServiceProblemArea
+from app.services.advice.models import AdviceResponse as ServiceAdviceResponse
+from app.services.advice.models import ProblemArea as ServiceProblemArea
 
 
 class TestAdviceDataFromJson(unittest.TestCase):

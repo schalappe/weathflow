@@ -1,9 +1,11 @@
 """FastAPI router for CSV upload and categorization endpoints."""
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy.orm import Session
+# ruff: noqa: B008
 
-from app.db.database import get_db
+from fastapi import File, HTTPException, Query, UploadFile
+from loguru import logger
+
+from app.api.deps import MonthRepo, TransactionRepo, UploadSvc, create_router
 from app.responses.upload import CategorizeResponse, ImportMode, UploadResponse
 from app.services.exceptions import (
     APIConnectionError,
@@ -14,23 +16,16 @@ from app.services.exceptions import (
     InvalidResponseError,
     NoTransactionsFoundError,
     ScoreCalculationError,
+    UploadPersistenceError,
 )
-from app.services.upload import UploadService
 
-# ruff: noqa: B008
-
-router = APIRouter(prefix="/api", tags=["upload"])
-
-
-def _get_upload_service() -> UploadService:
-    """Provide UploadService instance for dependency injection."""
-    return UploadService()
+router = create_router("upload", prefix="/api")
 
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_file(
+    service: UploadSvc,
     file: UploadFile = File(...),
-    service: UploadService = Depends(_get_upload_service),
 ) -> UploadResponse:
     """
     Upload a Bankin' CSV file and return a preview of detected months.
@@ -54,17 +49,23 @@ async def upload_file(
         content = await file.read()
         result = service.get_upload_preview(content)
         return UploadResponse(**result)
-    except (CSVParseError, NoTransactionsFoundError) as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    except (CSVParseError, NoTransactionsFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.exception("Unexpected error in upload_file: error_type={}", type(error).__name__)
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.") from error
 
 
 @router.post("/categorize", response_model=CategorizeResponse)
 async def categorize_file(
+    month_repo: MonthRepo,
+    transaction_repo: TransactionRepo,
+    service: UploadSvc,
     file: UploadFile = File(...),
     months_to_process: str = Query(..., description="Comma-separated months (YYYY-MM) or 'all'"),
     import_mode: ImportMode = Query(..., description="Import mode: 'replace' or 'merge'"),
-    db: Session = Depends(get_db),
-    service: UploadService = Depends(_get_upload_service),
 ) -> CategorizeResponse:
     """
     Categorize transactions from CSV and persist to database.
@@ -108,24 +109,34 @@ async def categorize_file(
             file_content=content,
             months_to_process=months_list,
             import_mode=import_mode,
-            db=db,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
         return CategorizeResponse(**result)
-    except (CSVParseError, NoTransactionsFoundError, InvalidMonthFormatError) as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except APIConnectionError as e:
+    except (CSVParseError, NoTransactionsFoundError, InvalidMonthFormatError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except APIConnectionError as error:
         raise HTTPException(
             status_code=502,
-            detail=f"Claude API unreachable after {e.retry_count} retries. Please try again later.",
-        ) from e
-    except InvalidResponseError as e:
+            detail=f"Claude API unreachable after {error.retry_count} retries. Please try again later.",
+        ) from error
+    except InvalidResponseError as error:
         raise HTTPException(
             status_code=502, detail="Claude returned an invalid response. Please try again or contact support."
-        ) from e
-    except BatchCategorizationError as e:
-        raise HTTPException(status_code=502, detail=f"Failed to categorize {len(e.failed_ids)} transactions.") from e
-    except CategorizationError as e:
+        ) from error
+    except BatchCategorizationError as error:
+        raise HTTPException(
+            status_code=502, detail=f"Failed to categorize {len(error.failed_ids)} transactions."
+        ) from error
+    except CategorizationError as error:
         # ##>: Generic CategorizationError (e.g., missing API key).
-        raise HTTPException(status_code=502, detail=str(e)) from e
-    except ScoreCalculationError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to calculate month score: {e}") from e
+        raise HTTPException(status_code=502, detail=str(error)) from error
+    except UploadPersistenceError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except ScoreCalculationError as error:
+        raise HTTPException(status_code=500, detail=f"Failed to calculate month score: {error}") from error
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.exception("Unexpected error in categorize_file: error_type={}", type(error).__name__)
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.") from error

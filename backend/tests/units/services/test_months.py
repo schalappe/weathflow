@@ -7,49 +7,50 @@ import pytest
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
-from app.services import months as months_service
+from app.repositories.month import MonthRepository
+from app.repositories.transaction import TransactionRepository
+from app.services.data import months as months_service
 from app.services.exceptions import InvalidCategoryTypeError
-from app.services.months import _escape_like_pattern
 from tests.conftest import DatabaseTestCase
 
 
 class TestEscapeLikePattern:
-    """Tests for _escape_like_pattern SQL LIKE escape function."""
+    """Tests for _escape_like_pattern SQL LIKE escape function (now in TransactionRepository)."""
 
     def test_escapes_percent_wildcard(self) -> None:
         """Should escape % to prevent SQL wildcard matching."""
-        result = _escape_like_pattern("100%")
+        result = TransactionRepository._escape_like_pattern("100%")
         assert result == "100\\%"
 
     def test_escapes_underscore_wildcard(self) -> None:
         """Should escape _ to prevent single-char wildcard matching."""
-        result = _escape_like_pattern("test_user")
+        result = TransactionRepository._escape_like_pattern("test_user")
         assert result == "test\\_user"
 
     def test_escapes_backslash(self) -> None:
         """Should escape backslash before escaping wildcards."""
-        result = _escape_like_pattern("path\\file")
+        result = TransactionRepository._escape_like_pattern("path\\file")
         assert result == "path\\\\file"
 
     def test_preserves_normal_characters(self) -> None:
         """Should not modify strings without special characters."""
-        result = _escape_like_pattern("normal search")
+        result = TransactionRepository._escape_like_pattern("normal search")
         assert result == "normal search"
 
     def test_handles_mixed_special_characters(self) -> None:
         """Should escape all special chars in correct order."""
-        result = _escape_like_pattern("50%_discount\\sale")
+        result = TransactionRepository._escape_like_pattern("50%_discount\\sale")
         # ##>: Backslash escaped first, then % and _.
         assert result == "50\\%\\_discount\\\\sale"
 
     def test_handles_empty_string(self) -> None:
         """Should return empty string unchanged."""
-        result = _escape_like_pattern("")
+        result = TransactionRepository._escape_like_pattern("")
         assert result == ""
 
     def test_handles_multiple_consecutive_wildcards(self) -> None:
         """Should escape multiple consecutive wildcard characters."""
-        result = _escape_like_pattern("%%__")
+        result = TransactionRepository._escape_like_pattern("%%__")
         assert result == "\\%\\%\\_\\_"
 
 
@@ -65,7 +66,8 @@ class TestGetAllMonthsWithCounts(DatabaseTestCase):
         self.session.add_all([month_jan, month_oct, month_dec_2024])
         self.session.commit()
 
-        result = months_service.get_all_months_with_counts(self.session)
+        month_repo = MonthRepository(self.session)
+        result = months_service.get_all_months_with_counts(month_repo)
 
         self.assertEqual(len(result), 3)
         # ##>: Order should be: 2025-10, 2025-01, 2024-12.
@@ -91,7 +93,8 @@ class TestGetAllMonthsWithCounts(DatabaseTestCase):
         self.session.add_all([tx1, tx2, tx3, tx4])
         self.session.commit()
 
-        result = months_service.get_all_months_with_counts(self.session)
+        month_repo = MonthRepository(self.session)
+        result = months_service.get_all_months_with_counts(month_repo)
 
         # ##>: Ordered by date desc: 2025-10 (3 tx), 2025-09 (1 tx).
         self.assertEqual(result[0][1], 3)  # month1 has 3 transactions
@@ -103,7 +106,8 @@ class TestGetMonthByYearMonth(DatabaseTestCase):
 
     def test_returns_none_when_not_found(self) -> None:
         """Should return None when month does not exist."""
-        result = months_service.get_month_by_year_month(self.session, year=2025, month=10)
+        month_repo = MonthRepository(self.session)
+        result = months_service.get_month_by_year_month(month_repo, year=2025, month=10)
 
         self.assertIsNone(result)
 
@@ -113,7 +117,8 @@ class TestGetMonthByYearMonth(DatabaseTestCase):
         self.session.add(month)
         self.session.commit()
 
-        result = months_service.get_month_by_year_month(self.session, year=2025, month=10)
+        month_repo = MonthRepository(self.session)
+        result = months_service.get_month_by_year_month(month_repo, year=2025, month=10)
 
         self.assertIsNotNone(result)
         assert result is not None  # ##>: Type narrowing for mypy.
@@ -175,8 +180,9 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
 
     def test_applies_category_filter_correctly(self) -> None:
         """Should filter transactions by category_types (single category)."""
+        transaction_repo = TransactionRepository(self.session)
         transactions, total_count = months_service.get_transactions_filtered(
-            self.session,
+            transaction_repo,
             month_id=self.month.id,
             category_types=[MoneyMapType.CORE.value],
         )
@@ -188,9 +194,11 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
 
     def test_returns_correct_pagination_tuple(self) -> None:
         """Should return correct transactions and total count for pagination."""
+        transaction_repo = TransactionRepository(self.session)
+
         # ##>: Request page 1 with page_size 2.
         transactions, total_count = months_service.get_transactions_filtered(
-            self.session,
+            transaction_repo,
             month_id=self.month.id,
             page=1,
             page_size=2,
@@ -202,7 +210,7 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
 
         # ##>: Page 2 should have next 2 transactions.
         transactions_p2, total_count_p2 = months_service.get_transactions_filtered(
-            self.session,
+            transaction_repo,
             month_id=self.month.id,
             page=2,
             page_size=2,
@@ -213,7 +221,7 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
 
         # ##>: Page 3 should have the last transaction.
         transactions_p3, total_count_p3 = months_service.get_transactions_filtered(
-            self.session,
+            transaction_repo,
             month_id=self.month.id,
             page=3,
             page_size=2,
@@ -224,9 +232,11 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
 
     def test_search_filter_case_insensitive(self) -> None:
         """Should filter by description using case-insensitive search."""
+        transaction_repo = TransactionRepository(self.session)
+
         # ##>: Search for "carrefour" (lowercase) should match "CARREFOUR GROCERIES".
         transactions, total_count = months_service.get_transactions_filtered(
-            self.session,
+            transaction_repo,
             month_id=self.month.id,
             search="carrefour",
         )
@@ -236,8 +246,9 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
 
     def test_date_range_filter(self) -> None:
         """Should filter transactions by date range."""
+        transaction_repo = TransactionRepository(self.session)
         transactions, total_count = months_service.get_transactions_filtered(
-            self.session,
+            transaction_repo,
             month_id=self.month.id,
             start_date=date(2025, 10, 5),
             end_date=date(2025, 10, 15),
@@ -248,8 +259,9 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
 
     def test_combined_filters(self) -> None:
         """Should apply multiple filters with AND logic."""
+        transaction_repo = TransactionRepository(self.session)
         transactions, total_count = months_service.get_transactions_filtered(
-            self.session,
+            transaction_repo,
             month_id=self.month.id,
             category_types=[MoneyMapType.CHOICE.value],
             search="netflix",
@@ -260,8 +272,9 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
 
     def test_returns_transactions_ordered_by_date_desc(self) -> None:
         """Should return transactions ordered by date descending."""
+        transaction_repo = TransactionRepository(self.session)
         transactions, _ = months_service.get_transactions_filtered(
-            self.session,
+            transaction_repo,
             month_id=self.month.id,
         )
 
@@ -271,8 +284,9 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
 
     def test_multi_category_filter_returns_union(self) -> None:
         """Should return transactions matching any of the specified categories (union)."""
+        transaction_repo = TransactionRepository(self.session)
         transactions, total_count = months_service.get_transactions_filtered(
-            self.session,
+            transaction_repo,
             month_id=self.month.id,
             category_types=[MoneyMapType.CORE.value, MoneyMapType.CHOICE.value],
         )
@@ -285,8 +299,9 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
 
     def test_empty_category_list_returns_all(self) -> None:
         """Should return all transactions when category_types is empty list."""
+        transaction_repo = TransactionRepository(self.session)
         transactions, total_count = months_service.get_transactions_filtered(
-            self.session,
+            transaction_repo,
             month_id=self.month.id,
             category_types=[],
         )
@@ -297,9 +312,10 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
 
     def test_invalid_category_values_raise_error(self) -> None:
         """Should raise InvalidCategoryTypeError when invalid category values provided."""
+        transaction_repo = TransactionRepository(self.session)
         with pytest.raises(InvalidCategoryTypeError) as exc_info:
             months_service.get_transactions_filtered(
-                self.session,
+                transaction_repo,
                 month_id=self.month.id,
                 category_types=["INVALID_TYPE", MoneyMapType.CORE.value],
             )
@@ -312,9 +328,10 @@ class TestGetTransactionsFiltered(DatabaseTestCase):
 
     def test_all_invalid_categories_raise_error(self) -> None:
         """Should raise InvalidCategoryTypeError when all category values are invalid."""
+        transaction_repo = TransactionRepository(self.session)
         with pytest.raises(InvalidCategoryTypeError) as exc_info:
             months_service.get_transactions_filtered(
-                self.session,
+                transaction_repo,
                 month_id=self.month.id,
                 category_types=["INVALID1", "INVALID2"],
             )

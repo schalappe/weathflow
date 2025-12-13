@@ -4,8 +4,8 @@ import unittest
 from datetime import date
 from decimal import Decimal
 
-from app.services.csv_parser import BankinCSVParser
 from app.services.exceptions import InvalidFormatError, MissingColumnsError, RowParseError
+from app.services.upload.parser import BankinCSVParser
 
 
 class TestBankinCSVParserValidCSV(unittest.TestCase):

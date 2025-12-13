@@ -3,7 +3,7 @@
 from pydantic import Field, model_validator
 
 from app.db.enums import SCORE_TO_LABEL, ScoreLabel
-from app.services.dto._base import FrozenModel
+from app.services.models import FrozenModel
 
 
 class MonthStats(FrozenModel):

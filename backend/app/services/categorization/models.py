@@ -3,7 +3,7 @@
 from pydantic import Field
 
 from app.db.enums import MoneyMapType
-from app.services.dto._base import FrozenModel
+from app.services.models import FrozenModel
 
 
 class TransactionInput(FrozenModel):

@@ -3,19 +3,17 @@
 import csv
 import io
 import json
-import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy.orm import Session
+from loguru import logger
 
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
-from app.services import months as months_service
+from app.repositories.month import MonthRepository
+from app.repositories.transaction import TransactionRepository
 from app.services.exceptions import ExportSerializationError, MonthNotFoundError
-
-logger = logging.getLogger(__name__)
 
 # ##>: CSV column headers for CSV export output.
 EXPORT_HEADERS = [
@@ -102,14 +100,21 @@ def _serialize_transaction(t: Transaction) -> dict[str, Any]:
     }
 
 
-def _get_month_export_data(db: Session, year: int, month: int) -> tuple[Month, list[Transaction]]:
+def _get_month_export_data(
+    month_repo: MonthRepository,
+    transaction_repo: TransactionRepository,
+    year: int,
+    month: int,
+) -> tuple[Month, list[Transaction]]:
     """
     Fetch month and transactions for export.
 
     Parameters
     ----------
-    db : Session
-        Database session.
+    month_repo : MonthRepository
+        Repository for month data access.
+    transaction_repo : TransactionRepository
+        Repository for transaction data access.
     year : int
         Year (e.g., 2025).
     month : int
@@ -127,24 +132,31 @@ def _get_month_export_data(db: Session, year: int, month: int) -> tuple[Month, l
     TransactionQueryError
         If database query fails.
     """
-    month_record = months_service.get_month_by_year_month(db, year, month)
+    month_record = month_repo.get_by_year_month(year, month)
 
     if month_record is None:
-        logger.info("Export requested for non-existent month: %d-%02d", year, month)
+        logger.info("Export requested for non-existent month: {}-{:02d}", year, month)
         raise MonthNotFoundError(month_id=-1)  # -1 indicates lookup by year/month
 
-    transactions = months_service.get_all_transactions_for_month(db, month_record.id)
+    transactions = transaction_repo.get_all_for_month(month_record.id)
     return month_record, transactions
 
 
-def export_month_to_json(db: Session, year: int, month: int) -> ExportResult:
+def export_month_to_json(
+    month_repo: MonthRepository,
+    transaction_repo: TransactionRepository,
+    year: int,
+    month: int,
+) -> ExportResult:
     """
     Export month data as JSON.
 
     Parameters
     ----------
-    db : Session
-        Database session.
+    month_repo : MonthRepository
+        Repository for month data access.
+    transaction_repo : TransactionRepository
+        Repository for transaction data access.
     year : int
         Year (e.g., 2025).
     month : int
@@ -164,7 +176,7 @@ def export_month_to_json(db: Session, year: int, month: int) -> ExportResult:
     ExportSerializationError
         If JSON serialization fails due to non-serializable data.
     """
-    month_record, transactions = _get_month_export_data(db, year, month)
+    month_record, transactions = _get_month_export_data(month_repo, transaction_repo, year, month)
 
     export_data = {
         "exported_at": datetime.now(UTC).isoformat(),
@@ -188,12 +200,12 @@ def export_month_to_json(db: Session, year: int, month: int) -> ExportResult:
     try:
         json_content = json.dumps(export_data, ensure_ascii=False, indent=2)
     except TypeError as error:
-        logger.error("JSON serialization failed for %d-%02d: %s", year, month, str(error))
+        logger.error("JSON serialization failed for {}-{:02d}: {}", year, month, str(error))
         raise ExportSerializationError(year, month, str(error)) from error
 
     filename = f"moneymap-{year}-{month:02d}.json"
 
-    logger.info("Generated JSON export for %d-%02d with %d transactions", year, month, len(transactions))
+    logger.info("Generated JSON export for {}-{:02d} with {} transactions", year, month, len(transactions))
 
     return ExportResult(
         content=json_content.encode("utf-8"),
@@ -202,14 +214,21 @@ def export_month_to_json(db: Session, year: int, month: int) -> ExportResult:
     )
 
 
-def export_month_to_csv(db: Session, year: int, month: int) -> ExportResult:
+def export_month_to_csv(
+    month_repo: MonthRepository,
+    transaction_repo: TransactionRepository,
+    year: int,
+    month: int,
+) -> ExportResult:
     """
     Export month transactions as CSV.
 
     Parameters
     ----------
-    db : Session
-        Database session.
+    month_repo : MonthRepository
+        Repository for month data access.
+    transaction_repo : TransactionRepository
+        Repository for transaction data access.
     year : int
         Year (e.g., 2025).
     month : int
@@ -227,7 +246,7 @@ def export_month_to_csv(db: Session, year: int, month: int) -> ExportResult:
     TransactionQueryError
         If database query fails.
     """
-    _, transactions = _get_month_export_data(db, year, month)
+    _, transactions = _get_month_export_data(month_repo, transaction_repo, year, month)
 
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";")
@@ -250,7 +269,7 @@ def export_month_to_csv(db: Session, year: int, month: int) -> ExportResult:
 
     filename = f"moneymap-{year}-{month:02d}.csv"
 
-    logger.info("Generated CSV export for %d-%02d with %d transactions", year, month, len(transactions))
+    logger.info("Generated CSV export for {}-{:02d} with {} transactions", year, month, len(transactions))
 
     return ExportResult(
         content=output.getvalue().encode("utf-8"),

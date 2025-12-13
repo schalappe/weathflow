@@ -7,10 +7,10 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 from app.db.enums import MoneyMapType
-from app.services.dto.categorization import CategorizationResult
-from app.services.dto.parsing import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
+from app.services.categorization.models import CategorizationResult
 from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError
-from app.services.upload import UploadService
+from app.services.upload.models import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
+from app.services.upload.service import UploadService
 from tests.conftest import DatabaseTestCase
 
 # ##>: Fixture to mock the API key environment variable for categorization tests.
@@ -20,7 +20,7 @@ MOCK_API_KEY_ENV = {"ANTHROPIC_API_KEY": "test-key"}
 class TestUploadServicePreview(TestCase):
     """Tests for UploadService.get_upload_preview()."""
 
-    @patch("app.services.upload.BankinCSVParser")
+    @patch("app.services.upload.service.BankinCSVParser")
     def test_get_upload_preview_returns_correct_month_summaries(self, mock_parser_class: MagicMock) -> None:
         """Preview returns correct structure with month summaries."""
         mock_parser = MagicMock()
@@ -74,7 +74,7 @@ class TestUploadServicePreview(TestCase):
         self.assertEqual(month_summary["total_income"], 3000.00)
         self.assertEqual(month_summary["total_expenses"], 50.00)
 
-    @patch("app.services.upload.BankinCSVParser")
+    @patch("app.services.upload.service.BankinCSVParser")
     def test_get_upload_preview_includes_transaction_previews(self, mock_parser_class: MagicMock) -> None:
         """Preview includes transaction details per month."""
         mock_parser = MagicMock()
@@ -116,7 +116,7 @@ class TestUploadServicePreview(TestCase):
         self.assertEqual(transactions[0]["description"], "Coffee Shop")
         self.assertEqual(transactions[0]["amount"], -5.50)
 
-    @patch("app.services.upload.BankinCSVParser")
+    @patch("app.services.upload.service.BankinCSVParser")
     def test_get_upload_preview_raises_on_empty_file(self, mock_parser_class: MagicMock) -> None:
         """Preview raises NoTransactionsFoundError for empty CSV."""
         mock_parser = MagicMock()
@@ -132,8 +132,8 @@ class TestUploadServicePreview(TestCase):
 class TestUploadServiceCategorization(DatabaseTestCase):
     """Tests for UploadService.process_categorization()."""
 
-    @patch("app.services.upload.TransactionCategorizer")
-    @patch("app.services.upload.BankinCSVParser")
+    @patch("app.services.upload.service.TransactionCategorizer")
+    @patch("app.services.upload.service.BankinCSVParser")
     def test_process_categorization_categorizes_transactions(
         self, mock_parser_class: MagicMock, mock_categorizer_class: MagicMock
     ) -> None:
@@ -182,12 +182,19 @@ class TestUploadServiceCategorization(DatabaseTestCase):
             1,
         )
 
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
+
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         service = UploadService()
         result = service.process_categorization(
             file_content=b"csv",
             months_to_process=["2025-03"],
             import_mode="replace",
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
 
         self.assertTrue(result["success"])
@@ -196,8 +203,8 @@ class TestUploadServiceCategorization(DatabaseTestCase):
         self.assertEqual(result["months_processed"][0]["month"], 3)
         self.assertEqual(result["months_processed"][0]["transactions_categorized"], 1)
 
-    @patch("app.services.upload.TransactionCategorizer")
-    @patch("app.services.upload.BankinCSVParser")
+    @patch("app.services.upload.service.TransactionCategorizer")
+    @patch("app.services.upload.service.BankinCSVParser")
     def test_process_categorization_handles_all_months(
         self, mock_parser_class: MagicMock, mock_categorizer_class: MagicMock
     ) -> None:
@@ -260,18 +267,25 @@ class TestUploadServiceCategorization(DatabaseTestCase):
             1,
         )
 
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
+
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         service = UploadService()
         result = service.process_categorization(
             file_content=b"csv",
             months_to_process=["all"],
             import_mode="replace",
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
 
         self.assertEqual(len(result["months_processed"]), 2)
 
-    @patch("app.services.upload.TransactionCategorizer")
-    @patch("app.services.upload.BankinCSVParser")
+    @patch("app.services.upload.service.TransactionCategorizer")
+    @patch("app.services.upload.service.BankinCSVParser")
     def test_process_categorization_tracks_api_calls(
         self, mock_parser_class: MagicMock, mock_categorizer_class: MagicMock
     ) -> None:
@@ -313,12 +327,19 @@ class TestUploadServiceCategorization(DatabaseTestCase):
             2,  # Simulate 2 API calls
         )
 
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
+
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         service = UploadService()
         result = service.process_categorization(
             file_content=b"csv",
             months_to_process=["2025-04"],
             import_mode="replace",
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
 
         self.assertIn("total_api_calls", result)
@@ -329,8 +350,8 @@ class TestUploadServiceCategorization(DatabaseTestCase):
 class TestUploadServiceImportModes(DatabaseTestCase):
     """Tests for import mode functionality."""
 
-    @patch("app.services.upload.TransactionCategorizer")
-    @patch("app.services.upload.BankinCSVParser")
+    @patch("app.services.upload.service.TransactionCategorizer")
+    @patch("app.services.upload.service.BankinCSVParser")
     def test_replace_mode_deletes_existing_month(
         self, mock_parser_class: MagicMock, mock_categorizer_class: MagicMock
     ) -> None:
@@ -389,12 +410,19 @@ class TestUploadServiceImportModes(DatabaseTestCase):
             1,
         )
 
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
+
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         service = UploadService()
         service.process_categorization(
             file_content=b"csv",
             months_to_process=["2025-05"],
             import_mode="replace",
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
 
         # ##>: Expire session cache to get fresh data from database.
@@ -411,8 +439,8 @@ class TestUploadServiceImportModes(DatabaseTestCase):
         old_tx_exists = self.session.query(Transaction).filter(Transaction.description == "Old transaction").first()
         self.assertIsNone(old_tx_exists)
 
-    @patch("app.services.upload.TransactionCategorizer")
-    @patch("app.services.upload.BankinCSVParser")
+    @patch("app.services.upload.service.TransactionCategorizer")
+    @patch("app.services.upload.service.BankinCSVParser")
     def test_merge_mode_skips_duplicate_transactions(
         self, mock_parser_class: MagicMock, mock_categorizer_class: MagicMock
     ) -> None:
@@ -485,12 +513,19 @@ class TestUploadServiceImportModes(DatabaseTestCase):
             1,
         )
 
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
+
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         service = UploadService()
         result = service.process_categorization(
             file_content=b"csv",
             months_to_process=["2025-06"],
             import_mode="merge",
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
 
         # ##>: Should only insert 1 new transaction (skip duplicate).
@@ -501,8 +536,8 @@ class TestUploadServiceImportModes(DatabaseTestCase):
         assert month is not None
         self.assertEqual(len(month.transactions), 2)
 
-    @patch("app.services.upload.TransactionCategorizer")
-    @patch("app.services.upload.BankinCSVParser")
+    @patch("app.services.upload.service.TransactionCategorizer")
+    @patch("app.services.upload.service.BankinCSVParser")
     def test_merge_mode_inserts_only_new_transactions(
         self, mock_parser_class: MagicMock, mock_categorizer_class: MagicMock
     ) -> None:
@@ -551,12 +586,19 @@ class TestUploadServiceImportModes(DatabaseTestCase):
             1,
         )
 
+        from app.repositories.month import MonthRepository
+        from app.repositories.transaction import TransactionRepository
+
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         service = UploadService()
         result = service.process_categorization(
             file_content=b"csv",
             months_to_process=["2025-07"],
             import_mode="merge",
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
 
         self.assertEqual(result["months_processed"][0]["transactions_categorized"], 1)
@@ -565,7 +607,7 @@ class TestUploadServiceImportModes(DatabaseTestCase):
 class TestUploadServiceValidation(TestCase):
     """Tests for input validation."""
 
-    @patch("app.services.upload.BankinCSVParser")
+    @patch("app.services.upload.service.BankinCSVParser")
     def test_invalid_month_format_raises_error(self, mock_parser_class: MagicMock) -> None:
         """Invalid month format raises InvalidMonthFormatError."""
         mock_parser = MagicMock()
@@ -603,7 +645,8 @@ class TestUploadServiceValidation(TestCase):
                 file_content=b"csv",
                 months_to_process=["invalid-format"],
                 import_mode="replace",
-                db=MagicMock(),
+                month_repo=MagicMock(),
+                transaction_repo=MagicMock(),
             )
 
         self.assertEqual(context.exception.value, "invalid-format")

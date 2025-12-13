@@ -3,8 +3,8 @@
 import unittest
 
 from app.db.enums import MoneyMapType
-from app.services.categorization_prompt import CATEGORIZATION_SYSTEM_PROMPT
-from app.services.category_mapping import CategoryMapping
+from app.services.categorization.mapping import CategoryMapping
+from app.services.categorization.prompt import CATEGORIZATION_SYSTEM_PROMPT
 
 
 class TestCategoryMappingDeterministicCategory(unittest.TestCase):

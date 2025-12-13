@@ -9,9 +9,9 @@ from unittest.mock import MagicMock, Mock
 import anthropic
 
 from app.db.enums import MoneyMapType
-from app.services.categorization_cache import CategorizationCache
-from app.services.categorizer import TransactionCategorizer
-from app.services.dto.categorization import TransactionInput
+from app.services.categorization.cache import CategorizationCache
+from app.services.categorization.models import TransactionInput
+from app.services.categorization.service import TransactionCategorizer
 from app.services.exceptions import (
     APIConnectionError,
     BatchCategorizationError,

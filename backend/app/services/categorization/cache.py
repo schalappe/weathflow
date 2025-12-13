@@ -1,16 +1,15 @@
 """In-memory cache with JSON persistence for transaction categorizations."""
 
 import json
-import logging
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, ClassVar
 
-from app.db.enums import MoneyMapType
-from app.services.dto.categorization import CachedCategorization
+from loguru import logger
 
-logger = logging.getLogger(__name__)
+from app.db.enums import MoneyMapType
+from app.services.categorization.models import CachedCategorization
 
 
 class CategorizationCache:
@@ -107,7 +106,7 @@ class CategorizationCache:
             )
         except (KeyError, ValueError, TypeError) as e:
             # ##!: Corrupted cache entry - remove it and fall through to API.
-            logger.warning("Removing corrupted cache entry for '%s': %s", key, e)
+            logger.warning("Removing corrupted cache entry for '{}': {}", key, e)
             del self._cache[key]
             return None
 
@@ -166,7 +165,7 @@ class CategorizationCache:
         except OSError as e:
             # ##!: Cache persistence is non-critical; log and continue.
             logger.error(
-                "Failed to save categorization cache to %s: %s. Cache will only be in-memory for this session.",
+                "Failed to save categorization cache to {}: {}. Cache will only be in-memory for this session.",
                 self._cache_path,
                 e,
             )
@@ -186,7 +185,7 @@ class CategorizationCache:
         except json.JSONDecodeError as e:
             # ##!: Start fresh if cache file is corrupted.
             logger.warning(
-                "Cache file corrupted at %s (line %d, col %d): starting with empty cache",
+                "Cache file corrupted at {} (line {}, col {}): starting with empty cache",
                 self._cache_path,
                 e.lineno,
                 e.colno,
@@ -194,7 +193,7 @@ class CategorizationCache:
             self._cache = {}
         except OSError as e:
             # ##!: File permission or I/O error - start fresh.
-            logger.warning("Cannot read cache file %s: %s. Starting with empty cache", self._cache_path, e)
+            logger.warning("Cannot read cache file {}: {}. Starting with empty cache", self._cache_path, e)
             self._cache = {}
 
     def _remove_stale_entries(self) -> None:
@@ -215,7 +214,7 @@ class CategorizationCache:
                         stale_keys.append(key)
                 except (ValueError, TypeError) as e:
                     # ##!: Corrupted entry - mark for removal.
-                    logger.warning("Removing cache entry with invalid date '%s': %s", key, e)
+                    logger.warning("Removing cache entry with invalid date '{}': {}", key, e)
                     corrupted_keys.append(key)
 
         for key in stale_keys + corrupted_keys:

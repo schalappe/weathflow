@@ -1,16 +1,17 @@
 """FastAPI router for Monthly Data API endpoints."""
 
+# ruff: noqa: B008
+
 import io
-import logging
 from datetime import date
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import HTTPException, Path, Query
 from fastapi.responses import StreamingResponse
+from loguru import logger
 from pydantic import ValidationError
-from sqlalchemy.orm import Session
 
-from app.db.database import get_db
+from app.api.deps import MonthRepo, TransactionRepo, create_router
 from app.responses.history import HistoryResponse, MonthHistory
 from app.responses.months import (
     MonthDetailResponse,
@@ -19,14 +20,11 @@ from app.responses.months import (
     PaginationInfo,
     TransactionResponse,
 )
-from app.services import export as export_service
-from app.services import months as months_service
+from app.services.data import export as export_service
+from app.services.data import months as months_service
 from app.services.exceptions import InvalidCategoryTypeError, MonthDataError, MonthNotFoundError
 
-# ruff: noqa: B008
-
-router = APIRouter(prefix="/api", tags=["months"])
-logger = logging.getLogger(__name__)
+router = create_router("months")
 
 
 def _http_detail_for_db_error(error: MonthDataError) -> str:
@@ -49,8 +47,8 @@ def _http_detail_for_db_error(error: MonthDataError) -> str:
     return "An error occurred while retrieving data. Please try again or contact support."
 
 
-@router.get("/months", response_model=MonthsListResponse)
-def list_months(db: Session = Depends(get_db)) -> MonthsListResponse:
+@router.get("/", response_model=MonthsListResponse)
+def list_months(month_repo: MonthRepo) -> MonthsListResponse:
     """
     List all months with summary data.
 
@@ -68,8 +66,7 @@ def list_months(db: Session = Depends(get_db)) -> MonthsListResponse:
         If database is temporarily unavailable.
     """
     try:
-        # ##>: Use optimized query with JOIN to avoid N+1 queries.
-        months_with_counts = months_service.get_all_months_with_counts(db)
+        months_with_counts = months_service.get_all_months_with_counts(month_repo)
         month_summaries = [MonthSummary.from_model(m, tx_count) for m, tx_count in months_with_counts]
 
         return MonthsListResponse(months=month_summaries, total=len(month_summaries))
@@ -77,14 +74,14 @@ def list_months(db: Session = Depends(get_db)) -> MonthsListResponse:
         logger.exception("Database error in list_months")
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
     except Exception as error:
-        logger.exception("Unexpected error in list_months: error_type=%s", type(error).__name__)
+        logger.exception("Unexpected error in list_months: error_type={}", type(error).__name__)
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
-@router.get("/months/history", response_model=HistoryResponse)
+@router.get("/history", response_model=HistoryResponse)
 def get_history(
+    month_repo: MonthRepo,
     months: int = Query(12, ge=1, le=24, description="Number of months to retrieve (1-24)"),
-    db: Session = Depends(get_db),
 ) -> HistoryResponse:
     """
     Get historical data for score trend analysis.
@@ -108,7 +105,7 @@ def get_history(
         If database is temporarily unavailable.
     """
     try:
-        month_records = months_service.get_months_history(db, months)
+        month_records = months_service.get_months_history(month_repo, months)
 
         # ##>: Build response models with explicit error handling per record.
         month_list: list[MonthHistory] = []
@@ -117,7 +114,7 @@ def get_history(
                 month_list.append(MonthHistory.from_model(record))
             except ValidationError as ve:
                 logger.error(
-                    "Data integrity error for month %d-%02d (id=%d): %s",
+                    "Data integrity error for month {}-{:02d} (id={}): {}",
                     record.year,
                     record.month,
                     record.id,
@@ -138,12 +135,14 @@ def get_history(
         logger.exception("Database error in get_history")
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
     except Exception as error:
-        logger.exception("Unexpected error in get_history: error_type=%s", type(error).__name__)
+        logger.exception("Unexpected error in get_history: error_type={}", type(error).__name__)
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
-@router.get("/months/{year}/{month}", response_model=MonthDetailResponse)
+@router.get("/{year}/{month}", response_model=MonthDetailResponse)
 def get_month_detail(
+    month_repo: MonthRepo,
+    transaction_repo: TransactionRepo,
     year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
     month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
     category: str | None = Query(None, description="Comma-separated category types (e.g., CORE,CHOICE)"),
@@ -152,7 +151,6 @@ def get_month_detail(
     end_date: date | None = Query(None, description="Filter transactions until this date"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=100, description="Items per page"),
-    db: Session = Depends(get_db),
 ) -> MonthDetailResponse:
     """
     Get detailed data for a specific month with filtered transactions.
@@ -198,7 +196,7 @@ def get_month_detail(
         )
 
     try:
-        month_record = months_service.get_month_by_year_month(db, year, month)
+        month_record = months_service.get_month_by_year_month(month_repo, year, month)
 
         if month_record is None:
             raise HTTPException(
@@ -209,7 +207,7 @@ def get_month_detail(
         # ##>: Parse comma-separated categories to list for service layer.
         category_types = [c.strip() for c in category.split(",") if c.strip()] if category else None
         transactions, total_items = months_service.get_transactions_filtered(
-            db,
+            transaction_repo,
             month_id=month_record.id,
             category_types=category_types,
             search=search,
@@ -247,23 +245,24 @@ def get_month_detail(
         raise
     except InvalidCategoryTypeError as error:
         # ##>: Return 400 for invalid category types with helpful message.
-        logger.warning("Invalid category types in request: %s", error.invalid_types)
+        logger.warning("Invalid category types in request: {}", error.invalid_types)
         raise HTTPException(status_code=400, detail=str(error)) from error
     except MonthDataError as error:
-        logger.exception("Database error in get_month_detail for %d-%02d", year, month)
+        logger.exception("Database error in get_month_detail for {}-{:02d}", year, month)
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
     except Exception as error:
         logger.exception(
-            "Unexpected error in get_month_detail for %d-%02d: error_type=%s", year, month, type(error).__name__
+            "Unexpected error in get_month_detail for {}-{:02d}: error_type={}", year, month, type(error).__name__
         )
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
-@router.get("/months/{year}/{month}/export/json")
+@router.get("/{year}/{month}/export/json")
 def export_month_json(
+    month_repo: MonthRepo,
+    transaction_repo: TransactionRepo,
     year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
     month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
-    db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """
     Export month data as JSON file.
@@ -290,7 +289,7 @@ def export_month_json(
         If database is temporarily unavailable.
     """
     try:
-        result = export_service.export_month_to_json(db, year, month)
+        result = export_service.export_month_to_json(month_repo, transaction_repo, year, month)
         return StreamingResponse(
             io.BytesIO(result.content),
             media_type=result.media_type,
@@ -302,20 +301,21 @@ def export_month_json(
             detail=f"No data found for {year}-{month:02d}. Please upload transactions for this month first.",
         ) from error
     except MonthDataError as error:
-        logger.exception("Database error in export_month_json for %d-%02d", year, month)
+        logger.exception("Database error in export_month_json for {}-{:02d}", year, month)
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
     except Exception as error:
         logger.exception(
-            "Unexpected error in export_month_json for %d-%02d: error_type=%s", year, month, type(error).__name__
+            "Unexpected error in export_month_json for {}-{:02d}: error_type={}", year, month, type(error).__name__
         )
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
-@router.get("/months/{year}/{month}/export/csv")
+@router.get("/{year}/{month}/export/csv")
 def export_month_csv(
+    month_repo: MonthRepo,
+    transaction_repo: TransactionRepo,
     year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
     month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
-    db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """
     Export month transactions as CSV file.
@@ -342,7 +342,7 @@ def export_month_csv(
         If database is temporarily unavailable.
     """
     try:
-        result = export_service.export_month_to_csv(db, year, month)
+        result = export_service.export_month_to_csv(month_repo, transaction_repo, year, month)
         return StreamingResponse(
             io.BytesIO(result.content),
             media_type=result.media_type,
@@ -354,10 +354,10 @@ def export_month_csv(
             detail=f"No data found for {year}-{month:02d}. Please upload transactions for this month first.",
         ) from error
     except MonthDataError as error:
-        logger.exception("Database error in export_month_csv for %d-%02d", year, month)
+        logger.exception("Database error in export_month_csv for {}-{:02d}", year, month)
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
     except Exception as error:
         logger.exception(
-            "Unexpected error in export_month_csv for %d-%02d: error_type=%s", year, month, type(error).__name__
+            "Unexpected error in export_month_csv for {}-{:02d}: error_type={}", year, month, type(error).__name__
         )
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error

@@ -1,21 +1,17 @@
 """FastAPI router for Advice API endpoints."""
 
-import logging
+from fastapi import HTTPException, Path
+from loguru import logger
 
-from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlalchemy.orm import Session
-
-from app.config.settings import get_settings
-from app.db.database import get_db
+from app.api.deps import AdviceGen, AdviceRepo, MonthRepo, create_router
 from app.responses.advice import (
     AdviceData,
     GenerateAdviceRequest,
     GenerateAdviceResponse,
     GetAdviceResponse,
 )
-from app.services import advice as advice_service
-from app.services import months as months_service
-from app.services.advisor import AdviceGenerator
+from app.services.advice import service as advice_service
+from app.services.data import months as months_service
 from app.services.exceptions import (
     AdviceAPIError,
     AdviceGenerationError,
@@ -25,10 +21,7 @@ from app.services.exceptions import (
     MonthDataError,
 )
 
-# ruff: noqa: B008
-
-router = APIRouter(prefix="/api", tags=["advice"])
-logger = logging.getLogger(__name__)
+router = create_router("advice")
 
 
 def _http_detail_for_advice_error(error: AdviceGenerationError) -> str:
@@ -54,10 +47,12 @@ def _http_detail_for_advice_error(error: AdviceGenerationError) -> str:
     return "An error occurred while generating advice. Please try again."
 
 
-@router.post("/advice/generate", response_model=GenerateAdviceResponse)
+@router.post("/generate", response_model=GenerateAdviceResponse)
 def generate_advice(
     request: GenerateAdviceRequest,
-    db: Session = Depends(get_db),
+    month_repo: MonthRepo,
+    advice_repo: AdviceRepo,
+    generator: AdviceGen,
 ) -> GenerateAdviceResponse:
     """
     Generate or retrieve cached advice for a month.
@@ -87,7 +82,7 @@ def generate_advice(
         If AI service or database unavailable (AdviceQueryError, MonthDataError).
     """
     try:
-        month_record = months_service.get_month_by_year_month(db, request.year, request.month)
+        month_record = months_service.get_month_by_year_month(month_repo, request.year, request.month)
         if month_record is None:
             raise HTTPException(
                 status_code=404,
@@ -95,9 +90,9 @@ def generate_advice(
             )
 
         if not request.regenerate:
-            existing_advice = advice_service.get_advice_by_month_id(db, month_record.id)
+            existing_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
             if existing_advice:
-                logger.info("Returning cached advice for %d-%02d", request.year, request.month)
+                logger.info("Returning cached advice for {}-{:02d}", request.year, request.month)
                 return GenerateAdviceResponse(
                     success=True,
                     advice=AdviceData.from_json(existing_advice.advice_text),
@@ -106,7 +101,7 @@ def generate_advice(
                 )
 
         # ##>: Fetch history and prepare data for advice generation.
-        history_months = months_service.get_months_history(db, limit=3)
+        history_months = months_service.get_months_history(month_repo, limit=3)
 
         current_data = advice_service.month_to_month_data(month_record)
         history_data = [
@@ -115,17 +110,12 @@ def generate_advice(
             if not (m.year == request.year and m.month == request.month)
         ]
 
-        settings = get_settings()
-        generator = AdviceGenerator(
-            api_key=settings.anthropic_api_key.get_secret_value(),
-            base_url=settings.anthropic_base_url,
-        )
         advice_response = generator.generate_advice(current_data, history_data)
 
         advice_json = advice_service.advice_response_to_json(advice_response)
-        stored_advice = advice_service.create_or_update_advice(db, month_record.id, advice_json)
+        stored_advice = advice_service.create_or_update_advice(advice_repo, month_record.id, advice_json)
 
-        logger.info("Generated new advice for %d-%02d", request.year, request.month)
+        logger.info("Generated new advice for {}-{:02d}", request.year, request.month)
         return GenerateAdviceResponse(
             success=True,
             advice=AdviceData.from_service_response(advice_response),
@@ -137,30 +127,31 @@ def generate_advice(
         raise
     except ValueError as error:
         # ##>: Catches corrupted JSON from AdviceData.from_json() when loading cached advice.
-        logger.exception("Corrupted advice data for %d-%02d", request.year, request.month)
+        logger.exception("Corrupted advice data for {}-{:02d}", request.year, request.month)
         raise HTTPException(
             status_code=500,
             detail="Stored advice data is corrupted. Please regenerate advice with regenerate=true.",
         ) from error
     except InsufficientDataError as error:
-        logger.info("Insufficient data for advice generation: %s", error)
+        logger.info("Insufficient data for advice generation: {}", error)
         raise HTTPException(status_code=400, detail=_http_detail_for_advice_error(error)) from error
     except (AdviceQueryError, MonthDataError) as error:
         logger.exception("Database error in generate_advice")
         raise HTTPException(status_code=503, detail="Database temporarily unavailable.") from error
     except AdviceGenerationError as error:
-        logger.exception("Advice generation error for %d-%02d", request.year, request.month)
+        logger.exception("Advice generation error for {}-{:02d}", request.year, request.month)
         raise HTTPException(status_code=503, detail=_http_detail_for_advice_error(error)) from error
     except Exception as error:
-        logger.exception("Unexpected error in generate_advice: error_type=%s", type(error).__name__)
+        logger.exception("Unexpected error in generate_advice: error_type={}", type(error).__name__)
         raise HTTPException(status_code=500, detail="An unexpected error occurred.") from error
 
 
-@router.get("/advice/{year}/{month}", response_model=GetAdviceResponse)
+@router.get("/{year}/{month}", response_model=GetAdviceResponse)
 def get_advice(
+    month_repo: MonthRepo,
+    advice_repo: AdviceRepo,
     year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
     month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
-    db: Session = Depends(get_db),
 ) -> GetAdviceResponse:
     """
     Retrieve stored advice for a specific month.
@@ -185,14 +176,14 @@ def get_advice(
         If database unavailable.
     """
     try:
-        month_record = months_service.get_month_by_year_month(db, year, month)
+        month_record = months_service.get_month_by_year_month(month_repo, year, month)
         if month_record is None:
             raise HTTPException(
                 status_code=404,
                 detail=f"No data found for {year}-{month:02d}. Upload transactions first.",
             )
 
-        advice = advice_service.get_advice_by_month_id(db, month_record.id)
+        advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
 
         if advice is None:
             return GetAdviceResponse(
@@ -213,14 +204,14 @@ def get_advice(
         raise
     except ValueError as error:
         # ##>: Catches corrupted JSON from AdviceData.from_json() when loading stored advice.
-        logger.exception("Corrupted advice data for %d-%02d", year, month)
+        logger.exception("Corrupted advice data for {}-{:02d}", year, month)
         raise HTTPException(
             status_code=500,
             detail="Stored advice data is corrupted. Please regenerate advice.",
         ) from error
     except (AdviceQueryError, MonthDataError) as error:
-        logger.exception("Database error in get_advice for %d-%02d", year, month)
+        logger.exception("Database error in get_advice for {}-{:02d}", year, month)
         raise HTTPException(status_code=503, detail="Database temporarily unavailable.") from error
     except Exception as error:
-        logger.exception("Unexpected error in get_advice for %d-%02d", year, month)
+        logger.exception("Unexpected error in get_advice for {}-{:02d}", year, month)
         raise HTTPException(status_code=500, detail="An unexpected error occurred.") from error
