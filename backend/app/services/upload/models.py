@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from pydantic import Field
 
-from app.services.dto._base import FrozenModel
+from app.services.models import FrozenModel
 
 
 class ParsedTransaction(FrozenModel):

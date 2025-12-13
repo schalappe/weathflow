@@ -48,7 +48,7 @@ class TestUpdateTransactionCategory(DatabaseTestCase):
         """Update sets is_manually_corrected to True."""
         from app.repositories.month import MonthRepository
         from app.repositories.transaction import TransactionRepository
-        from app.services.transactions import update_transaction_category
+        from app.services.data.transactions import update_transaction_category
 
         _, transaction = self._create_month_with_transactions()
         assert transaction.is_manually_corrected is False
@@ -69,7 +69,7 @@ class TestUpdateTransactionCategory(DatabaseTestCase):
         """Update changes money_map_type and money_map_subcategory fields."""
         from app.repositories.month import MonthRepository
         from app.repositories.transaction import TransactionRepository
-        from app.services.transactions import update_transaction_category
+        from app.services.data.transactions import update_transaction_category
 
         _, transaction = self._create_month_with_transactions()
         assert transaction.money_map_type == MoneyMapType.CHOICE.value
@@ -92,7 +92,7 @@ class TestUpdateTransactionCategory(DatabaseTestCase):
         """Update triggers recalculation of month statistics."""
         from app.repositories.month import MonthRepository
         from app.repositories.transaction import TransactionRepository
-        from app.services.transactions import update_transaction_category
+        from app.services.data.transactions import update_transaction_category
 
         month, transaction = self._create_month_with_transactions()
         original_choice_pct = month.choice_percentage
@@ -116,7 +116,7 @@ class TestUpdateTransactionCategory(DatabaseTestCase):
         """Update raises TransactionNotFoundError for non-existent transaction."""
         from app.repositories.month import MonthRepository
         from app.repositories.transaction import TransactionRepository
-        from app.services.transactions import update_transaction_category
+        from app.services.data.transactions import update_transaction_category
 
         self._create_month_with_transactions()
 
@@ -173,7 +173,7 @@ class TestSubcategoryValidation(DatabaseTestCase):
         """Invalid subcategory for MoneyMapType raises InvalidSubcategoryError."""
         from app.repositories.month import MonthRepository
         from app.repositories.transaction import TransactionRepository
-        from app.services.transactions import update_transaction_category
+        from app.services.data.transactions import update_transaction_category
 
         transaction = self._create_month_with_transaction()
 
@@ -195,7 +195,7 @@ class TestSubcategoryValidation(DatabaseTestCase):
         """EXCLUDED type automatically clears subcategory to null."""
         from app.repositories.month import MonthRepository
         from app.repositories.transaction import TransactionRepository
-        from app.services.transactions import update_transaction_category
+        from app.services.data.transactions import update_transaction_category
 
         transaction = self._create_month_with_transaction()
 

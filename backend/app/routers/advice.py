@@ -15,9 +15,9 @@ from app.responses.advice import (
     GenerateAdviceResponse,
     GetAdviceResponse,
 )
-from app.services import advice as advice_service
-from app.services import months as months_service
-from app.services.advisor import AdviceGenerator
+from app.services.advice import service as advice_service
+from app.services.advice.generator import AdviceGenerator
+from app.services.data import months as months_service
 from app.services.exceptions import (
     AdviceAPIError,
     AdviceGenerationError,

@@ -8,8 +8,8 @@ from decimal import Decimal, InvalidOperation
 from io import StringIO
 from typing import ClassVar
 
-from app.services.dto.parsing import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
 from app.services.exceptions import InvalidFormatError, MissingColumnsError, RowParseError
+from app.services.upload.models import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
 
 
 class BankinCSVParser:

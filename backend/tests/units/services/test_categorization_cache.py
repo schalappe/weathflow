@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from app.db.enums import MoneyMapType
-from app.services.categorization_cache import CategorizationCache
+from app.services.categorization.cache import CategorizationCache
 
 
 class TestCategorizationCacheNormalizeKey(unittest.TestCase):

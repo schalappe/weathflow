@@ -12,7 +12,7 @@ from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
 from app.responses.months import MonthSummary, TransactionResponse
 from app.responses.transactions import UpdateTransactionRequest, UpdateTransactionResponse
-from app.services import transactions as transactions_service
+from app.services.data import transactions as transactions_service
 from app.services.exceptions import (
     InvalidSubcategoryError,
     MonthNotFoundError,

@@ -17,7 +17,7 @@ from app.services.exceptions import (
     NoTransactionsFoundError,
     ScoreCalculationError,
 )
-from app.services.upload import UploadService
+from app.services.upload.service import UploadService
 
 # ruff: noqa: B008
 

@@ -9,7 +9,7 @@ from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
-from app.services import months as months_service
+from app.services.data import months as months_service
 from app.services.exceptions import InvalidCategoryTypeError
 from tests.conftest import DatabaseTestCase
 

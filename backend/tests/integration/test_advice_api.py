@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models.advice import Advice
 from app.db.models.month import Month
-from app.services.dto.advice import AdviceResponse, ProblemArea
+from app.services.advice.models import AdviceResponse, ProblemArea
 from app.services.exceptions import AdviceAPIError
 
 

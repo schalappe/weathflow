@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 from app.db.models.advice import Advice
 from app.db.models.month import Month
 from app.repositories.advice import AdviceRepository
-from app.services import advice as advice_service
-from app.services.dto.advice import AdviceResponse, ProblemArea
+from app.services.advice import service as advice_service
+from app.services.advice.models import AdviceResponse, ProblemArea
 from tests.conftest import DatabaseTestCase
 
 

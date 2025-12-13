@@ -13,7 +13,7 @@ from app.db.enums import SCORE_TO_LABEL, ScoreLabel
 from app.db.models.month import Month
 from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
-from app.services.dto.calculation import MonthStats
+from app.services.calculation.models import MonthStats
 from app.services.exceptions import MonthNotFoundError, ScorePersistenceError, TransactionAggregationError
 
 logger = logging.getLogger(__name__)

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
-from app.services.dto.categorization import CategorizationResult
+from app.services.categorization.models import CategorizationResult
 from app.services.exceptions import CategorizationError
 from tests.integration.fixtures.csv_builder import CSVBuilder, combine_csvs
 
@@ -58,7 +58,7 @@ def _create_mock_categorizer(money_map_types: list[MoneyMapType] | None = None) 
 class TestCategorizeReplaceMode:
     """Integration tests for replace mode categorization."""
 
-    @patch("app.services.upload.TransactionCategorizer")
+    @patch("app.services.upload.service.TransactionCategorizer")
     def test_upload_categorize_creates_month_with_transactions(
         self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
     ) -> None:
@@ -109,7 +109,7 @@ class TestCategorizeReplaceMode:
         assert month.total_compound == 3000.0 - 150.0 - 25.0
         assert month.score is not None
 
-    @patch("app.services.upload.TransactionCategorizer")
+    @patch("app.services.upload.service.TransactionCategorizer")
     def test_replace_mode_deletes_existing_data(
         self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
     ) -> None:
@@ -145,7 +145,7 @@ class TestCategorizeReplaceMode:
 class TestCategorizeMergeMode:
     """Integration tests for merge mode categorization."""
 
-    @patch("app.services.upload.TransactionCategorizer")
+    @patch("app.services.upload.service.TransactionCategorizer")
     def test_merge_mode_skips_duplicate_transactions(
         self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
     ) -> None:
@@ -184,7 +184,7 @@ class TestCategorizeMergeMode:
         assert month is not None
         assert len(month.transactions) == 2
 
-    @patch("app.services.upload.TransactionCategorizer")
+    @patch("app.services.upload.service.TransactionCategorizer")
     def test_merge_mode_adds_new_transactions(
         self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
     ) -> None:
@@ -226,7 +226,7 @@ class TestCategorizeMergeMode:
 class TestMultiMonthProcessing:
     """Integration tests for multi-month file processing."""
 
-    @patch("app.services.upload.TransactionCategorizer")
+    @patch("app.services.upload.service.TransactionCategorizer")
     def test_processes_all_months_in_csv(
         self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
     ) -> None:
@@ -268,7 +268,7 @@ class TestMultiMonthProcessing:
 class TestPartialFailure:
     """Integration tests for partial success scenarios."""
 
-    @patch("app.services.upload.TransactionCategorizer")
+    @patch("app.services.upload.service.TransactionCategorizer")
     def test_api_error_mid_processing(
         self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
     ) -> None:
@@ -322,7 +322,7 @@ class TestPartialFailure:
 class TestErrorHandling:
     """Integration tests for error handling scenarios."""
 
-    @patch("app.services.upload.TransactionCategorizer")
+    @patch("app.services.upload.service.TransactionCategorizer")
     def test_claude_api_failure_returns_502(
         self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
     ) -> None:

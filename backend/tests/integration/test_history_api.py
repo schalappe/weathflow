@@ -137,7 +137,7 @@ class TestGetHistoryEndpoint:
     def test_history_returns_503_on_database_error(self, client: TestClient) -> None:
         """Should return 503 when database query fails."""
         with patch(
-            "app.services.months.get_months_history",
+            "app.services.data.months.get_months_history",
             side_effect=MonthQueryError("Connection refused"),
         ):
             response = client.get("/api/months/history")

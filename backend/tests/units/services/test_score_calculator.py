@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from app.db.enums import MoneyMapType, ScoreLabel
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
-from app.services.dto.calculation import MonthStats
+from app.services.calculation.models import MonthStats
 from app.services.exceptions import (
     MonthNotFoundError,
     ScoreCalculationError,
@@ -194,7 +194,7 @@ class TestCalculateScore(unittest.TestCase):
 
     def test_perfect_score_all_thresholds_met(self) -> None:
         """Should return score 3 and 'Great' when all thresholds are met."""
-        from app.services.calculator import calculate_score
+        from app.services.calculation.service import calculate_score
 
         # ##>: 45% core (<=50), 25% choice (<=30), 30% compound (>=20).
         score, label = calculate_score(core_pct=45.0, choice_pct=25.0, compound_pct=30.0)
@@ -204,7 +204,7 @@ class TestCalculateScore(unittest.TestCase):
 
     def test_score_at_exact_thresholds(self) -> None:
         """Should return score 3 when percentages are exactly at thresholds."""
-        from app.services.calculator import calculate_score
+        from app.services.calculation.service import calculate_score
 
         # ##>: Exactly 50%, 30%, 20% should still pass all thresholds.
         score, label = calculate_score(core_pct=50.0, choice_pct=30.0, compound_pct=20.0)
@@ -214,7 +214,7 @@ class TestCalculateScore(unittest.TestCase):
 
     def test_score_one_threshold_exceeded(self) -> None:
         """Should return score 2 when one threshold is exceeded."""
-        from app.services.calculator import calculate_score
+        from app.services.calculation.service import calculate_score
 
         # ##>: Core at 55% (exceeds 50%), others within limits.
         score, label = calculate_score(core_pct=55.0, choice_pct=25.0, compound_pct=20.0)
@@ -224,7 +224,7 @@ class TestCalculateScore(unittest.TestCase):
 
     def test_score_two_thresholds_exceeded(self) -> None:
         """Should return score 1 when two thresholds are exceeded."""
-        from app.services.calculator import calculate_score
+        from app.services.calculation.service import calculate_score
 
         # ##>: Core at 55% (exceeds 50%), compound at 15% (below 20%).
         score, label = calculate_score(core_pct=55.0, choice_pct=25.0, compound_pct=15.0)
@@ -234,7 +234,7 @@ class TestCalculateScore(unittest.TestCase):
 
     def test_score_zero_no_thresholds_met(self) -> None:
         """Should return score 0 when no thresholds are met."""
-        from app.services.calculator import calculate_score
+        from app.services.calculation.service import calculate_score
 
         # ##>: All thresholds exceeded.
         score, label = calculate_score(core_pct=60.0, choice_pct=35.0, compound_pct=5.0)
@@ -248,7 +248,7 @@ class TestCalculateMonthStats(unittest.TestCase):
 
     def test_happy_path_with_valid_totals(self) -> None:
         """Should calculate correct stats from valid totals."""
-        from app.services.calculator import calculate_month_stats
+        from app.services.calculation.service import calculate_month_stats
 
         stats = calculate_month_stats(income=5000.0, core=2000.0, choice=1000.0)
 
@@ -264,7 +264,7 @@ class TestCalculateMonthStats(unittest.TestCase):
 
     def test_zero_income_edge_case(self) -> None:
         """Should return score 0 and 'Poor' when income is zero."""
-        from app.services.calculator import calculate_month_stats
+        from app.services.calculation.service import calculate_month_stats
 
         stats = calculate_month_stats(income=0.0, core=0.0, choice=0.0)
 
@@ -277,7 +277,7 @@ class TestCalculateMonthStats(unittest.TestCase):
 
     def test_negative_income_edge_case(self) -> None:
         """Should return score 0 and 'Poor' when income is negative."""
-        from app.services.calculator import calculate_month_stats
+        from app.services.calculation.service import calculate_month_stats
 
         # ##>: Negative income (data error or refund-only month) handled like zero.
         stats = calculate_month_stats(income=-500.0, core=0.0, choice=0.0)
@@ -291,7 +291,7 @@ class TestCalculateMonthStats(unittest.TestCase):
 
     def test_negative_compound_overspent(self) -> None:
         """Should calculate correctly when compound is negative (overspent)."""
-        from app.services.calculator import calculate_month_stats
+        from app.services.calculation.service import calculate_month_stats
 
         # ##>: Spending exceeds income: 3000 + 2500 = 5500 > 5000.
         stats = calculate_month_stats(income=5000.0, core=3000.0, choice=2500.0)
@@ -425,7 +425,7 @@ class TestCalculateAndUpdateMonth(DatabaseTestCase):
         """Should update all Month fields with calculated stats."""
         from app.repositories.month import MonthRepository
         from app.repositories.transaction import TransactionRepository
-        from app.services.calculator import calculate_and_update_month
+        from app.services.calculation.service import calculate_and_update_month
 
         month = Month(year=2025, month=10)
         self.session.add(month)
@@ -476,7 +476,7 @@ class TestCalculateAndUpdateMonth(DatabaseTestCase):
         """Should raise MonthNotFoundError for non-existent month_id."""
         from app.repositories.month import MonthRepository
         from app.repositories.transaction import TransactionRepository
-        from app.services.calculator import calculate_and_update_month
+        from app.services.calculation.service import calculate_and_update_month
 
         month_repo = MonthRepository(self.session)
         transaction_repo = TransactionRepository(self.session)
@@ -490,7 +490,7 @@ class TestCalculateAndUpdateMonth(DatabaseTestCase):
         """Should recalculate correctly after transaction category is changed."""
         from app.repositories.month import MonthRepository
         from app.repositories.transaction import TransactionRepository
-        from app.services.calculator import calculate_and_update_month
+        from app.services.calculation.service import calculate_and_update_month
 
         month = Month(year=2025, month=10)
         self.session.add(month)

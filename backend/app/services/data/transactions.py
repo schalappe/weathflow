@@ -7,7 +7,7 @@ from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
-from app.services.calculator import calculate_and_update_month
+from app.services.calculation.service import calculate_and_update_month
 from app.services.exceptions import InvalidSubcategoryError, TransactionNotFoundError
 
 logger = logging.getLogger(__name__)

@@ -7,7 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.db.models.advice import Advice
 from app.db.models.month import Month
 from app.repositories.advice import AdviceRepository
-from app.services.dto.advice import AdviceResponse, MonthData
+from app.services.advice.models import AdviceResponse, MonthData
 from app.services.exceptions import AdviceQueryError
 
 logger = logging.getLogger(__name__)

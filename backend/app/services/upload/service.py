@@ -9,12 +9,12 @@ from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
-from app.services.calculator import calculate_and_update_month
-from app.services.categorizer import TransactionCategorizer
-from app.services.csv_parser import BankinCSVParser
-from app.services.dto.categorization import CategorizationResult, TransactionInput
-from app.services.dto.parsing import MonthData, ParsedTransaction
+from app.services.calculation.service import calculate_and_update_month
+from app.services.categorization.models import CategorizationResult, TransactionInput
+from app.services.categorization.service import TransactionCategorizer
 from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError
+from app.services.upload.models import MonthData, ParsedTransaction
+from app.services.upload.parser import BankinCSVParser
 
 logger = logging.getLogger(__name__)
 

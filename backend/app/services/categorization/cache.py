@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from app.db.enums import MoneyMapType
-from app.services.dto.categorization import CachedCategorization
+from app.services.categorization.models import CachedCategorization
 
 logger = logging.getLogger(__name__)
 

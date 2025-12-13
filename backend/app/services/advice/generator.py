@@ -7,14 +7,14 @@ from typing import ClassVar
 import anthropic
 from anthropic import Anthropic
 
-from app.services.dto.advice import AdviceResponse, MonthData, ProblemArea
+from app.services.advice.models import AdviceResponse, MonthData, ProblemArea
+from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
 from app.services.exceptions import (
     AdviceAPIError,
     AdviceGenerationError,
     AdviceParseError,
     InsufficientDataError,
 )
-from app.services.prompts.advice_prompt import ADVICE_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 

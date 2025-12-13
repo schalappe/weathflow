@@ -6,15 +6,15 @@ from unittest.mock import MagicMock
 import anthropic
 from pydantic import ValidationError
 
-from app.services.advisor import AdviceGenerator, calculate_trend
-from app.services.dto.advice import AdviceResponse, MonthData, ProblemArea
+from app.services.advice.generator import AdviceGenerator, calculate_trend
+from app.services.advice.models import AdviceResponse, MonthData, ProblemArea
+from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
 from app.services.exceptions import (
     AdviceAPIError,
     AdviceGenerationError,
     AdviceParseError,
     InsufficientDataError,
 )
-from app.services.prompts.advice_prompt import ADVICE_SYSTEM_PROMPT
 
 
 def _make_month_data(
