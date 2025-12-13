@@ -1,6 +1,7 @@
 "use client";
 
 import { useReducer, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -138,6 +139,7 @@ function importReducer(state: ImportState, action: ImportAction): ImportState {
 }
 
 export function ImportPageClient() {
+  const router = useRouter();
   const [state, dispatch] = useReducer(importReducer, initialState);
 
   // [>]: Handle file selection and trigger upload.
@@ -197,10 +199,10 @@ export function ImportPageClient() {
     dispatch({ type: "SET_IMPORT_MODE", payload: mode });
   }, []);
 
-  // [>]: Handle finish/reset.
+  // [>]: Handle finish - navigate to dashboard.
   const handleFinish = useCallback(() => {
-    dispatch({ type: "RESET" });
-  }, []);
+    router.push("/");
+  }, [router]);
 
   // [>]: Handle cancel - reset to initial state.
   const handleCancel = useCallback(() => {
