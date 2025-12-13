@@ -14,21 +14,21 @@ Primary Stack: Next.js + React (Frontend-only)
 
 **Dependencies:** None
 
-- [ ] 1.0 Complete theme infrastructure
-  - [ ] 1.1 Write 3 focused tests for theme functionality
+- [x] 1.0 Complete theme infrastructure
+  - [x] 1.1 Write 3 focused tests for theme functionality
     - Test ThemeProvider renders children
     - Test useTheme returns theme value and toggleTheme function
     - Test useTheme throws error when used outside ThemeProvider
-  - [ ] 1.2 Create ThemeProvider component (`components/ui/theme-provider.tsx`)
+  - [x] 1.2 Create ThemeProvider component (`components/ui/theme-provider.tsx`)
     - Export `Theme` type (`'light' | 'dark'`)
     - Export `ThemeContext` with `theme` and `toggleTheme`
     - Manage theme state with useState (default: `'light'`)
     - useEffect to read localStorage on mount
     - useEffect to apply `.dark` class to `document.documentElement` and persist to localStorage
-  - [ ] 1.3 Create useTheme hook (`lib/hooks/use-theme.ts`)
+  - [x] 1.3 Create useTheme hook (`lib/hooks/use-theme.ts`)
     - Consume ThemeContext
     - Throw descriptive error if used outside ThemeProvider
-  - [ ] 1.4 Ensure tests pass
+  - [x] 1.4 Ensure tests pass
     - Run ONLY tests from 1.1
 
 **Acceptance Criteria:**
@@ -44,17 +44,17 @@ Primary Stack: Next.js + React (Frontend-only)
 
 **Dependencies:** Task Group 1
 
-- [ ] 2.0 Complete theme toggle component
-  - [ ] 2.1 Write 2 focused tests for ThemeToggle
+- [x] 2.0 Complete theme toggle component
+  - [x] 2.1 Write 2 focused tests for ThemeToggle
     - Test renders Moon icon in light mode
     - Test renders Sun icon in dark mode
-  - [ ] 2.2 Create ThemeToggle component (`components/ui/theme-toggle.tsx`)
+  - [x] 2.2 Create ThemeToggle component (`components/ui/theme-toggle.tsx`)
     - Import Button with `variant="ghost"` and `size="icon-sm"`
     - Import Sun and Moon icons from lucide-react
     - Use useTheme hook to get theme and toggleTheme
     - Render Moon when light, Sun when dark
     - Add descriptive `aria-label` that changes based on theme
-  - [ ] 2.3 Ensure tests pass
+  - [x] 2.3 Ensure tests pass
     - Run ONLY tests from 2.1
 
 **Acceptance Criteria:**
@@ -69,18 +69,18 @@ Primary Stack: Next.js + React (Frontend-only)
 
 **Dependencies:** Task Group 1, Task Group 2
 
-- [ ] 3.0 Complete layout integration
-  - [ ] 3.1 Write 2 focused tests for layout integration
+- [x] 3.0 Complete layout integration
+  - [x] 3.1 Write 2 focused tests for layout integration
     - Test ThemeToggle appears in navigation
     - Test theme toggle works end-to-end (click toggles theme)
-  - [ ] 3.2 Modify layout.tsx for theme support
+  - [x] 3.2 Modify layout.tsx for theme support
     - Add `suppressHydrationWarning` to `<html>` element
     - Add inline script in `<head>` to prevent flash (reads localStorage, applies `.dark` class)
     - Wrap body contents with ThemeProvider
-  - [ ] 3.3 Add ThemeToggle to NavBar
+  - [x] 3.3 Add ThemeToggle to NavBar
     - Position after navigation links (right side of header)
     - Maintain consistent spacing with existing nav items
-  - [ ] 3.4 Ensure tests pass
+  - [x] 3.4 Ensure tests pass
     - Run ONLY tests from 3.1
 
 **Acceptance Criteria:**
@@ -95,14 +95,14 @@ Primary Stack: Next.js + React (Frontend-only)
 
 **Dependencies:** Task Groups 1-3
 
-- [ ] 4.0 Review and verify feature completeness
-  - [ ] 4.1 Review tests from groups 1-3 (7 tests)
-  - [ ] 4.2 Manual verification checklist
+- [x] 4.0 Review and verify feature completeness
+  - [x] 4.1 Review tests from groups 1-3 (7 tests)
+  - [x] 4.2 Manual verification checklist
     - Toggle switches theme instantly
     - Preference persists after page refresh
     - All pages render correctly in dark mode
     - All pages render correctly in light mode
-  - [ ] 4.3 Run all dark mode tests
+  - [x] 4.3 Run all dark mode tests
 
 **Acceptance Criteria:**
 
