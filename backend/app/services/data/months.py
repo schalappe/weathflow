@@ -232,6 +232,77 @@ def get_months_history(month_repo: MonthRepository, limit: int) -> list[Month]:
         raise MonthQueryError(str(error)) from error
 
 
+def get_months_history_with_transactions(month_repo: MonthRepository, limit: int) -> list[Month]:
+    """
+    Retrieve months with transactions eager-loaded for advice generation.
+
+    Uses selectinload to fetch all transactions in a single additional query,
+    avoiding N+1 queries when accessing month.transactions.
+
+    Parameters
+    ----------
+    month_repo : MonthRepository
+        Repository for month data access.
+    limit : int
+        Maximum number of months to return (1-24).
+
+    Returns
+    -------
+    list[Month]
+        List of Month records with transactions loaded, ordered chronologically.
+
+    Raises
+    ------
+    MonthQueryError
+        If database query fails.
+    """
+    try:
+        result = month_repo.get_recent_with_transactions(limit)
+        logger.info("Retrieved {} months with transactions for advice", len(result))
+        return result
+    except SQLAlchemyError as error:
+        logger.error("Database error retrieving months with transactions: {}", str(error))
+        raise MonthQueryError(str(error)) from error
+
+
+def get_month_with_transactions(month_repo: MonthRepository, year: int, month: int) -> Month | None:
+    """
+    Retrieve a single month with transactions eager-loaded.
+
+    Uses selectinload to fetch all transactions in a single additional query,
+    avoiding N+1 queries when accessing month.transactions.
+
+    Parameters
+    ----------
+    month_repo : MonthRepository
+        Repository for month data access.
+    year : int
+        Year (e.g., 2025).
+    month : int
+        Month number (1-12).
+
+    Returns
+    -------
+    Month | None
+        Month record with transactions loaded, or None if not found.
+
+    Raises
+    ------
+    MonthQueryError
+        If database query fails.
+    """
+    try:
+        result = month_repo.get_by_year_month_with_transactions(year, month)
+        if result:
+            logger.info("Found month with transactions: {}-{:02d} (id={})", year, month, result.id)
+        else:
+            logger.info("Month not found: {}-{:02d}", year, month)
+        return result
+    except SQLAlchemyError as error:
+        logger.error("Database error retrieving month {}-{:02d} with transactions: {}", year, month, str(error))
+        raise MonthQueryError(str(error)) from error
+
+
 def _calculate_score_trend(months: list[Month]) -> ScoreTrendLiteral:
     """
     Calculate score trend comparing recent vs previous periods.

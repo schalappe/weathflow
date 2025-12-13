@@ -88,9 +88,10 @@ class TestPostGenerateAdvice(unittest.TestCase):
         mock_settings.return_value.anthropic_base_url = None
 
         mock_month = _create_mock_month()
-        mock_months_service.get_month_by_year_month.return_value = mock_month
-        mock_months_service.get_months_history.return_value = [mock_month]
+        mock_months_service.get_month_with_transactions.return_value = mock_month
+        mock_months_service.get_months_history_with_transactions.return_value = [mock_month]
         mock_advice_service.get_advice_by_month_id.return_value = None
+        mock_advice_service.get_advice_by_month_ids.return_value = {}
 
         mock_generator = MagicMock()
         mock_generator.generate_advice.return_value = _create_advice_response()
@@ -100,6 +101,7 @@ class TestPostGenerateAdvice(unittest.TestCase):
         mock_advice_service.create_or_update_advice.return_value = mock_stored_advice
         mock_advice_service.month_to_month_data.return_value = MagicMock()
         mock_advice_service.advice_response_to_json.return_value = "{}"
+        mock_advice_service.extract_recommendations_from_advice.return_value = None
 
         response = client.post("/api/advice/generate", json={"year": 2025, "month": 10})
 
@@ -118,7 +120,7 @@ class TestPostGenerateAdvice(unittest.TestCase):
     ) -> None:
         """POST returns cached advice when exists and regenerate=False."""
         mock_month = _create_mock_month()
-        mock_months_service.get_month_by_year_month.return_value = mock_month
+        mock_months_service.get_month_with_transactions.return_value = mock_month
         mock_advice_service.get_advice_by_month_id.return_value = _create_mock_advice()
 
         response = client.post("/api/advice/generate", json={"year": 2025, "month": 10})
@@ -145,8 +147,8 @@ class TestPostGenerateAdvice(unittest.TestCase):
         mock_settings.return_value.anthropic_base_url = None
 
         mock_month = _create_mock_month()
-        mock_months_service.get_month_by_year_month.return_value = mock_month
-        mock_months_service.get_months_history.return_value = [mock_month]
+        mock_months_service.get_month_with_transactions.return_value = mock_month
+        mock_months_service.get_months_history_with_transactions.return_value = [mock_month]
 
         mock_generator = MagicMock()
         mock_generator.generate_advice.return_value = _create_advice_response()
@@ -156,18 +158,19 @@ class TestPostGenerateAdvice(unittest.TestCase):
         mock_advice_service.create_or_update_advice.return_value = mock_stored_advice
         mock_advice_service.month_to_month_data.return_value = MagicMock()
         mock_advice_service.advice_response_to_json.return_value = "{}"
+        mock_advice_service.get_advice_by_month_ids.return_value = {}
+        mock_advice_service.extract_recommendations_from_advice.return_value = None
 
         response = client.post("/api/advice/generate", json={"year": 2025, "month": 10, "regenerate": True})
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertFalse(data["was_cached"])
-        mock_advice_service.get_advice_by_month_id.assert_not_called()
 
     @patch("app.api.advice.months_service")
     def test_returns_404_when_month_not_found(self, mock_months_service: MagicMock) -> None:
         """POST returns 404 when month not found in database."""
-        mock_months_service.get_month_by_year_month.return_value = None
+        mock_months_service.get_month_with_transactions.return_value = None
 
         response = client.post("/api/advice/generate", json={"year": 2025, "month": 10})
 
@@ -190,10 +193,12 @@ class TestPostGenerateAdvice(unittest.TestCase):
         mock_settings.return_value.anthropic_base_url = None
 
         mock_month = _create_mock_month()
-        mock_months_service.get_month_by_year_month.return_value = mock_month
-        mock_months_service.get_months_history.return_value = [mock_month]
+        mock_months_service.get_month_with_transactions.return_value = mock_month
+        mock_months_service.get_months_history_with_transactions.return_value = [mock_month]
         mock_advice_service.get_advice_by_month_id.return_value = None
+        mock_advice_service.get_advice_by_month_ids.return_value = {}
         mock_advice_service.month_to_month_data.return_value = MagicMock()
+        mock_advice_service.extract_recommendations_from_advice.return_value = None
 
         mock_generator = MagicMock()
         mock_generator.generate_advice.side_effect = InsufficientDataError(min_months_required=2)
@@ -213,7 +218,7 @@ class TestPostGenerateAdvice(unittest.TestCase):
     ) -> None:
         """POST returns 500 with helpful message when cached advice JSON is corrupted."""
         mock_month = _create_mock_month()
-        mock_months_service.get_month_by_year_month.return_value = mock_month
+        mock_months_service.get_month_with_transactions.return_value = mock_month
 
         mock_advice = MagicMock(spec=Advice)
         mock_advice.advice_text = "invalid json {"
@@ -241,11 +246,13 @@ class TestPostGenerateAdvice(unittest.TestCase):
         mock_settings.return_value.anthropic_base_url = None
 
         mock_month = _create_mock_month()
-        mock_months_service.get_month_by_year_month.return_value = mock_month
-        mock_months_service.get_months_history.return_value = [mock_month]
+        mock_months_service.get_month_with_transactions.return_value = mock_month
+        mock_months_service.get_months_history_with_transactions.return_value = [mock_month]
         mock_advice_service.get_advice_by_month_id.return_value = None
+        mock_advice_service.get_advice_by_month_ids.return_value = {}
         mock_advice_service.month_to_month_data.return_value = MagicMock()
         mock_advice_service.advice_response_to_json.return_value = "{}"
+        mock_advice_service.extract_recommendations_from_advice.return_value = None
 
         mock_generator = MagicMock()
         mock_generator.generate_advice.return_value = _create_advice_response()

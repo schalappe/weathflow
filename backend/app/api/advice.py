@@ -82,7 +82,8 @@ def generate_advice(
         If AI service or database unavailable (AdviceQueryError, MonthDataError).
     """
     try:
-        month_record = months_service.get_month_by_year_month(month_repo, request.year, request.month)
+        # ##>: Use eager loading to fetch month with transactions in single query.
+        month_record = months_service.get_month_with_transactions(month_repo, request.year, request.month)
         if month_record is None:
             raise HTTPException(
                 status_code=404,
@@ -100,15 +101,35 @@ def generate_advice(
                     was_cached=True,
                 )
 
-        # ##>: Fetch history and prepare data for advice generation.
-        history_months = months_service.get_months_history(month_repo, limit=3)
+        # ##>: Fetch history with transactions eager-loaded to avoid N+1 queries.
+        history_months = months_service.get_months_history_with_transactions(month_repo, limit=3)
 
-        current_data = advice_service.month_to_month_data(month_record)
-        history_data = [
-            advice_service.month_to_month_data(m)
-            for m in history_months
-            if not (m.year == request.year and m.month == request.month)
-        ]
+        # ##>: Filter out current month from history and collect IDs for batch advice fetch.
+        filtered_history = [m for m in history_months if not (m.year == request.year and m.month == request.month)]
+        all_month_ids = [m.id for m in filtered_history] + [month_record.id]
+
+        # ##>: Batch fetch all advice records in single query to eliminate N+1.
+        advice_by_month_id = advice_service.get_advice_by_month_ids(advice_repo, all_month_ids)
+
+        # ##>: Build history data with past advice for each month.
+        history_data = []
+        for m in filtered_history:
+            past_advice_record = advice_by_month_id.get(m.id)
+            past_recommendations = (
+                advice_service.extract_recommendations_from_advice(past_advice_record.advice_text)
+                if past_advice_record
+                else None
+            )
+            history_data.append(advice_service.month_to_month_data(m, past_recommendations))
+
+        # ##>: Current month also gets its past advice (if regenerating).
+        current_past_advice = advice_by_month_id.get(month_record.id)
+        current_recommendations = (
+            advice_service.extract_recommendations_from_advice(current_past_advice.advice_text)
+            if current_past_advice
+            else None
+        )
+        current_data = advice_service.month_to_month_data(month_record, current_recommendations)
 
         advice_response = generator.generate_advice(current_data, history_data)
 

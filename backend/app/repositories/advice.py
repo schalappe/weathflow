@@ -42,6 +42,27 @@ class AdviceRepository:
         """
         return self._db.query(Advice).filter(Advice.month_id == month_id).first()
 
+    def get_by_month_ids(self, month_ids: list[int]) -> dict[int, Advice]:
+        """
+        Get advice for multiple months in a single query.
+
+        Eliminates N+1 queries when fetching advice for multiple months.
+
+        Parameters
+        ----------
+        month_ids : list[int]
+            List of month IDs to look up.
+
+        Returns
+        -------
+        dict[int, Advice]
+            Mapping of month_id to Advice record. Missing months are not included.
+        """
+        if not month_ids:
+            return {}
+        results = self._db.query(Advice).filter(Advice.month_id.in_(month_ids)).all()
+        return {advice.month_id: advice for advice in results}
+
     def upsert(self, month_id: int, advice_text: str) -> Advice:
         """
         Create or update advice for a month.

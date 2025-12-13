@@ -59,7 +59,6 @@ class AdviceGenerator:
     """
 
     MIN_MONTHS_REQUIRED: ClassVar[int] = 2
-    MAX_TOKENS: ClassVar[int] = 1024
     MAX_RETRIES: ClassVar[int] = 3
 
     def __init__(
@@ -186,6 +185,16 @@ class AdviceGenerator:
             if month.category_breakdown:
                 month_dict["category_breakdown"] = month.category_breakdown
 
+            # ##>: Include all transactions for pattern analysis and personalized recommendations.
+            if month.transactions:
+                month_dict["transactions"] = {
+                    category: [tx.model_dump() for tx in txs] for category, txs in month.transactions.items()
+                }
+
+            # ##>: Include past advice to track if recommendations were followed.
+            if month.past_advice:
+                month_dict["past_advice"] = month.past_advice
+
             months_data.append(month_dict)
 
         # ##>: Embed system instructions in user message for Claude Pro compatibility.
@@ -193,6 +202,7 @@ class AdviceGenerator:
             f"{ADVICE_SYSTEM_PROMPT}\n\n"
             "---\n\n"
             "Analyse les données financières suivantes et génère des conseils personnalisés. "
+            "Analyse TOUTES les transactions pour identifier des patterns et recommandations SPÉCIFIQUES.\n"
             "Retourne UNIQUEMENT un objet JSON, sans markdown ni texte additionnel.\n\n"
             f"{json.dumps(months_data, ensure_ascii=False, indent=2)}"
         )
@@ -221,10 +231,10 @@ class AdviceGenerator:
             If response is empty.
         """
         try:
+            # ##>: max_tokens is required by Anthropic API. Set high to let model respond fully.
             response = self._client.messages.create(
                 model=self._model,
-                max_tokens=self.MAX_TOKENS,
-                system=ADVICE_SYSTEM_PROMPT,
+                max_tokens=4096,
                 messages=[{"role": "user", "content": user_prompt}],
             )
         except anthropic.AuthenticationError as e:

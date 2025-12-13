@@ -5,6 +5,28 @@ from pydantic import Field
 from app.services.models import FrozenModel
 
 
+class TransactionSample(FrozenModel):
+    """
+    A sample transaction for context in advice generation.
+
+    Provides Claude with specific transaction details to generate
+    actionable, personalized recommendations.
+
+    Attributes
+    ----------
+    description : str
+        Merchant or transaction description (e.g., "Netflix", "Uber Eats").
+    amount : float
+        Transaction amount (absolute value).
+    subcategory : str | None
+        Money Map subcategory if assigned.
+    """
+
+    description: str
+    amount: float
+    subcategory: str | None = None
+
+
 class MonthData(FrozenModel):
     """
     Monthly financial data to be analyzed for advice generation.
@@ -38,6 +60,11 @@ class MonthData(FrozenModel):
         Human-readable score label.
     category_breakdown : dict[str, float] | None
         Optional breakdown by subcategory (e.g., {'Subscriptions': 85.0}).
+    transactions : dict[str, list[TransactionSample]] | None
+        All transactions per category for pattern analysis.
+        Keys are category types ('CORE', 'CHOICE', 'COMPOUND').
+    past_advice : list[str] | None
+        Previous recommendations given for this month to track follow-through.
     """
 
     year: int = Field(ge=2000, le=2100)
@@ -52,6 +79,8 @@ class MonthData(FrozenModel):
     score: int = Field(ge=0, le=3)
     score_label: str | None = None
     category_breakdown: dict[str, float] | None = None
+    transactions: dict[str, list[TransactionSample]] | None = None
+    past_advice: list[str] | None = None
 
 
 class ProblemArea(FrozenModel):
