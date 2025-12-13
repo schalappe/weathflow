@@ -1,11 +1,10 @@
 """FastAPI router for CSV upload and categorization endpoints."""
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy.orm import Session
+# ruff: noqa: B008
 
-from app.db.database import get_db
-from app.repositories.month import MonthRepository
-from app.repositories.transaction import TransactionRepository
+from fastapi import File, HTTPException, Query, UploadFile
+
+from app.api.deps import MonthRepo, TransactionRepo, UploadSvc, create_router
 from app.responses.upload import CategorizeResponse, ImportMode, UploadResponse
 from app.services.exceptions import (
     APIConnectionError,
@@ -17,22 +16,14 @@ from app.services.exceptions import (
     NoTransactionsFoundError,
     ScoreCalculationError,
 )
-from app.services.upload.service import UploadService
 
-# ruff: noqa: B008
-
-router = APIRouter(prefix="/api", tags=["upload"])
-
-
-def _get_upload_service() -> UploadService:
-    """Provide UploadService instance for dependency injection."""
-    return UploadService()
+router = create_router("upload", prefix="/api")
 
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_file(
+    service: UploadSvc,
     file: UploadFile = File(...),
-    service: UploadService = Depends(_get_upload_service),
 ) -> UploadResponse:
     """
     Upload a Bankin' CSV file and return a preview of detected months.
@@ -62,11 +53,12 @@ async def upload_file(
 
 @router.post("/categorize", response_model=CategorizeResponse)
 async def categorize_file(
+    month_repo: MonthRepo,
+    transaction_repo: TransactionRepo,
+    service: UploadSvc,
     file: UploadFile = File(...),
     months_to_process: str = Query(..., description="Comma-separated months (YYYY-MM) or 'all'"),
     import_mode: ImportMode = Query(..., description="Import mode: 'replace' or 'merge'"),
-    db: Session = Depends(get_db),
-    service: UploadService = Depends(_get_upload_service),
 ) -> CategorizeResponse:
     """
     Categorize transactions from CSV and persist to database.
@@ -105,10 +97,6 @@ async def categorize_file(
         raise HTTPException(status_code=400, detail="No valid months provided")
 
     try:
-        # ##>: Create repositories and pass to service.
-        month_repo = MonthRepository(db)
-        transaction_repo = TransactionRepository(db)
-
         content = await file.read()
         result = service.process_categorization(
             file_content=content,

@@ -72,10 +72,10 @@ def _create_advice_response() -> AdviceResponse:
 class TestPostGenerateAdvice(unittest.TestCase):
     """Tests for POST /api/advice/generate endpoint."""
 
-    @patch("app.routers.advice.advice_service")
-    @patch("app.routers.advice.months_service")
-    @patch("app.routers.advice.AdviceGenerator")
-    @patch("app.routers.advice.get_settings")
+    @patch("app.api.advice.advice_service")
+    @patch("app.api.advice.months_service")
+    @patch("app.api.deps.AdviceGenerator")
+    @patch("app.api.deps.get_settings")
     def test_generates_new_advice_when_none_exists(
         self,
         mock_settings: MagicMock,
@@ -109,8 +109,8 @@ class TestPostGenerateAdvice(unittest.TestCase):
         self.assertFalse(data["was_cached"])
         self.assertIn("advice", data)
 
-    @patch("app.routers.advice.advice_service")
-    @patch("app.routers.advice.months_service")
+    @patch("app.api.advice.advice_service")
+    @patch("app.api.advice.months_service")
     def test_returns_cached_advice_when_exists_and_not_regenerate(
         self,
         mock_months_service: MagicMock,
@@ -129,10 +129,10 @@ class TestPostGenerateAdvice(unittest.TestCase):
         self.assertTrue(data["was_cached"])
         self.assertEqual(data["advice"]["analysis"], "Test analysis")
 
-    @patch("app.routers.advice.advice_service")
-    @patch("app.routers.advice.months_service")
-    @patch("app.routers.advice.AdviceGenerator")
-    @patch("app.routers.advice.get_settings")
+    @patch("app.api.advice.advice_service")
+    @patch("app.api.advice.months_service")
+    @patch("app.api.deps.AdviceGenerator")
+    @patch("app.api.deps.get_settings")
     def test_regenerates_advice_when_regenerate_true(
         self,
         mock_settings: MagicMock,
@@ -164,7 +164,7 @@ class TestPostGenerateAdvice(unittest.TestCase):
         self.assertFalse(data["was_cached"])
         mock_advice_service.get_advice_by_month_id.assert_not_called()
 
-    @patch("app.routers.advice.months_service")
+    @patch("app.api.advice.months_service")
     def test_returns_404_when_month_not_found(self, mock_months_service: MagicMock) -> None:
         """POST returns 404 when month not found in database."""
         mock_months_service.get_month_by_year_month.return_value = None
@@ -174,10 +174,10 @@ class TestPostGenerateAdvice(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertIn("No data found", response.json()["detail"])
 
-    @patch("app.routers.advice.advice_service")
-    @patch("app.routers.advice.months_service")
-    @patch("app.routers.advice.AdviceGenerator")
-    @patch("app.routers.advice.get_settings")
+    @patch("app.api.advice.advice_service")
+    @patch("app.api.advice.months_service")
+    @patch("app.api.deps.AdviceGenerator")
+    @patch("app.api.deps.get_settings")
     def test_returns_400_when_insufficient_data(
         self,
         mock_settings: MagicMock,
@@ -204,8 +204,8 @@ class TestPostGenerateAdvice(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("Not enough historical data", response.json()["detail"])
 
-    @patch("app.routers.advice.advice_service")
-    @patch("app.routers.advice.months_service")
+    @patch("app.api.advice.advice_service")
+    @patch("app.api.advice.months_service")
     def test_returns_500_when_cached_advice_is_corrupted(
         self,
         mock_months_service: MagicMock,
@@ -225,10 +225,10 @@ class TestPostGenerateAdvice(unittest.TestCase):
         self.assertIn("corrupted", response.json()["detail"].lower())
         self.assertIn("regenerate", response.json()["detail"].lower())
 
-    @patch("app.routers.advice.advice_service")
-    @patch("app.routers.advice.months_service")
-    @patch("app.routers.advice.AdviceGenerator")
-    @patch("app.routers.advice.get_settings")
+    @patch("app.api.advice.advice_service")
+    @patch("app.api.advice.months_service")
+    @patch("app.api.deps.AdviceGenerator")
+    @patch("app.api.deps.get_settings")
     def test_returns_503_when_database_error_during_storage(
         self,
         mock_settings: MagicMock,
@@ -262,8 +262,8 @@ class TestPostGenerateAdvice(unittest.TestCase):
 class TestGetAdvice(unittest.TestCase):
     """Tests for GET /api/advice/{year}/{month} endpoint."""
 
-    @patch("app.routers.advice.advice_service")
-    @patch("app.routers.advice.months_service")
+    @patch("app.api.advice.advice_service")
+    @patch("app.api.advice.months_service")
     def test_returns_existing_advice_with_exists_true(
         self,
         mock_months_service: MagicMock,
@@ -282,8 +282,8 @@ class TestGetAdvice(unittest.TestCase):
         self.assertTrue(data["exists"])
         self.assertEqual(data["advice"]["analysis"], "Test analysis")
 
-    @patch("app.routers.advice.advice_service")
-    @patch("app.routers.advice.months_service")
+    @patch("app.api.advice.advice_service")
+    @patch("app.api.advice.months_service")
     def test_returns_exists_false_when_no_advice(
         self,
         mock_months_service: MagicMock,
@@ -302,7 +302,7 @@ class TestGetAdvice(unittest.TestCase):
         self.assertFalse(data["exists"])
         self.assertIsNone(data["advice"])
 
-    @patch("app.routers.advice.months_service")
+    @patch("app.api.advice.months_service")
     def test_returns_404_when_month_not_found(self, mock_months_service: MagicMock) -> None:
         """GET returns 404 when month not found in database."""
         mock_months_service.get_month_by_year_month.return_value = None
@@ -312,8 +312,8 @@ class TestGetAdvice(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertIn("No data found", response.json()["detail"])
 
-    @patch("app.routers.advice.advice_service")
-    @patch("app.routers.advice.months_service")
+    @patch("app.api.advice.advice_service")
+    @patch("app.api.advice.months_service")
     def test_returns_500_when_stored_advice_is_corrupted(
         self,
         mock_months_service: MagicMock,

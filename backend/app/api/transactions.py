@@ -2,14 +2,11 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import HTTPException, Path
 from sqlalchemy import func
-from sqlalchemy.orm import Session
 
-from app.db.database import get_db
+from app.api.deps import DbSession, MonthRepo, TransactionRepo, create_router
 from app.db.models.transaction import Transaction
-from app.repositories.month import MonthRepository
-from app.repositories.transaction import TransactionRepository
 from app.responses.months import MonthSummary, TransactionResponse
 from app.responses.transactions import UpdateTransactionRequest, UpdateTransactionResponse
 from app.services.data import transactions as transactions_service
@@ -20,17 +17,17 @@ from app.services.exceptions import (
     TransactionNotFoundError,
 )
 
-# ruff: noqa: B008
-
-router = APIRouter(prefix="/api/transactions", tags=["transactions"])
+router = create_router("transactions")
 logger = logging.getLogger(__name__)
 
 
 @router.patch("/{transaction_id}", response_model=UpdateTransactionResponse)
 def update_transaction(
     request: UpdateTransactionRequest,
+    db: DbSession,
+    month_repo: MonthRepo,
+    transaction_repo: TransactionRepo,
     transaction_id: int = Path(..., ge=1, description="Transaction ID"),
-    db: Session = Depends(get_db),
 ) -> UpdateTransactionResponse:
     """
     Update a transaction's Money Map category and subcategory.
@@ -60,10 +57,6 @@ def update_transaction(
         If an unexpected error occurs.
     """
     try:
-        # ##>: Create repositories and delegate to service.
-        month_repo = MonthRepository(db)
-        transaction_repo = TransactionRepository(db)
-
         transaction, month = transactions_service.update_transaction_category(
             month_repo=month_repo,
             transaction_repo=transaction_repo,

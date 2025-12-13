@@ -2,13 +2,9 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlalchemy.orm import Session
+from fastapi import HTTPException, Path
 
-from app.config.settings import get_settings
-from app.db.database import get_db
-from app.repositories.advice import AdviceRepository
-from app.repositories.month import MonthRepository
+from app.api.deps import AdviceGen, AdviceRepo, MonthRepo, create_router
 from app.responses.advice import (
     AdviceData,
     GenerateAdviceRequest,
@@ -16,7 +12,6 @@ from app.responses.advice import (
     GetAdviceResponse,
 )
 from app.services.advice import service as advice_service
-from app.services.advice.generator import AdviceGenerator
 from app.services.data import months as months_service
 from app.services.exceptions import (
     AdviceAPIError,
@@ -27,9 +22,7 @@ from app.services.exceptions import (
     MonthDataError,
 )
 
-# ruff: noqa: B008
-
-router = APIRouter(prefix="/api", tags=["advice"])
+router = create_router("advice")
 logger = logging.getLogger(__name__)
 
 
@@ -56,10 +49,12 @@ def _http_detail_for_advice_error(error: AdviceGenerationError) -> str:
     return "An error occurred while generating advice. Please try again."
 
 
-@router.post("/advice/generate", response_model=GenerateAdviceResponse)
+@router.post("/generate", response_model=GenerateAdviceResponse)
 def generate_advice(
     request: GenerateAdviceRequest,
-    db: Session = Depends(get_db),
+    month_repo: MonthRepo,
+    advice_repo: AdviceRepo,
+    generator: AdviceGen,
 ) -> GenerateAdviceResponse:
     """
     Generate or retrieve cached advice for a month.
@@ -89,9 +84,6 @@ def generate_advice(
         If AI service or database unavailable (AdviceQueryError, MonthDataError).
     """
     try:
-        month_repo = MonthRepository(db)
-        advice_repo = AdviceRepository(db)
-
         month_record = months_service.get_month_by_year_month(month_repo, request.year, request.month)
         if month_record is None:
             raise HTTPException(
@@ -120,11 +112,6 @@ def generate_advice(
             if not (m.year == request.year and m.month == request.month)
         ]
 
-        settings = get_settings()
-        generator = AdviceGenerator(
-            api_key=settings.anthropic_api_key.get_secret_value(),
-            base_url=settings.anthropic_base_url,
-        )
         advice_response = generator.generate_advice(current_data, history_data)
 
         advice_json = advice_service.advice_response_to_json(advice_response)
@@ -161,11 +148,12 @@ def generate_advice(
         raise HTTPException(status_code=500, detail="An unexpected error occurred.") from error
 
 
-@router.get("/advice/{year}/{month}", response_model=GetAdviceResponse)
+@router.get("/{year}/{month}", response_model=GetAdviceResponse)
 def get_advice(
+    month_repo: MonthRepo,
+    advice_repo: AdviceRepo,
     year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
     month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
-    db: Session = Depends(get_db),
 ) -> GetAdviceResponse:
     """
     Retrieve stored advice for a specific month.
@@ -190,9 +178,6 @@ def get_advice(
         If database unavailable.
     """
     try:
-        month_repo = MonthRepository(db)
-        advice_repo = AdviceRepository(db)
-
         month_record = months_service.get_month_by_year_month(month_repo, year, month)
         if month_record is None:
             raise HTTPException(

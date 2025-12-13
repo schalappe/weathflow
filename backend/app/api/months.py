@@ -1,18 +1,17 @@
 """FastAPI router for Monthly Data API endpoints."""
 
+# ruff: noqa: B008
+
 import io
 import logging
 from datetime import date
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import HTTPException, Path, Query
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
-from sqlalchemy.orm import Session
 
-from app.db.database import get_db
-from app.repositories.month import MonthRepository
-from app.repositories.transaction import TransactionRepository
+from app.api.deps import MonthRepo, TransactionRepo, create_router
 from app.responses.history import HistoryResponse, MonthHistory
 from app.responses.months import (
     MonthDetailResponse,
@@ -25,9 +24,7 @@ from app.services.data import export as export_service
 from app.services.data import months as months_service
 from app.services.exceptions import InvalidCategoryTypeError, MonthDataError, MonthNotFoundError
 
-# ruff: noqa: B008
-
-router = APIRouter(prefix="/api", tags=["months"])
+router = create_router("months")
 logger = logging.getLogger(__name__)
 
 
@@ -51,8 +48,8 @@ def _http_detail_for_db_error(error: MonthDataError) -> str:
     return "An error occurred while retrieving data. Please try again or contact support."
 
 
-@router.get("/months", response_model=MonthsListResponse)
-def list_months(db: Session = Depends(get_db)) -> MonthsListResponse:
+@router.get("/", response_model=MonthsListResponse)
+def list_months(month_repo: MonthRepo) -> MonthsListResponse:
     """
     List all months with summary data.
 
@@ -70,8 +67,6 @@ def list_months(db: Session = Depends(get_db)) -> MonthsListResponse:
         If database is temporarily unavailable.
     """
     try:
-        # ##>: Create repository and delegate to service.
-        month_repo = MonthRepository(db)
         months_with_counts = months_service.get_all_months_with_counts(month_repo)
         month_summaries = [MonthSummary.from_model(m, tx_count) for m, tx_count in months_with_counts]
 
@@ -84,10 +79,10 @@ def list_months(db: Session = Depends(get_db)) -> MonthsListResponse:
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
-@router.get("/months/history", response_model=HistoryResponse)
+@router.get("/history", response_model=HistoryResponse)
 def get_history(
+    month_repo: MonthRepo,
     months: int = Query(12, ge=1, le=24, description="Number of months to retrieve (1-24)"),
-    db: Session = Depends(get_db),
 ) -> HistoryResponse:
     """
     Get historical data for score trend analysis.
@@ -111,7 +106,6 @@ def get_history(
         If database is temporarily unavailable.
     """
     try:
-        month_repo = MonthRepository(db)
         month_records = months_service.get_months_history(month_repo, months)
 
         # ##>: Build response models with explicit error handling per record.
@@ -146,8 +140,10 @@ def get_history(
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
-@router.get("/months/{year}/{month}", response_model=MonthDetailResponse)
+@router.get("/{year}/{month}", response_model=MonthDetailResponse)
 def get_month_detail(
+    month_repo: MonthRepo,
+    transaction_repo: TransactionRepo,
     year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
     month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
     category: str | None = Query(None, description="Comma-separated category types (e.g., CORE,CHOICE)"),
@@ -156,7 +152,6 @@ def get_month_detail(
     end_date: date | None = Query(None, description="Filter transactions until this date"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=100, description="Items per page"),
-    db: Session = Depends(get_db),
 ) -> MonthDetailResponse:
     """
     Get detailed data for a specific month with filtered transactions.
@@ -202,9 +197,6 @@ def get_month_detail(
         )
 
     try:
-        month_repo = MonthRepository(db)
-        transaction_repo = TransactionRepository(db)
-
         month_record = months_service.get_month_by_year_month(month_repo, year, month)
 
         if month_record is None:
@@ -266,11 +258,12 @@ def get_month_detail(
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
-@router.get("/months/{year}/{month}/export/json")
+@router.get("/{year}/{month}/export/json")
 def export_month_json(
+    month_repo: MonthRepo,
+    transaction_repo: TransactionRepo,
     year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
     month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
-    db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """
     Export month data as JSON file.
@@ -297,9 +290,6 @@ def export_month_json(
         If database is temporarily unavailable.
     """
     try:
-        month_repo = MonthRepository(db)
-        transaction_repo = TransactionRepository(db)
-
         result = export_service.export_month_to_json(month_repo, transaction_repo, year, month)
         return StreamingResponse(
             io.BytesIO(result.content),
@@ -321,11 +311,12 @@ def export_month_json(
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
-@router.get("/months/{year}/{month}/export/csv")
+@router.get("/{year}/{month}/export/csv")
 def export_month_csv(
+    month_repo: MonthRepo,
+    transaction_repo: TransactionRepo,
     year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
     month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
-    db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """
     Export month transactions as CSV file.
@@ -352,9 +343,6 @@ def export_month_csv(
         If database is temporarily unavailable.
     """
     try:
-        month_repo = MonthRepository(db)
-        transaction_repo = TransactionRepository(db)
-
         result = export_service.export_month_to_csv(month_repo, transaction_repo, year, month)
         return StreamingResponse(
             io.BytesIO(result.content),

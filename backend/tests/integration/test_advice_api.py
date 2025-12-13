@@ -58,7 +58,7 @@ class TestGenerateThenRetrieveFlow:
     """Integration tests for full generate-then-retrieve workflow."""
 
     @patch.dict("os.environ", MOCK_API_KEY_ENV)
-    @patch("app.routers.advice.AdviceGenerator")
+    @patch("app.api.deps.AdviceGenerator")
     def test_full_generate_then_retrieve_flow(
         self,
         mock_generator_class: MagicMock,
@@ -90,7 +90,7 @@ class TestGenerateThenRetrieveFlow:
         assert get_data["advice"]["analysis"] == "Votre gestion financière montre des progrès."
 
     @patch.dict("os.environ", MOCK_API_KEY_ENV)
-    @patch("app.routers.advice.AdviceGenerator")
+    @patch("app.api.deps.AdviceGenerator")
     def test_advice_persisted_correctly_in_database(
         self,
         mock_generator_class: MagicMock,
@@ -120,7 +120,7 @@ class TestGenerateThenRetrieveFlow:
         assert stored_data["encouragement"] == "Continuez sur cette lancée!"
 
     @patch.dict("os.environ", MOCK_API_KEY_ENV)
-    @patch("app.routers.advice.AdviceGenerator")
+    @patch("app.api.deps.AdviceGenerator")
     def test_regeneration_replaces_existing_advice(
         self,
         mock_generator_class: MagicMock,
@@ -163,7 +163,7 @@ class TestErrorHandling:
     """Integration tests for error scenarios."""
 
     @patch.dict("os.environ", MOCK_API_KEY_ENV)
-    @patch("app.routers.advice.AdviceGenerator")
+    @patch("app.api.deps.AdviceGenerator")
     def test_returns_503_when_claude_api_unavailable(
         self,
         mock_generator_class: MagicMock,

@@ -19,7 +19,7 @@ client = TestClient(app)
 class TestUploadEndpoint:
     """Tests for POST /api/upload endpoint."""
 
-    @patch("app.routers.upload.UploadService")
+    @patch("app.api.deps.UploadService")
     def test_valid_csv_returns_200_with_summaries(self, mock_service_class: MagicMock) -> None:
         """Valid CSV upload returns 200 with month summaries."""
         mock_service = MagicMock()
@@ -55,7 +55,7 @@ class TestUploadEndpoint:
         assert len(data["months_detected"]) == 1
         assert data["months_detected"][0]["year"] == 2025
 
-    @patch("app.routers.upload.UploadService")
+    @patch("app.api.deps.UploadService")
     def test_invalid_csv_format_returns_400(self, mock_service_class: MagicMock) -> None:
         """Invalid CSV format returns 400."""
         mock_service = MagicMock()
@@ -70,7 +70,7 @@ class TestUploadEndpoint:
         assert response.status_code == 400
         assert "empty" in response.json()["detail"].lower()
 
-    @patch("app.routers.upload.UploadService")
+    @patch("app.api.deps.UploadService")
     def test_missing_columns_returns_400(self, mock_service_class: MagicMock) -> None:
         """Missing required columns returns 400."""
         mock_service = MagicMock()
@@ -89,8 +89,8 @@ class TestUploadEndpoint:
 class TestCategorizeEndpoint:
     """Tests for POST /api/categorize endpoint."""
 
-    @patch("app.routers.upload.UploadService")
-    @patch("app.routers.upload.get_db")
+    @patch("app.api.deps.UploadService")
+    @patch("app.db.database.get_db")
     def test_valid_request_returns_200_with_results(
         self, mock_get_db: MagicMock, mock_service_class: MagicMock
     ) -> None:
@@ -128,8 +128,8 @@ class TestCategorizeEndpoint:
         assert data["months_processed"][0]["score"] == 2
         assert data["total_api_calls"] == 1
 
-    @patch("app.routers.upload.UploadService")
-    @patch("app.routers.upload.get_db")
+    @patch("app.api.deps.UploadService")
+    @patch("app.db.database.get_db")
     def test_invalid_month_format_returns_400(self, mock_get_db: MagicMock, mock_service_class: MagicMock) -> None:
         """Invalid month format returns 400."""
         mock_db = MagicMock()
@@ -158,8 +158,8 @@ class TestCategorizeEndpoint:
 
         assert response.status_code == 422
 
-    @patch("app.routers.upload.UploadService")
-    @patch("app.routers.upload.get_db")
+    @patch("app.api.deps.UploadService")
+    @patch("app.db.database.get_db")
     def test_claude_api_error_returns_502(self, mock_get_db: MagicMock, mock_service_class: MagicMock) -> None:
         """Claude API error returns 502 with actual error message."""
         mock_db = MagicMock()
@@ -179,8 +179,8 @@ class TestCategorizeEndpoint:
         # ##>: Generic CategorizationError now returns the actual error message.
         assert "API failed" in response.json()["detail"]
 
-    @patch("app.routers.upload.UploadService")
-    @patch("app.routers.upload.get_db")
+    @patch("app.api.deps.UploadService")
+    @patch("app.db.database.get_db")
     def test_all_months_selection(self, mock_get_db: MagicMock, mock_service_class: MagicMock) -> None:
         """months_to_process='all' processes all months."""
         mock_db = MagicMock()
@@ -223,8 +223,8 @@ class TestCategorizeEndpoint:
         call_args = mock_service.process_categorization.call_args
         assert call_args.kwargs["months_to_process"] == ["all"]
 
-    @patch("app.routers.upload.UploadService")
-    @patch("app.routers.upload.get_db")
+    @patch("app.api.deps.UploadService")
+    @patch("app.db.database.get_db")
     def test_comma_separated_months(self, mock_get_db: MagicMock, mock_service_class: MagicMock) -> None:
         """Comma-separated months are parsed correctly."""
         mock_db = MagicMock()
