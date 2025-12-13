@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db.models.transaction import Transaction
+from app.repositories.month_repository import MonthRepository
+from app.repositories.transaction_repository import TransactionRepository
 from app.responses.months import MonthSummary, TransactionResponse
 from app.responses.transactions import UpdateTransactionRequest, UpdateTransactionResponse
 from app.services import transactions as transactions_service
@@ -58,8 +60,13 @@ def update_transaction(
         If an unexpected error occurs.
     """
     try:
+        # ##>: Create repositories and delegate to service.
+        month_repo = MonthRepository(db)
+        transaction_repo = TransactionRepository(db)
+
         transaction, month = transactions_service.update_transaction_category(
-            db=db,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
             transaction_id=transaction_id,
             money_map_type=request.money_map_type,
             money_map_subcategory=request.money_map_subcategory,

@@ -4,11 +4,11 @@ import logging
 import re
 from typing import Any, Literal
 
-from sqlalchemy.orm import Session
-
 from app.config.settings import get_settings
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
+from app.repositories.month_repository import MonthRepository
+from app.repositories.transaction_repository import TransactionRepository
 from app.services.calculator import calculate_and_update_month
 from app.services.categorizer import TransactionCategorizer
 from app.services.csv_parser import BankinCSVParser
@@ -33,7 +33,7 @@ class UploadService:
     --------
     >>> service = UploadService()
     >>> preview = service.get_upload_preview(csv_bytes)
-    >>> result = service.process_categorization(csv_bytes, ["2025-01"], "replace", db)
+    >>> result = service.process_categorization(csv_bytes, ["2025-01"], "replace", month_repo, tx_repo)
     """
 
     def __init__(self) -> None:
@@ -118,7 +118,8 @@ class UploadService:
         file_content: bytes,
         months_to_process: list[str],
         import_mode: Literal["replace", "merge"],
-        db: Session,
+        month_repo: MonthRepository,
+        transaction_repo: TransactionRepository,
     ) -> dict[str, Any]:
         """
         Parse, categorize, and persist transactions for selected months.
@@ -132,8 +133,10 @@ class UploadService:
         import_mode : Literal["replace", "merge"]
             "replace" deletes existing month and all its transactions, creating fresh.
             "merge" preserves existing month and transactions, only adding new ones.
-        db : Session
-            Database session for persistence.
+        month_repo : MonthRepository
+            Repository for month data access.
+        transaction_repo : TransactionRepository
+            Repository for transaction data access.
 
         Returns
         -------
@@ -179,7 +182,8 @@ class UploadService:
 
             month_data = result.months[month_key]
             month_result, api_calls = self._process_single_month(
-                db=db,
+                month_repo=month_repo,
+                transaction_repo=transaction_repo,
                 month_data=month_data,
                 import_mode=import_mode,
             )
@@ -195,7 +199,8 @@ class UploadService:
 
     def _process_single_month(
         self,
-        db: Session,
+        month_repo: MonthRepository,
+        transaction_repo: TransactionRepository,
         month_data: MonthData,
         import_mode: Literal["replace", "merge"],
     ) -> tuple[dict[str, Any], int]:
@@ -211,10 +216,10 @@ class UploadService:
 
         # ##>: Handle import mode and get month record.
         if import_mode == "replace":
-            month_record = self._handle_replace_mode(db, year, month)
+            month_record = self._handle_replace_mode(month_repo, year, month)
             skip_keys: set[str] = set()
         else:
-            month_record, skip_keys = self._handle_merge_mode(db, year, month)
+            month_record, skip_keys = self._handle_merge_mode(month_repo, transaction_repo, year, month)
 
         # ##>: Transform and categorize transactions. IDs start at 1 for each month.
         inputs = self._transform_to_inputs(month_data.transactions, start_id=1)
@@ -223,7 +228,7 @@ class UploadService:
 
         # ##>: Persist transactions and calculate score.
         inserted_count, skipped_count = self._persist_transactions(
-            db=db,
+            transaction_repo=transaction_repo,
             month_id=month_record.id,
             transactions=month_data.transactions,
             results=results,
@@ -231,9 +236,9 @@ class UploadService:
         )
 
         # ##>: Flush to make transactions visible for aggregation query, but don't commit yet.
-        db.flush()
+        transaction_repo.flush()
         # ##>: Let calculate_and_update_month handle the final commit for atomicity.
-        updated_month = calculate_and_update_month(db, month_record.id)
+        updated_month = calculate_and_update_month(month_repo, transaction_repo, month_record.id)
 
         low_confidence_count = self._count_low_confidence(results)
 
@@ -271,40 +276,34 @@ class UploadService:
         """Generate unique key for duplicate detection."""
         return f"{t.date.isoformat()}_{t.description}_{float(t.amount)}_{t.account}"
 
-    def _handle_replace_mode(self, db: Session, year: int, month: int) -> Month:
+    def _handle_replace_mode(self, month_repo: MonthRepository, year: int, month: int) -> Month:
         """Delete existing month and create new one."""
-        existing = db.query(Month).filter(Month.year == year, Month.month == month).first()
+        existing = month_repo.get_by_year_month(year, month)
         if existing:
-            db.delete(existing)
-            db.flush()
+            month_repo.delete(existing)
 
-        new_month = Month(year=year, month=month)
-        db.add(new_month)
-        db.flush()
-        return new_month
+        return month_repo.create(year, month)
 
-    def _handle_merge_mode(self, db: Session, year: int, month: int) -> tuple[Month, set[str]]:
+    def _handle_merge_mode(
+        self,
+        month_repo: MonthRepository,
+        transaction_repo: TransactionRepository,
+        year: int,
+        month: int,
+    ) -> tuple[Month, set[str]]:
         """Get or create month and return existing transaction keys."""
-        existing = db.query(Month).filter(Month.year == year, Month.month == month).first()
+        existing = month_repo.get_by_year_month(year, month)
 
         if existing:
-            skip_keys = self._get_existing_transaction_keys(db, existing.id)
+            skip_keys = transaction_repo.get_keys_for_month(existing.id)
             return existing, skip_keys
 
-        new_month = Month(year=year, month=month)
-        db.add(new_month)
-        db.flush()
+        new_month = month_repo.create(year, month)
         return new_month, set()
-
-    def _get_existing_transaction_keys(self, db: Session, month_id: int) -> set[str]:
-        """Get transaction keys for duplicate detection."""
-        transactions = db.query(Transaction).filter(Transaction.month_id == month_id).all()
-        # ##>: Use float() to match key format from _generate_transaction_key.
-        return {f"{t.date.isoformat()}_{t.description}_{float(t.amount)}_{t.account}" for t in transactions}
 
     def _persist_transactions(
         self,
-        db: Session,
+        transaction_repo: TransactionRepository,
         month_id: int,
         transactions: list[ParsedTransaction],
         results: list[CategorizationResult],
@@ -355,7 +354,6 @@ class UploadService:
                 )
             )
 
-        if new_transactions:
-            db.add_all(new_transactions)
+        transaction_repo.add_bulk(new_transactions)
 
         return len(new_transactions), skipped_count

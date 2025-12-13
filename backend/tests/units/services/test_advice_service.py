@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models.advice import Advice
 from app.db.models.month import Month
+from app.repositories.advice_repository import AdviceRepository
 from app.services import advice as advice_service
 from app.services.dto.advice import AdviceResponse, ProblemArea
 from tests.conftest import DatabaseTestCase
@@ -58,7 +59,8 @@ class TestGetAdviceByMonthId(DatabaseTestCase):
         self.session.add(advice)
         self.session.commit()
 
-        result = advice_service.get_advice_by_month_id(self.session, month.id)
+        advice_repo = AdviceRepository(self.session)
+        result = advice_service.get_advice_by_month_id(advice_repo, month.id)
 
         self.assertIsNotNone(result)
         assert result is not None
@@ -69,7 +71,8 @@ class TestGetAdviceByMonthId(DatabaseTestCase):
         """Get advice returns None when no advice exists for the month."""
         month = _create_month(self.session)
 
-        result = advice_service.get_advice_by_month_id(self.session, month.id)
+        advice_repo = AdviceRepository(self.session)
+        result = advice_service.get_advice_by_month_id(advice_repo, month.id)
 
         self.assertIsNone(result)
 
@@ -82,7 +85,8 @@ class TestCreateOrUpdateAdvice(DatabaseTestCase):
         month = _create_month(self.session)
         advice_text = '{"analysis": "new advice"}'
 
-        result = advice_service.create_or_update_advice(self.session, month.id, advice_text)
+        advice_repo = AdviceRepository(self.session)
+        result = advice_service.create_or_update_advice(advice_repo, month.id, advice_text)
 
         self.assertIsNotNone(result.id)
         self.assertEqual(result.month_id, month.id)
@@ -98,8 +102,9 @@ class TestCreateOrUpdateAdvice(DatabaseTestCase):
         original_id = original_advice.id
         original_time = original_advice.generated_at
 
+        advice_repo = AdviceRepository(self.session)
         new_text = '{"analysis": "updated"}'
-        result = advice_service.create_or_update_advice(self.session, month.id, new_text)
+        result = advice_service.create_or_update_advice(advice_repo, month.id, new_text)
 
         self.assertEqual(result.id, original_id)
         self.assertEqual(result.advice_text, new_text)

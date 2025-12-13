@@ -3,25 +3,24 @@
 import logging
 
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
 from app.db.models.advice import Advice
-from app.db.models.base import utc_now
 from app.db.models.month import Month
+from app.repositories.advice_repository import AdviceRepository
 from app.services.dto.advice import AdviceResponse, MonthData
 from app.services.exceptions import AdviceQueryError
 
 logger = logging.getLogger(__name__)
 
 
-def get_advice_by_month_id(db: Session, month_id: int) -> Advice | None:
+def get_advice_by_month_id(advice_repo: AdviceRepository, month_id: int) -> Advice | None:
     """
     Retrieve stored advice for a month.
 
     Parameters
     ----------
-    db : Session
-        Database session.
+    advice_repo : AdviceRepository
+        Repository for advice data access.
     month_id : int
         Month ID to look up.
 
@@ -36,7 +35,7 @@ def get_advice_by_month_id(db: Session, month_id: int) -> Advice | None:
         If database query fails.
     """
     try:
-        result = db.query(Advice).filter(Advice.month_id == month_id).first()
+        result = advice_repo.get_by_month_id(month_id)
         if result:
             logger.info("Found advice for month_id=%d", month_id)
         else:
@@ -47,14 +46,14 @@ def get_advice_by_month_id(db: Session, month_id: int) -> Advice | None:
         raise AdviceQueryError(month_id, str(error)) from error
 
 
-def create_or_update_advice(db: Session, month_id: int, advice_text: str) -> Advice:
+def create_or_update_advice(advice_repo: AdviceRepository, month_id: int, advice_text: str) -> Advice:
     """
     Create or update advice for a month (upsert pattern).
 
     Parameters
     ----------
-    db : Session
-        Database session.
+    advice_repo : AdviceRepository
+        Repository for advice data access.
     month_id : int
         Month ID for the advice.
     advice_text : str
@@ -71,24 +70,13 @@ def create_or_update_advice(db: Session, month_id: int, advice_text: str) -> Adv
         If database operation fails.
     """
     try:
-        existing = db.query(Advice).filter(Advice.month_id == month_id).first()
-
-        if existing:
-            existing.advice_text = advice_text
-            existing.generated_at = utc_now()
-            logger.info("Updated advice for month_id=%d", month_id)
-            db.commit()
-            db.refresh(existing)
-            return existing
-
-        advice = Advice(month_id=month_id, advice_text=advice_text)
-        db.add(advice)
-        db.commit()
-        db.refresh(advice)
-        logger.info("Created advice for month_id=%d", month_id)
-        return advice
+        result = advice_repo.upsert(month_id, advice_text)
+        advice_repo.commit()
+        advice_repo.refresh(result)
+        logger.info("Saved advice for month_id=%d", month_id)
+        return result
     except SQLAlchemyError as error:
-        db.rollback()
+        advice_repo.rollback()
         logger.exception("Database error saving advice for month_id=%d", month_id)
         raise AdviceQueryError(month_id, str(error)) from error
 

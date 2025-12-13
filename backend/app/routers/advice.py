@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.config.settings import get_settings
 from app.db.database import get_db
+from app.repositories.advice_repository import AdviceRepository
+from app.repositories.month_repository import MonthRepository
 from app.responses.advice import (
     AdviceData,
     GenerateAdviceRequest,
@@ -87,7 +89,10 @@ def generate_advice(
         If AI service or database unavailable (AdviceQueryError, MonthDataError).
     """
     try:
-        month_record = months_service.get_month_by_year_month(db, request.year, request.month)
+        month_repo = MonthRepository(db)
+        advice_repo = AdviceRepository(db)
+
+        month_record = months_service.get_month_by_year_month(month_repo, request.year, request.month)
         if month_record is None:
             raise HTTPException(
                 status_code=404,
@@ -95,7 +100,7 @@ def generate_advice(
             )
 
         if not request.regenerate:
-            existing_advice = advice_service.get_advice_by_month_id(db, month_record.id)
+            existing_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
             if existing_advice:
                 logger.info("Returning cached advice for %d-%02d", request.year, request.month)
                 return GenerateAdviceResponse(
@@ -106,7 +111,7 @@ def generate_advice(
                 )
 
         # ##>: Fetch history and prepare data for advice generation.
-        history_months = months_service.get_months_history(db, limit=3)
+        history_months = months_service.get_months_history(month_repo, limit=3)
 
         current_data = advice_service.month_to_month_data(month_record)
         history_data = [
@@ -123,7 +128,7 @@ def generate_advice(
         advice_response = generator.generate_advice(current_data, history_data)
 
         advice_json = advice_service.advice_response_to_json(advice_response)
-        stored_advice = advice_service.create_or_update_advice(db, month_record.id, advice_json)
+        stored_advice = advice_service.create_or_update_advice(advice_repo, month_record.id, advice_json)
 
         logger.info("Generated new advice for %d-%02d", request.year, request.month)
         return GenerateAdviceResponse(
@@ -185,14 +190,17 @@ def get_advice(
         If database unavailable.
     """
     try:
-        month_record = months_service.get_month_by_year_month(db, year, month)
+        month_repo = MonthRepository(db)
+        advice_repo = AdviceRepository(db)
+
+        month_record = months_service.get_month_by_year_month(month_repo, year, month)
         if month_record is None:
             raise HTTPException(
                 status_code=404,
                 detail=f"No data found for {year}-{month:02d}. Upload transactions first.",
             )
 
-        advice = advice_service.get_advice_by_month_id(db, month_record.id)
+        advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
 
         if advice is None:
             return GetAdviceResponse(

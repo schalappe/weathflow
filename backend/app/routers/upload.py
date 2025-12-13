@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.repositories.month_repository import MonthRepository
+from app.repositories.transaction_repository import TransactionRepository
 from app.responses.upload import CategorizeResponse, ImportMode, UploadResponse
 from app.services.exceptions import (
     APIConnectionError,
@@ -103,12 +105,17 @@ async def categorize_file(
         raise HTTPException(status_code=400, detail="No valid months provided")
 
     try:
+        # ##>: Create repositories and pass to service.
+        month_repo = MonthRepository(db)
+        transaction_repo = TransactionRepository(db)
+
         content = await file.read()
         result = service.process_categorization(
             file_content=content,
             months_to_process=months_list,
             import_mode=import_mode,
-            db=db,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
         return CategorizeResponse(**result)
     except (CSVParseError, NoTransactionsFoundError, InvalidMonthFormatError) as e:

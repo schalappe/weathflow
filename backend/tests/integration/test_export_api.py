@@ -526,8 +526,9 @@ class TestExportDatabaseErrors:
         db_session.add(month)
         db_session.commit()
 
+        # ##>: Mock at the repository level since export service now uses repositories directly.
         with patch(
-            "app.services.export.months_service.get_all_transactions_for_month",
+            "app.repositories.transaction_repository.TransactionRepository.get_all_for_month",
             side_effect=TransactionQueryError(month.id, "Connection refused"),
         ):
             response = client.get("/api/months/2025/10/export/json")
@@ -541,8 +542,9 @@ class TestExportDatabaseErrors:
         db_session.add(month)
         db_session.commit()
 
+        # ##>: Mock at the repository level since export service now uses repositories directly.
         with patch(
-            "app.services.export.months_service.get_all_transactions_for_month",
+            "app.repositories.transaction_repository.TransactionRepository.get_all_for_month",
             side_effect=TransactionQueryError(month.id, "Connection refused"),
         ):
             response = client.get("/api/months/2025/10/export/csv")

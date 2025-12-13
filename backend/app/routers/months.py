@@ -11,6 +11,8 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.repositories.month_repository import MonthRepository
+from app.repositories.transaction_repository import TransactionRepository
 from app.responses.history import HistoryResponse, MonthHistory
 from app.responses.months import (
     MonthDetailResponse,
@@ -68,8 +70,9 @@ def list_months(db: Session = Depends(get_db)) -> MonthsListResponse:
         If database is temporarily unavailable.
     """
     try:
-        # ##>: Use optimized query with JOIN to avoid N+1 queries.
-        months_with_counts = months_service.get_all_months_with_counts(db)
+        # ##>: Create repository and delegate to service.
+        month_repo = MonthRepository(db)
+        months_with_counts = months_service.get_all_months_with_counts(month_repo)
         month_summaries = [MonthSummary.from_model(m, tx_count) for m, tx_count in months_with_counts]
 
         return MonthsListResponse(months=month_summaries, total=len(month_summaries))
@@ -108,7 +111,8 @@ def get_history(
         If database is temporarily unavailable.
     """
     try:
-        month_records = months_service.get_months_history(db, months)
+        month_repo = MonthRepository(db)
+        month_records = months_service.get_months_history(month_repo, months)
 
         # ##>: Build response models with explicit error handling per record.
         month_list: list[MonthHistory] = []
@@ -198,7 +202,10 @@ def get_month_detail(
         )
 
     try:
-        month_record = months_service.get_month_by_year_month(db, year, month)
+        month_repo = MonthRepository(db)
+        transaction_repo = TransactionRepository(db)
+
+        month_record = months_service.get_month_by_year_month(month_repo, year, month)
 
         if month_record is None:
             raise HTTPException(
@@ -209,7 +216,7 @@ def get_month_detail(
         # ##>: Parse comma-separated categories to list for service layer.
         category_types = [c.strip() for c in category.split(",") if c.strip()] if category else None
         transactions, total_items = months_service.get_transactions_filtered(
-            db,
+            transaction_repo,
             month_id=month_record.id,
             category_types=category_types,
             search=search,
@@ -290,7 +297,10 @@ def export_month_json(
         If database is temporarily unavailable.
     """
     try:
-        result = export_service.export_month_to_json(db, year, month)
+        month_repo = MonthRepository(db)
+        transaction_repo = TransactionRepository(db)
+
+        result = export_service.export_month_to_json(month_repo, transaction_repo, year, month)
         return StreamingResponse(
             io.BytesIO(result.content),
             media_type=result.media_type,
@@ -342,7 +352,10 @@ def export_month_csv(
         If database is temporarily unavailable.
     """
     try:
-        result = export_service.export_month_to_csv(db, year, month)
+        month_repo = MonthRepository(db)
+        transaction_repo = TransactionRepository(db)
+
+        result = export_service.export_month_to_csv(month_repo, transaction_repo, year, month)
         return StreamingResponse(
             io.BytesIO(result.content),
             media_type=result.media_type,

@@ -1,10 +1,11 @@
 """Tests for history service functions."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.models.month import Month
+from app.repositories.month_repository import MonthRepository
 from app.services import months as months_service
 from app.services.exceptions import MonthQueryError
 from tests.conftest import DatabaseTestCase
@@ -21,7 +22,8 @@ class TestGetMonthsHistory(DatabaseTestCase):
             self.session.add(month)
         self.session.commit()
 
-        result = months_service.get_months_history(self.session, limit=3)
+        month_repo = MonthRepository(self.session)
+        result = months_service.get_months_history(month_repo, limit=3)
 
         self.assertEqual(len(result), 3)
         # ##>: Should return most recent 3 months (March, April, May) in chronological order.
@@ -37,7 +39,8 @@ class TestGetMonthsHistory(DatabaseTestCase):
         self.session.add_all([month1, month2])
         self.session.commit()
 
-        result = months_service.get_months_history(self.session, limit=12)
+        month_repo = MonthRepository(self.session)
+        result = months_service.get_months_history(month_repo, limit=12)
 
         self.assertEqual(len(result), 2)
         # ##>: Should be in chronological order (oldest first).
@@ -46,17 +49,21 @@ class TestGetMonthsHistory(DatabaseTestCase):
 
     def test_returns_empty_list_when_no_months_exist(self) -> None:
         """Should return empty list when no months in database."""
-        result = months_service.get_months_history(self.session, limit=12)
+        month_repo = MonthRepository(self.session)
+        result = months_service.get_months_history(month_repo, limit=12)
 
         self.assertEqual(result, [])
 
     def test_raises_month_query_error_on_database_failure(self) -> None:
         """Should wrap SQLAlchemyError as MonthQueryError."""
-        with patch.object(self.session, "query", side_effect=SQLAlchemyError("Connection refused")):
-            with self.assertRaises(MonthQueryError) as context:
-                months_service.get_months_history(self.session, limit=12)
+        # ##>: Create a mock repository that raises on get_recent.
+        mock_repo = MagicMock(spec=MonthRepository)
+        mock_repo.get_recent.side_effect = SQLAlchemyError("Connection refused")
 
-            self.assertIn("Connection refused", str(context.exception))
+        with self.assertRaises(MonthQueryError) as context:
+            months_service.get_months_history(mock_repo, limit=12)
+
+        self.assertIn("Connection refused", str(context.exception))
 
     def test_returns_months_sorted_across_year_boundary(self) -> None:
         """Should correctly order months spanning year boundary."""
@@ -66,7 +73,8 @@ class TestGetMonthsHistory(DatabaseTestCase):
         self.session.add_all([month_jan, month_dec, month_feb])  # Add out of order
         self.session.commit()
 
-        result = months_service.get_months_history(self.session, limit=12)
+        month_repo = MonthRepository(self.session)
+        result = months_service.get_months_history(month_repo, limit=12)
 
         # ##>: Dec 2024 should come before Jan 2025.
         self.assertEqual(result[0].year, 2024)
