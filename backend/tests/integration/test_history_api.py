@@ -145,9 +145,22 @@ class TestGetHistoryEndpoint:
         assert response.status_code == 503
         assert "Database temporarily unavailable" in response.json()["detail"]
 
-    def test_history_min_limit_1(self, client: TestClient) -> None:
-        """Should return 422 when months < 1."""
+    def test_history_months_zero_returns_all(self, client: TestClient, db_session: Session) -> None:
+        """Should return all months when months=0."""
+        # ##>: Create test months.
+        for i in range(1, 4):
+            db_session.add(Month(year=2025, month=i, score=2, score_label="Okay"))
+        db_session.commit()
+
         response = client.get("/api/months/history", params={"months": 0})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["months"]) == 3
+
+    def test_history_negative_months_returns_422(self, client: TestClient) -> None:
+        """Should return 422 when months < 0."""
+        response = client.get("/api/months/history", params={"months": -1})
 
         assert response.status_code == 422
 

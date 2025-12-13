@@ -81,7 +81,7 @@ def list_months(month_repo: MonthRepo) -> MonthsListResponse:
 @router.get("/history", response_model=HistoryResponse)
 def get_history(
     month_repo: MonthRepo,
-    months: int = Query(12, ge=1, le=24, description="Number of months to retrieve (1-24)"),
+    months: int = Query(12, ge=0, le=24, description="Number of months to retrieve (1-24, or 0 for all)"),
 ) -> HistoryResponse:
     """
     Get historical data for score trend analysis.
