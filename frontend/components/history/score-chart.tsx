@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  Tooltip,
-  ReferenceArea,
-} from "recharts";
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import {
   Card,
   CardContent,
@@ -16,9 +8,15 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { SCORE_COLORS_HEX } from "@/lib/utils";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, Trophy, Target, AlertTriangle, XCircle } from "lucide-react";
 import type { MonthHistory } from "@/types";
 
 interface ScoreChartProps {
@@ -30,31 +28,35 @@ interface ChartDataPoint {
   score: number | null;
   scoreLabel: string | null;
   fullLabel: string;
+  fill: string;
 }
 
-function CustomTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload: ChartDataPoint }>;
-}) {
-  if (!active || !payload?.[0]) return null;
-
-  const data = payload[0].payload;
-  if (data.score === null) return null;
-
-  return (
-    <div className="rounded-lg border border-border/50 bg-card p-3 shadow-lg">
-      <p className="font-medium">{data.fullLabel}</p>
-      <p className="text-sm text-muted-foreground">
-        Score:{" "}
-        <span className="font-semibold text-foreground">{data.score}/3</span> -{" "}
-        {data.scoreLabel}
-      </p>
-    </div>
-  );
+// [>]: Map score to color for dynamic dot coloring.
+function getScoreColor(score: number | null): string {
+  if (score === null) return SCORE_COLORS_HEX[0];
+  if (score === 3) return SCORE_COLORS_HEX[3];
+  if (score === 2) return SCORE_COLORS_HEX[2];
+  if (score === 1) return SCORE_COLORS_HEX[1];
+  return SCORE_COLORS_HEX[0];
 }
+
+// [>]: Map score to icon for tooltip display.
+function getScoreIcon(score: number | null) {
+  if (score === 3) return Trophy;
+  if (score === 2) return Target;
+  if (score === 1) return AlertTriangle;
+  return XCircle;
+}
+
+// [>]: Line color - using a visible blue that works in both light and dark mode.
+const LINE_COLOR = "#6a9bcc";
+
+const chartConfig = {
+  score: {
+    label: "Score",
+    color: LINE_COLOR,
+  },
+} satisfies ChartConfig;
 
 function transformToChartData(months: MonthHistory[]): ChartDataPoint[] {
   if (!Array.isArray(months)) {
@@ -84,11 +86,14 @@ function transformToChartData(months: MonthHistory[]): ChartDataPoint[] {
       year: "numeric",
     });
 
+    const score = monthData?.score ?? null;
+
     result.push({
       label,
-      score: monthData?.score ?? null,
+      score,
       scoreLabel: monthData?.score_label ?? null,
       fullLabel,
+      fill: getScoreColor(score),
     });
   }
 
@@ -103,6 +108,43 @@ const chartErrorFallback = (
     Unable to display chart
   </div>
 );
+
+// [>]: Custom tooltip formatter to display score details with icons.
+function CustomTooltipContent({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: ChartDataPoint }>;
+}) {
+  if (!active || !payload?.[0]) return null;
+
+  const data = payload[0].payload;
+  if (data.score === null) return null;
+
+  const Icon = getScoreIcon(data.score);
+  const scoreColor = getScoreColor(data.score);
+
+  return (
+    <div className="grid min-w-[10rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
+      <div className="font-medium">{data.fullLabel}</div>
+      <div className="flex items-center gap-2">
+        <Icon
+          className="h-3.5 w-3.5"
+          style={{ color: scoreColor }}
+        />
+        <span className="text-muted-foreground">Score:</span>
+        <span
+          className="font-mono font-semibold tabular-nums"
+          style={{ color: scoreColor }}
+        >
+          {data.score}/3
+        </span>
+        <span className="text-muted-foreground">— {data.scoreLabel}</span>
+      </div>
+    </div>
+  );
+}
 
 export function ScoreChart({ months }: ScoreChartProps) {
   const chartData = transformToChartData(months);
@@ -131,64 +173,61 @@ export function ScoreChart({ months }: ScoreChartProps) {
               No historical data available
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={chartData}>
-                {/* Background zones for score thresholds */}
-                <ReferenceArea
-                  y1={0}
-                  y2={1}
-                  fill={SCORE_COLORS_HEX[0]}
-                  fillOpacity={0.08}
-                />
-                <ReferenceArea
-                  y1={1}
-                  y2={2}
-                  fill={SCORE_COLORS_HEX[1]}
-                  fillOpacity={0.08}
-                />
-                <ReferenceArea
-                  y1={2}
-                  y2={3}
-                  fill={SCORE_COLORS_HEX[3]}
-                  fillOpacity={0.08}
-                />
-
+            <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
+              <LineChart
+                accessibilityLayer
+                data={chartData}
+                margin={{ left: 12, right: 12, top: 12, bottom: 12 }}
+              >
+                {/* [>]: Horizontal grid lines only for cleaner look. */}
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  axisLine={{ stroke: "hsl(var(--border))" }}
                   tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 />
                 <YAxis
                   domain={[0, 3]}
                   ticks={[0, 1, 2, 3]}
                   width={30}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  axisLine={{ stroke: "hsl(var(--border))" }}
                   tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <ChartTooltip
+                  cursor={false}
+                  content={<CustomTooltipContent />}
+                />
                 <Line
-                  type="monotone"
                   dataKey="score"
-                  stroke="hsl(var(--primary))"
+                  type="natural"
+                  stroke="var(--color-score)"
                   strokeWidth={2.5}
-                  dot={{
-                    fill: "hsl(var(--primary))",
-                    r: 4,
-                    strokeWidth: 2,
-                    stroke: "hsl(var(--card))",
+                  dot={({ cx, cy, payload }) => {
+                    if (payload.score === null) return <g key={payload.label} />;
+                    return (
+                      <circle
+                        key={payload.label}
+                        cx={cx}
+                        cy={cy}
+                        r={5}
+                        fill={payload.fill}
+                        stroke="hsl(var(--background))"
+                        strokeWidth={2}
+                      />
+                    );
                   }}
                   activeDot={{
-                    r: 6,
-                    fill: "hsl(var(--primary))",
-                    stroke: "hsl(var(--card))",
+                    r: 7,
+                    stroke: "hsl(var(--background))",
                     strokeWidth: 2,
                   }}
                   connectNulls={false}
                 />
               </LineChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           )}
         </ErrorBoundary>
       </CardContent>

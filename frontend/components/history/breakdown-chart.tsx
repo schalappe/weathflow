@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import {
   Card,
   CardContent,
@@ -15,6 +8,12 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { CATEGORY_COLORS, sortMonthsChronologically, cn } from "@/lib/utils";
 import { BarChart3, Home, ShoppingBag, PiggyBank } from "lucide-react";
@@ -36,53 +35,30 @@ interface BreakdownChartDataPoint {
   originalCompound: number;
 }
 
-const ORIGINAL_VALUE_MAP: Record<string, keyof BreakdownChartDataPoint> = {
-  core: "originalCore",
-  choice: "originalChoice",
-  compound: "originalCompound",
-};
+// [>]: Chart config with icons for tooltip display.
+const chartConfig = {
+  core: {
+    label: "Core",
+    color: CATEGORY_COLORS.CORE,
+    icon: Home,
+  },
+  choice: {
+    label: "Choice",
+    color: CATEGORY_COLORS.CHOICE,
+    icon: ShoppingBag,
+  },
+  compound: {
+    label: "Compound",
+    color: CATEGORY_COLORS.COMPOUND,
+    icon: PiggyBank,
+  },
+} satisfies ChartConfig;
 
-function CustomTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: Array<{
-    name: string;
-    value: number;
-    dataKey: string;
-    color: string;
-    payload: BreakdownChartDataPoint;
-  }>;
-  label?: string;
-}) {
-  if (!active || !payload?.length) return null;
-
-  const displayLabel = payload[0]?.payload.fullLabel ?? label;
-
-  return (
-    <div className="rounded-lg border border-border/50 bg-card p-3 shadow-lg">
-      <p className="font-medium mb-2">{displayLabel}</p>
-      {payload.map((entry) => {
-        const originalKey = ORIGINAL_VALUE_MAP[entry.dataKey];
-        const displayValue = originalKey
-          ? (entry.payload[originalKey] as number)
-          : entry.value;
-        return (
-          <div key={entry.name} className="flex items-center gap-2 text-sm">
-            <div
-              className="h-2.5 w-2.5 rounded-sm"
-              style={{ backgroundColor: entry.color }}
-            />
-            <span className="text-muted-foreground">{entry.name}:</span>
-            <span className="font-medium">{displayValue.toFixed(1)}%</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+const LEGEND_ITEMS = [
+  { name: "Core", color: CATEGORY_COLORS.CORE, icon: Home },
+  { name: "Choice", color: CATEGORY_COLORS.CHOICE, icon: ShoppingBag },
+  { name: "Compound", color: CATEGORY_COLORS.COMPOUND, icon: PiggyBank },
+];
 
 function isValidMonthData(m: MonthHistory): boolean {
   return (
@@ -176,11 +152,66 @@ const chartErrorFallback = (
   </div>
 );
 
-const LEGEND_ITEMS = [
-  { name: "Core", color: CATEGORY_COLORS.CORE, icon: Home },
-  { name: "Choice", color: CATEGORY_COLORS.CHOICE, icon: ShoppingBag },
-  { name: "Compound", color: CATEGORY_COLORS.COMPOUND, icon: PiggyBank },
-];
+// [>]: Custom tooltip with icons matching the category colors.
+function CustomTooltipContent({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    dataKey: string;
+    color: string;
+    payload: BreakdownChartDataPoint;
+  }>;
+}) {
+  if (!active || !payload?.length) return null;
+
+  const data = payload[0]?.payload;
+  if (!data) return null;
+
+  const categories = [
+    {
+      key: "core",
+      label: "Core",
+      icon: Home,
+      color: CATEGORY_COLORS.CORE,
+      value: data.originalCore,
+    },
+    {
+      key: "choice",
+      label: "Choice",
+      icon: ShoppingBag,
+      color: CATEGORY_COLORS.CHOICE,
+      value: data.originalChoice,
+    },
+    {
+      key: "compound",
+      label: "Compound",
+      icon: PiggyBank,
+      color: CATEGORY_COLORS.COMPOUND,
+      value: data.originalCompound,
+    },
+  ];
+
+  return (
+    <div className="grid min-w-[10rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
+      <div className="font-medium">{data.fullLabel}</div>
+      <div className="grid gap-1">
+        {categories.map(({ key, label, icon: Icon, color, value }) => (
+          <div key={key} className="flex items-center gap-2">
+            <Icon className="h-3.5 w-3.5" style={{ color }} />
+            <span className="text-muted-foreground">{label}:</span>
+            <span className="font-mono font-medium tabular-nums text-foreground">
+              {value.toFixed(1)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function SpendingBreakdownChart({
   months,
@@ -202,13 +233,13 @@ export function SpendingBreakdownChart({
               <CardDescription>Monthly category distribution</CardDescription>
             </div>
           </div>
-          {/* Custom Legend */}
+          {/* [>]: Custom legend with icons matching the chart. */}
           <div className="flex items-center gap-4">
             {LEGEND_ITEMS.map((item) => (
               <div key={item.name} className="flex items-center gap-1.5">
-                <div
-                  className="h-2.5 w-2.5 rounded-sm"
-                  style={{ backgroundColor: item.color }}
+                <item.icon
+                  className="h-3.5 w-3.5"
+                  style={{ color: item.color }}
                 />
                 <span className="text-xs text-muted-foreground">
                   {item.name}
@@ -228,47 +259,57 @@ export function SpendingBreakdownChart({
               No spending data available
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={chartData} barCategoryGap="20%">
+            <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
+              <BarChart
+                accessibilityLayer
+                data={chartData}
+                margin={{ left: 12, right: 12, top: 12, bottom: 12 }}
+              >
+                {/* [>]: Horizontal grid lines only for cleaner look. */}
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  axisLine={{ stroke: "hsl(var(--border))" }}
                   tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 />
                 <YAxis
                   domain={[0, 100]}
                   ticks={[0, 25, 50, 75, 100]}
                   tickFormatter={(v) => `${v}%`}
                   width={40}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  axisLine={{ stroke: "hsl(var(--border))" }}
                   tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <ChartTooltip
+                  cursor={false}
+                  content={<CustomTooltipContent />}
+                />
                 <Bar
                   dataKey="core"
                   name="Core"
                   stackId="spending"
-                  fill={CATEGORY_COLORS.CORE}
+                  fill="var(--color-core)"
                   radius={[0, 0, 0, 0]}
                 />
                 <Bar
                   dataKey="choice"
                   name="Choice"
                   stackId="spending"
-                  fill={CATEGORY_COLORS.CHOICE}
+                  fill="var(--color-choice)"
                   radius={[0, 0, 0, 0]}
                 />
                 <Bar
                   dataKey="compound"
                   name="Compound"
                   stackId="spending"
-                  fill={CATEGORY_COLORS.COMPOUND}
+                  fill="var(--color-compound)"
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           )}
         </ErrorBoundary>
       </CardContent>
