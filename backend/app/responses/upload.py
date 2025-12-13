@@ -40,6 +40,10 @@ class MonthResult(BaseModel):
     year: int = Field(ge=2000, le=2100)
     month: int = Field(ge=1, le=12)
     transactions_categorized: int = Field(ge=0)
+    transactions_skipped: int = Field(ge=0, default=0, description="Duplicate transactions skipped in merge mode")
+    transactions_missing_result: int = Field(
+        ge=0, default=0, description="Transactions missing categorization result (indicates a bug)"
+    )
     low_confidence_count: int = Field(ge=0, description="Transactions with confidence below 0.8")
     score: int = Field(ge=0, le=3)
     score_label: ScoreLabelLiteral

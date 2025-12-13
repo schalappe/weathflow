@@ -329,6 +329,36 @@ class NoTransactionsFoundError(UploadError):
         super().__init__("No transactions found in the uploaded file")
 
 
+class UploadPersistenceError(UploadError):
+    """
+    Raised when database operations fail during upload processing.
+
+    Parameters
+    ----------
+    year : int
+        The year of the month being processed.
+    month : int
+        The month number being processed.
+    reason : str
+        Description of the database failure.
+
+    Attributes
+    ----------
+    year : int
+        The year for programmatic access.
+    month : int
+        The month for programmatic access.
+    reason : str
+        The failure reason for debugging.
+    """
+
+    def __init__(self, year: int, month: int, reason: str) -> None:
+        self.year = year
+        self.month = month
+        self.reason = reason
+        super().__init__(f"Failed to persist data for {year}-{month:02d}: {reason}")
+
+
 class TransactionError(Exception):
     """
     Base exception for all transaction operation errors.
