@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Upload, Clock } from "lucide-react";
+import { AlertCircle, Upload } from "lucide-react";
 import { ScoreCard } from "./score-card";
 import { MetricCard } from "./metric-card";
 import { SpendingPieChart } from "./spending-pie-chart";
@@ -290,38 +290,7 @@ export function DashboardClient() {
   const isLoading = state.pageState === "loading";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Navigation Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">
-            Money Map Manager
-          </h1>
-          <nav className="flex items-center gap-4">
-            {/* [>]: Show export buttons when a month is selected and data is loaded. */}
-            {state.selectedMonth && state.monthDetail && (
-              <ExportButtons
-                year={state.selectedMonth.year}
-                month={state.selectedMonth.month}
-                disabled={isLoading}
-              />
-            )}
-            <Link
-              href="/import"
-              className="flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
-            >
-              <Upload className="h-4 w-4" />
-              Import
-            </Link>
-            <span className="flex cursor-not-allowed items-center gap-2 text-sm font-medium text-slate-400">
-              <Clock className="h-4 w-4" />
-              History
-            </span>
-          </nav>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-6">
+    <div className="space-y-6">
         {/* Loading State */}
         {state.pageState === "loading" && state.monthsList.length === 0 && (
           <div className="flex items-center justify-center py-24">
@@ -336,8 +305,8 @@ export function DashboardClient() {
         {state.pageState === "empty" && (
           <Card className="mx-auto max-w-md">
             <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
-              <div className="rounded-full bg-slate-100 p-4">
-                <Upload className="h-8 w-8 text-slate-400" />
+              <div className="rounded-full bg-muted p-4">
+                <Upload className="h-8 w-8 text-muted-foreground" />
               </div>
               <div>
                 <h2 className="text-lg font-semibold">
@@ -377,16 +346,24 @@ export function DashboardClient() {
             <>
               {/* Month Selector Row */}
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-medium text-slate-700">
+                <h2 className="text-lg font-medium text-foreground">
                   Dashboard
                 </h2>
-                <MonthSelector
-                  months={state.monthsList}
-                  selectedYear={state.selectedMonth.year}
-                  selectedMonth={state.selectedMonth.month}
-                  onMonthChange={handleMonthChange}
-                  isDisabled={isLoading}
-                />
+                <div className="flex items-center gap-4">
+                  {/* [>]: Show export buttons when a month is selected and data is loaded. */}
+                  <ExportButtons
+                    year={state.selectedMonth.year}
+                    month={state.selectedMonth.month}
+                    disabled={isLoading}
+                  />
+                  <MonthSelector
+                    months={state.monthsList}
+                    selectedYear={state.selectedMonth.year}
+                    selectedMonth={state.selectedMonth.month}
+                    onMonthChange={handleMonthChange}
+                    isDisabled={isLoading}
+                  />
+                </div>
               </div>
 
               {/* Score Card */}
@@ -469,18 +446,17 @@ export function DashboardClient() {
             </>
           )}
 
-        {/* Transaction Edit Modal */}
-        {/* [>]: Key resets modal state when switching between transactions. */}
-        <TransactionEditModal
-          key={state.editingTransaction?.id ?? "closed"}
-          transaction={state.editingTransaction}
-          isOpen={state.editingTransaction !== null}
-          onClose={handleCloseModal}
-          onSave={handleSaveTransaction}
-          isSaving={isSaving}
-          error={saveError}
-        />
-      </main>
+      {/* Transaction Edit Modal */}
+      {/* [>]: Key resets modal state when switching between transactions. */}
+      <TransactionEditModal
+        key={state.editingTransaction?.id ?? "closed"}
+        transaction={state.editingTransaction}
+        isOpen={state.editingTransaction !== null}
+        onClose={handleCloseModal}
+        onSave={handleSaveTransaction}
+        isSaving={isSaving}
+        error={saveError}
+      />
     </div>
   );
 }
