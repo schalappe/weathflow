@@ -307,12 +307,12 @@ class TestCalculateMonthStats(unittest.TestCase):
 # =============================================================================
 
 
-class TestAggregateTransactionTotals(DatabaseTestCase):
-    """Tests for _aggregate_transaction_totals database function."""
+class TestTransactionRepositoryAggregateTotals(DatabaseTestCase):
+    """Tests for TransactionRepository.aggregate_totals method."""
 
     def test_aggregate_with_sample_transactions(self) -> None:
         """Should correctly aggregate totals by money_map_type."""
-        from app.services.calculator import _aggregate_transaction_totals
+        from app.repositories.transaction_repository import TransactionRepository
 
         month = Month(year=2025, month=10)
         self.session.add(month)
@@ -352,7 +352,8 @@ class TestAggregateTransactionTotals(DatabaseTestCase):
         self.session.add_all(transactions)
         self.session.commit()
 
-        income, core, choice = _aggregate_transaction_totals(self.session, month.id)
+        transaction_repo = TransactionRepository(self.session)
+        income, core, choice = transaction_repo.aggregate_totals(month.id)
 
         self.assertEqual(income, 5000.0)
         self.assertEqual(core, 2000.0)  # |1500| + |500|
@@ -360,13 +361,14 @@ class TestAggregateTransactionTotals(DatabaseTestCase):
 
     def test_aggregate_with_no_transactions(self) -> None:
         """Should return (0, 0, 0) when month has no transactions."""
-        from app.services.calculator import _aggregate_transaction_totals
+        from app.repositories.transaction_repository import TransactionRepository
 
         month = Month(year=2025, month=11)
         self.session.add(month)
         self.session.commit()
 
-        income, core, choice = _aggregate_transaction_totals(self.session, month.id)
+        transaction_repo = TransactionRepository(self.session)
+        income, core, choice = transaction_repo.aggregate_totals(month.id)
 
         self.assertEqual(income, 0.0)
         self.assertEqual(core, 0.0)
@@ -374,7 +376,7 @@ class TestAggregateTransactionTotals(DatabaseTestCase):
 
     def test_aggregate_ignores_excluded_transactions(self) -> None:
         """Should not include EXCLUDED transactions in totals."""
-        from app.services.calculator import _aggregate_transaction_totals
+        from app.repositories.transaction_repository import TransactionRepository
 
         month = Month(year=2025, month=12)
         self.session.add(month)
@@ -407,7 +409,8 @@ class TestAggregateTransactionTotals(DatabaseTestCase):
         self.session.add_all(transactions)
         self.session.commit()
 
-        income, core, choice = _aggregate_transaction_totals(self.session, month.id)
+        transaction_repo = TransactionRepository(self.session)
+        income, core, choice = transaction_repo.aggregate_totals(month.id)
 
         # ##>: EXCLUDED transactions should not appear in any total.
         self.assertEqual(income, 5000.0)
@@ -420,6 +423,8 @@ class TestCalculateAndUpdateMonth(DatabaseTestCase):
 
     def test_updates_month_record_correctly(self) -> None:
         """Should update all Month fields with calculated stats."""
+        from app.repositories.month_repository import MonthRepository
+        from app.repositories.transaction_repository import TransactionRepository
         from app.services.calculator import calculate_and_update_month
 
         month = Month(year=2025, month=10)
@@ -453,7 +458,9 @@ class TestCalculateAndUpdateMonth(DatabaseTestCase):
         self.session.add_all(transactions)
         self.session.commit()
 
-        updated_month = calculate_and_update_month(self.session, month.id)
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+        updated_month = calculate_and_update_month(month_repo, transaction_repo, month.id)
 
         self.assertEqual(updated_month.total_income, 10000.0)
         self.assertEqual(updated_month.total_core, 4000.0)
@@ -467,15 +474,22 @@ class TestCalculateAndUpdateMonth(DatabaseTestCase):
 
     def test_raises_month_not_found_error(self) -> None:
         """Should raise MonthNotFoundError for non-existent month_id."""
+        from app.repositories.month_repository import MonthRepository
+        from app.repositories.transaction_repository import TransactionRepository
         from app.services.calculator import calculate_and_update_month
 
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         with self.assertRaises(MonthNotFoundError) as context:
-            calculate_and_update_month(self.session, month_id=99999)
+            calculate_and_update_month(month_repo, transaction_repo, month_id=99999)
 
         self.assertEqual(context.exception.month_id, 99999)
 
     def test_recalculation_after_category_change(self) -> None:
         """Should recalculate correctly after transaction category is changed."""
+        from app.repositories.month_repository import MonthRepository
+        from app.repositories.transaction_repository import TransactionRepository
         from app.services.calculator import calculate_and_update_month
 
         month = Month(year=2025, month=10)
@@ -499,8 +513,11 @@ class TestCalculateAndUpdateMonth(DatabaseTestCase):
         self.session.add_all([income_tx, expense_tx])
         self.session.commit()
 
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         # ##>: First calculation.
-        first_result = calculate_and_update_month(self.session, month.id)
+        first_result = calculate_and_update_month(month_repo, transaction_repo, month.id)
         self.assertEqual(first_result.total_core, 3000.0)
         self.assertEqual(first_result.total_choice, 0.0)
 
@@ -509,7 +526,7 @@ class TestCalculateAndUpdateMonth(DatabaseTestCase):
         self.session.commit()
 
         # ##>: Recalculate after category change.
-        second_result = calculate_and_update_month(self.session, month.id)
+        second_result = calculate_and_update_month(month_repo, transaction_repo, month.id)
         self.assertEqual(second_result.total_core, 0.0)
         self.assertEqual(second_result.total_choice, 3000.0)
 

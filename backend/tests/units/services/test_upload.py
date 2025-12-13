@@ -182,12 +182,19 @@ class TestUploadServiceCategorization(DatabaseTestCase):
             1,
         )
 
+        from app.repositories.month_repository import MonthRepository
+        from app.repositories.transaction_repository import TransactionRepository
+
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         service = UploadService()
         result = service.process_categorization(
             file_content=b"csv",
             months_to_process=["2025-03"],
             import_mode="replace",
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
 
         self.assertTrue(result["success"])
@@ -260,12 +267,19 @@ class TestUploadServiceCategorization(DatabaseTestCase):
             1,
         )
 
+        from app.repositories.month_repository import MonthRepository
+        from app.repositories.transaction_repository import TransactionRepository
+
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         service = UploadService()
         result = service.process_categorization(
             file_content=b"csv",
             months_to_process=["all"],
             import_mode="replace",
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
 
         self.assertEqual(len(result["months_processed"]), 2)
@@ -313,12 +327,19 @@ class TestUploadServiceCategorization(DatabaseTestCase):
             2,  # Simulate 2 API calls
         )
 
+        from app.repositories.month_repository import MonthRepository
+        from app.repositories.transaction_repository import TransactionRepository
+
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         service = UploadService()
         result = service.process_categorization(
             file_content=b"csv",
             months_to_process=["2025-04"],
             import_mode="replace",
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
 
         self.assertIn("total_api_calls", result)
@@ -389,12 +410,19 @@ class TestUploadServiceImportModes(DatabaseTestCase):
             1,
         )
 
+        from app.repositories.month_repository import MonthRepository
+        from app.repositories.transaction_repository import TransactionRepository
+
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         service = UploadService()
         service.process_categorization(
             file_content=b"csv",
             months_to_process=["2025-05"],
             import_mode="replace",
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
 
         # ##>: Expire session cache to get fresh data from database.
@@ -485,12 +513,19 @@ class TestUploadServiceImportModes(DatabaseTestCase):
             1,
         )
 
+        from app.repositories.month_repository import MonthRepository
+        from app.repositories.transaction_repository import TransactionRepository
+
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         service = UploadService()
         result = service.process_categorization(
             file_content=b"csv",
             months_to_process=["2025-06"],
             import_mode="merge",
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
 
         # ##>: Should only insert 1 new transaction (skip duplicate).
@@ -551,12 +586,19 @@ class TestUploadServiceImportModes(DatabaseTestCase):
             1,
         )
 
+        from app.repositories.month_repository import MonthRepository
+        from app.repositories.transaction_repository import TransactionRepository
+
+        month_repo = MonthRepository(self.session)
+        transaction_repo = TransactionRepository(self.session)
+
         service = UploadService()
         result = service.process_categorization(
             file_content=b"csv",
             months_to_process=["2025-07"],
             import_mode="merge",
-            db=self.session,
+            month_repo=month_repo,
+            transaction_repo=transaction_repo,
         )
 
         self.assertEqual(result["months_processed"][0]["transactions_categorized"], 1)
@@ -603,7 +645,8 @@ class TestUploadServiceValidation(TestCase):
                 file_content=b"csv",
                 months_to_process=["invalid-format"],
                 import_mode="replace",
-                db=MagicMock(),
+                month_repo=MagicMock(),
+                transaction_repo=MagicMock(),
             )
 
         self.assertEqual(context.exception.value, "invalid-format")
