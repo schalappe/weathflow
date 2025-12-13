@@ -291,160 +291,156 @@ export function DashboardClient() {
 
   return (
     <div className="space-y-6">
-        {/* Loading State */}
-        {state.pageState === "loading" && state.monthsList.length === 0 && (
-          <div className="flex items-center justify-center py-24">
-            <div className="flex flex-col items-center gap-4">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-500 border-t-transparent" />
-              <p className="text-muted-foreground">Loading...</p>
-            </div>
+      {/* Loading State */}
+      {state.pageState === "loading" && state.monthsList.length === 0 && (
+        <div className="flex items-center justify-center py-24">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-500 border-t-transparent" />
+            <p className="text-muted-foreground">Loading...</p>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Empty State */}
-        {state.pageState === "empty" && (
-          <Card className="mx-auto max-w-md">
-            <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
-              <div className="rounded-full bg-muted p-4">
-                <Upload className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">
-                  No months imported yet
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Import your first Bankin&apos; CSV export to see your Money
-                  Map dashboard.
-                </p>
-              </div>
-              <Button asChild>
-                <Link href="/import">Import Transactions</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+      {/* Empty State */}
+      {state.pageState === "empty" && (
+        <Card className="mx-auto max-w-md">
+          <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+            <div className="rounded-full bg-muted p-4">
+              <Upload className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">No months imported yet</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Import your first Bankin&apos; CSV export to see your Money Map
+                dashboard.
+              </p>
+            </div>
+            <Button asChild>
+              <Link href="/import">Import Transactions</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Error State */}
-        {state.pageState === "error" && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between">
-              <span>{state.error}</span>
-              <Button variant="outline" size="sm" onClick={handleRetry}>
-                Try Again
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
+      {/* Error State */}
+      {state.pageState === "error" && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>{state.error}</span>
+            <Button variant="outline" size="sm" onClick={handleRetry}>
+              Try Again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
-        {/* [>]: Show dashboard when data exists. During loading (pagination/month change), keep
+      {/* [>]: Show dashboard when data exists. During loading (pagination/month change), keep
             showing old data for optimistic UI instead of flashing a loading spinner. */}
-        {(state.pageState === "loaded" ||
-          (state.pageState === "loading" && state.monthDetail)) &&
-          state.monthDetail &&
-          state.selectedMonth && (
-            <>
-              {/* Month Selector Row */}
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-medium text-foreground">
-                  Dashboard
-                </h2>
-                <div className="flex items-center gap-4">
-                  {/* [>]: Show export buttons when a month is selected and data is loaded. */}
-                  <ExportButtons
-                    year={state.selectedMonth.year}
-                    month={state.selectedMonth.month}
-                    disabled={isLoading}
-                  />
-                  <MonthSelector
-                    months={state.monthsList}
-                    selectedYear={state.selectedMonth.year}
-                    selectedMonth={state.selectedMonth.month}
-                    onMonthChange={handleMonthChange}
-                    isDisabled={isLoading}
-                  />
-                </div>
+      {(state.pageState === "loaded" ||
+        (state.pageState === "loading" && state.monthDetail)) &&
+        state.monthDetail &&
+        state.selectedMonth && (
+          <>
+            {/* Month Selector Row */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-medium text-foreground">Dashboard</h2>
+              <div className="flex items-center gap-4">
+                {/* [>]: Show export buttons when a month is selected and data is loaded. */}
+                <ExportButtons
+                  year={state.selectedMonth.year}
+                  month={state.selectedMonth.month}
+                  disabled={isLoading}
+                />
+                <MonthSelector
+                  months={state.monthsList}
+                  selectedYear={state.selectedMonth.year}
+                  selectedMonth={state.selectedMonth.month}
+                  onMonthChange={handleMonthChange}
+                  isDisabled={isLoading}
+                />
               </div>
+            </div>
 
-              {/* Score Card */}
-              <ScoreCard
-                score={state.monthDetail.month.score}
-                scoreLabel={state.monthDetail.month.score_label}
-                monthDisplay={formatMonthDisplay(
-                  state.monthDetail.month.year,
-                  state.monthDetail.month.month,
-                )}
-              />
+            {/* Score Card */}
+            <ScoreCard
+              score={state.monthDetail.month.score}
+              scoreLabel={state.monthDetail.month.score_label}
+              monthDisplay={formatMonthDisplay(
+                state.monthDetail.month.year,
+                state.monthDetail.month.month,
+              )}
+            />
 
-              {/* [>]: Metric Cards Grid. Backend returns expense categories as negative values,
+            {/* [>]: Metric Cards Grid. Backend returns expense categories as negative values,
                   so Math.abs() is applied for display. Income is already positive. */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <MetricCard
-                  title="Income"
-                  amount={state.monthDetail.month.total_income}
-                  colorClass={CATEGORY_TAILWIND.INCOME}
-                />
-                <MetricCard
-                  title="Core"
-                  amount={Math.abs(state.monthDetail.month.total_core)}
-                  percentage={state.monthDetail.month.core_percentage}
-                  isSuccess={meetsThreshold(
-                    "CORE",
-                    state.monthDetail.month.core_percentage,
-                  )}
-                  colorClass={CATEGORY_TAILWIND.CORE}
-                />
-                <MetricCard
-                  title="Choice"
-                  amount={Math.abs(state.monthDetail.month.total_choice)}
-                  percentage={state.monthDetail.month.choice_percentage}
-                  isSuccess={meetsThreshold(
-                    "CHOICE",
-                    state.monthDetail.month.choice_percentage,
-                  )}
-                  colorClass={CATEGORY_TAILWIND.CHOICE}
-                />
-                <MetricCard
-                  title="Compound"
-                  amount={Math.abs(state.monthDetail.month.total_compound)}
-                  percentage={state.monthDetail.month.compound_percentage}
-                  isSuccess={meetsThreshold(
-                    "COMPOUND",
-                    state.monthDetail.month.compound_percentage,
-                  )}
-                  colorClass={CATEGORY_TAILWIND.COMPOUND}
-                  compoundDirection={
-                    state.monthDetail.month.total_compound >= 0
-                      ? "positive"
-                      : "negative"
-                  }
-                />
-              </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <MetricCard
+                title="Income"
+                amount={state.monthDetail.month.total_income}
+                colorClass={CATEGORY_TAILWIND.INCOME}
+              />
+              <MetricCard
+                title="Core"
+                amount={Math.abs(state.monthDetail.month.total_core)}
+                percentage={state.monthDetail.month.core_percentage}
+                isSuccess={meetsThreshold(
+                  "CORE",
+                  state.monthDetail.month.core_percentage,
+                )}
+                colorClass={CATEGORY_TAILWIND.CORE}
+              />
+              <MetricCard
+                title="Choice"
+                amount={Math.abs(state.monthDetail.month.total_choice)}
+                percentage={state.monthDetail.month.choice_percentage}
+                isSuccess={meetsThreshold(
+                  "CHOICE",
+                  state.monthDetail.month.choice_percentage,
+                )}
+                colorClass={CATEGORY_TAILWIND.CHOICE}
+              />
+              <MetricCard
+                title="Compound"
+                amount={Math.abs(state.monthDetail.month.total_compound)}
+                percentage={state.monthDetail.month.compound_percentage}
+                isSuccess={meetsThreshold(
+                  "COMPOUND",
+                  state.monthDetail.month.compound_percentage,
+                )}
+                colorClass={CATEGORY_TAILWIND.COMPOUND}
+                compoundDirection={
+                  state.monthDetail.month.total_compound >= 0
+                    ? "positive"
+                    : "negative"
+                }
+              />
+            </div>
 
-              {/* Pie Chart and Transaction Table */}
-              <div className="grid gap-6 lg:grid-cols-3">
-                <div className="lg:col-span-1">
-                  <SpendingPieChart
-                    core={state.monthDetail.month.total_core}
-                    choice={state.monthDetail.month.total_choice}
-                    compound={state.monthDetail.month.total_compound}
-                  />
-                </div>
-                <div className="lg:col-span-2">
-                  <TransactionTable
-                    transactions={state.monthDetail.transactions}
-                    pagination={state.monthDetail.pagination}
-                    onPageChange={handlePageChange}
-                    onTransactionClick={handleTransactionClick}
-                    isLoading={isLoading}
-                    filters={state.filters}
-                    onFiltersChange={handleFiltersChange}
-                    selectedMonth={state.selectedMonth}
-                  />
-                </div>
+            {/* Pie Chart and Transaction Table */}
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-1">
+                <SpendingPieChart
+                  core={state.monthDetail.month.total_core}
+                  choice={state.monthDetail.month.total_choice}
+                  compound={state.monthDetail.month.total_compound}
+                />
               </div>
-            </>
-          )}
+              <div className="lg:col-span-2">
+                <TransactionTable
+                  transactions={state.monthDetail.transactions}
+                  pagination={state.monthDetail.pagination}
+                  onPageChange={handlePageChange}
+                  onTransactionClick={handleTransactionClick}
+                  isLoading={isLoading}
+                  filters={state.filters}
+                  onFiltersChange={handleFiltersChange}
+                  selectedMonth={state.selectedMonth}
+                />
+              </div>
+            </div>
+          </>
+        )}
 
       {/* Transaction Edit Modal */}
       {/* [>]: Key resets modal state when switching between transactions. */}

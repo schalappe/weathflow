@@ -2,12 +2,16 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ImportPageClient } from "@/components/import/import-page-client";
 import * as apiClient from "@/lib/api-client";
+import { useRouter } from "next/navigation";
 
 // [>]: Mock the API client module.
 vi.mock("@/lib/api-client", () => ({
   uploadCSV: vi.fn(),
   categorize: vi.fn(),
 }));
+
+// [>]: Get mocked router for assertions.
+vi.mock("next/navigation");
 
 const mockUploadResponse = {
   success: true,
@@ -135,6 +139,15 @@ describe("ImportPageClient", () => {
   });
 
   it("state transitions follow correct flow", async () => {
+    const mockPush = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({
+      push: mockPush,
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      prefetch: vi.fn(),
+    });
     vi.mocked(apiClient.uploadCSV).mockResolvedValue(mockUploadResponse);
     vi.mocked(apiClient.categorize).mockResolvedValue(mockCategorizeResponse);
 
@@ -165,12 +178,10 @@ describe("ImportPageClient", () => {
       expect(screen.getByText(/import complete/i)).toBeInTheDocument();
     });
 
-    // [>]: Click finish -> back to empty.
+    // [>]: Click finish -> navigates to homepage.
     fireEvent.click(screen.getByRole("button", { name: /finish import/i }));
 
-    await waitFor(() => {
-      expect(screen.getByText(/drag your csv file here/i)).toBeInTheDocument();
-    });
+    expect(mockPush).toHaveBeenCalledWith("/");
   });
 
   it("categorization API error displays error with retry option", async () => {
