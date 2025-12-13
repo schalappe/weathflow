@@ -72,8 +72,8 @@ describe("TransactionTable", () => {
 
     expect(screen.getByText("Date")).toBeInTheDocument();
     expect(screen.getByText("Description")).toBeInTheDocument();
-    expect(screen.getByText("Amount")).toBeInTheDocument();
-    expect(screen.getByText("Category")).toBeInTheDocument();
+    expect(screen.getByText("Montant")).toBeInTheDocument();
+    expect(screen.getByText("Catégorie")).toBeInTheDocument();
   });
 
   it("formats date as DD/MM", () => {

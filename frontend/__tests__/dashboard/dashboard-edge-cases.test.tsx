@@ -48,12 +48,12 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
       render(<DashboardClient />);
 
       await waitFor(() => {
-        expect(screen.getByText("No data yet")).toBeInTheDocument();
+        expect(screen.getByText("Aucune donnée")).toBeInTheDocument();
       });
 
-      // [>]: Should have CTA to import page (button says "Import Transactions").
+      // [>]: Should have CTA to import page (button says "Importer des transactions").
       expect(
-        screen.getByRole("link", { name: /import transactions/i }),
+        screen.getByRole("link", { name: /Importer des transactions/i }),
       ).toHaveAttribute("href", "/import");
     });
   });
@@ -81,7 +81,7 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
         />,
       );
 
-      expect(screen.getByText("No transactions")).toBeInTheDocument();
+      expect(screen.getByText("Aucune transaction")).toBeInTheDocument();
     });
 
     it("applies loading overlay when isLoading is true", () => {
@@ -187,17 +187,17 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
       });
 
       // [>]: Verify all metric cards rendered (use getAllByText since categories may appear multiple times).
-      expect(screen.getAllByText("Income").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("Core").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("Choice").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("Compound").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Revenus").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Essentiel").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Plaisir").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Épargne").length).toBeGreaterThan(0);
 
       // [>]: Verify transaction table.
       expect(screen.getByText("Transactions")).toBeInTheDocument();
       expect(screen.getByText("Test Transaction")).toBeInTheDocument();
 
       // [>]: Verify pie chart.
-      expect(screen.getByText("Spending Distribution")).toBeInTheDocument();
+      expect(screen.getByText("Répartition des dépenses")).toBeInTheDocument();
     });
   });
 });

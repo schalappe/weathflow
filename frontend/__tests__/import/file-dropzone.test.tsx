@@ -51,7 +51,7 @@ describe("FileDropzone", () => {
 
     expect(onFileSelected).not.toHaveBeenCalled();
     expect(onValidationError).toHaveBeenCalledWith(
-      "Invalid file type. Please select a CSV file (.csv extension required).",
+      "Type de fichier invalide. Veuillez sélectionner un fichier CSV (extension .csv requise).",
     );
   });
 
@@ -79,7 +79,7 @@ describe("FileDropzone", () => {
 
     expect(onFileSelected).not.toHaveBeenCalled();
     expect(onValidationError).toHaveBeenCalledWith(
-      "Invalid file type. Please select a CSV file (.csv extension required).",
+      "Type de fichier invalide. Veuillez sélectionner un fichier CSV (extension .csv requise).",
     );
   });
 
@@ -120,7 +120,7 @@ describe("FileDropzone", () => {
       dataTransfer: { types: ["Files"] },
     });
 
-    // [>]: Dropzone should show "Drop to upload" text when dragging.
-    expect(screen.getByText(/drop to upload/i)).toBeInTheDocument();
+    // [>]: Dropzone should show "Déposez pour télécharger" text when dragging.
+    expect(screen.getByText(/Déposez pour télécharger/i)).toBeInTheDocument();
   });
 });

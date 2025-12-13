@@ -45,7 +45,7 @@ const mockCategorizeResponse = {
       transactions_skipped: 0,
       low_confidence_count: 3,
       score: 3,
-      score_label: "Great" as const,
+      score_label: "Excellent" as const,
     },
   ],
   months_not_found: [],
@@ -63,7 +63,9 @@ describe("ImportPageClient", () => {
     render(<ImportPageClient />);
 
     // [>]: Initially shows dropzone.
-    expect(screen.getByText(/drag your csv file here/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Glissez votre fichier CSV ici/i),
+    ).toBeInTheDocument();
 
     // [>]: Simulate file upload.
     const input = document.querySelector(
@@ -79,7 +81,7 @@ describe("ImportPageClient", () => {
 
     // [>]: Should show preview state with months.
     await waitFor(() => {
-      expect(screen.getByText("Jan 2025")).toBeInTheDocument();
+      expect(screen.getByText("janvier 2025")).toBeInTheDocument();
     });
   });
 
@@ -98,18 +100,18 @@ describe("ImportPageClient", () => {
 
     // [>]: Wait for preview state.
     await waitFor(() => {
-      expect(screen.getByText("Jan 2025")).toBeInTheDocument();
+      expect(screen.getByText("janvier 2025")).toBeInTheDocument();
     });
 
     // [>]: Click categorize button.
     const categorizeButton = screen.getByRole("button", {
-      name: /categorize with ai/i,
+      name: /Catégoriser avec l'IA/i,
     });
     fireEvent.click(categorizeButton);
 
     // [>]: Wait for results.
     await waitFor(() => {
-      expect(screen.getByText(/import complete/i)).toBeInTheDocument();
+      expect(screen.getByText(/Import terminé/i)).toBeInTheDocument();
     });
   });
 
@@ -132,9 +134,9 @@ describe("ImportPageClient", () => {
       expect(screen.getAllByText(/network error/i).length).toBeGreaterThan(0);
     });
 
-    // [>]: Should show Try Again button.
+    // [>]: Should show Réessayer button.
     expect(
-      screen.getByRole("button", { name: /try again/i }),
+      screen.getByRole("button", { name: /Réessayer/i }),
     ).toBeInTheDocument();
   });
 
@@ -154,7 +156,9 @@ describe("ImportPageClient", () => {
     render(<ImportPageClient />);
 
     // [>]: Initial: empty state - dropzone visible.
-    expect(screen.getByText(/drag your csv file here/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Glissez votre fichier CSV ici/i),
+    ).toBeInTheDocument();
 
     // [>]: Upload file -> uploading -> preview.
     const input = document.querySelector(
@@ -165,21 +169,21 @@ describe("ImportPageClient", () => {
 
     // [>]: Preview state - months table visible.
     await waitFor(() => {
-      expect(screen.getByText("Jan 2025")).toBeInTheDocument();
+      expect(screen.getByText("janvier 2025")).toBeInTheDocument();
     });
 
     // [>]: Click categorize -> categorizing -> results.
     fireEvent.click(
-      screen.getByRole("button", { name: /categorize with ai/i }),
+      screen.getByRole("button", { name: /Catégoriser avec l'IA/i }),
     );
 
     // [>]: Results state - success message visible.
     await waitFor(() => {
-      expect(screen.getByText(/import complete/i)).toBeInTheDocument();
+      expect(screen.getByText(/Import terminé/i)).toBeInTheDocument();
     });
 
     // [>]: Click finish -> navigates to homepage.
-    fireEvent.click(screen.getByRole("button", { name: /finish import/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Terminer l'import/i }));
 
     expect(mockPush).toHaveBeenCalledWith("/");
   });
@@ -201,12 +205,12 @@ describe("ImportPageClient", () => {
 
     // [>]: Wait for preview state.
     await waitFor(() => {
-      expect(screen.getByText("Jan 2025")).toBeInTheDocument();
+      expect(screen.getByText("janvier 2025")).toBeInTheDocument();
     });
 
     // [>]: Click categorize button.
     fireEvent.click(
-      screen.getByRole("button", { name: /categorize with ai/i }),
+      screen.getByRole("button", { name: /Catégoriser avec l'IA/i }),
     );
 
     // [>]: Error shows in both Alert and FileDropzone, use getAllByText.
@@ -217,7 +221,7 @@ describe("ImportPageClient", () => {
     });
 
     expect(
-      screen.getByRole("button", { name: /try again/i }),
+      screen.getByRole("button", { name: /Réessayer/i }),
     ).toBeInTheDocument();
   });
 });

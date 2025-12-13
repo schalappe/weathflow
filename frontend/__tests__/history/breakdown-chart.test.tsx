@@ -21,7 +21,7 @@ describe("SpendingBreakdownChart", () => {
 
     const { container } = render(<SpendingBreakdownChart months={months} />);
 
-    expect(screen.getByText("Spending Breakdown")).toBeInTheDocument();
+    expect(screen.getByText("Répartition des dépenses")).toBeInTheDocument();
     expect(
       container.querySelector(".recharts-responsive-container"),
     ).toBeInTheDocument();
@@ -32,7 +32,9 @@ describe("SpendingBreakdownChart", () => {
     render(<SpendingBreakdownChart months={[]} />);
 
     expect(screen.getByTestId("empty-state")).toBeInTheDocument();
-    expect(screen.getByText("No spending data available")).toBeInTheDocument();
+    expect(
+      screen.getByText("Aucune donnée de dépenses disponible"),
+    ).toBeInTheDocument();
   });
 
   it("skips months with zero percentages", () => {

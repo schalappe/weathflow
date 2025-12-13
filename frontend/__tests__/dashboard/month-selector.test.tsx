@@ -54,7 +54,7 @@ describe("MonthSelector", () => {
 
     // [>]: Trigger should show selected month.
     expect(screen.getByRole("combobox")).toBeInTheDocument();
-    expect(screen.getByLabelText("Select month")).toBeInTheDocument();
+    expect(screen.getByLabelText("Sélectionner le mois")).toBeInTheDocument();
   });
 
   it("displays selected month value", () => {
@@ -69,7 +69,7 @@ describe("MonthSelector", () => {
     );
 
     // [>]: The selected month should be visible in the trigger.
-    expect(screen.getByText("Oct 2025")).toBeInTheDocument();
+    expect(screen.getByText("octobre 2025")).toBeInTheDocument();
   });
 
   it("disables dropdown when isDisabled is true", () => {

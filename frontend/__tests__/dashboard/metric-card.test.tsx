@@ -4,45 +4,52 @@ import { MetricCard } from "@/components/dashboard/metric-card";
 
 describe("MetricCard", () => {
   it("renders category title and formatted amount", () => {
-    render(<MetricCard title="Income" amount={2500} />);
+    render(<MetricCard title="Revenus" amount={2500} />);
 
-    expect(screen.getByText("Income")).toBeInTheDocument();
+    expect(screen.getByText("Revenus")).toBeInTheDocument();
     // [>]: French locale formats 2500 as "2 500 €".
     expect(screen.getByText(/2[\s\u00A0]500[\s\u00A0]€/)).toBeInTheDocument();
   });
 
   it("renders percentage for non-Income categories", () => {
     render(
-      <MetricCard title="Core" amount={1200} percentage={48.5} isSuccess />,
+      <MetricCard
+        title="Essentiel"
+        amount={1200}
+        percentage={48.5}
+        isSuccess
+      />,
     );
 
-    // [>]: New UI shows "X% of income" format.
-    expect(screen.getByText("48.5% of income")).toBeInTheDocument();
+    // [>]: New UI shows "X% des revenus" format.
+    expect(screen.getByText("48.5% des revenus")).toBeInTheDocument();
   });
 
   it("shows checkmark when threshold met", () => {
-    render(<MetricCard title="Core" amount={1200} percentage={45} isSuccess />);
+    render(
+      <MetricCard title="Essentiel" amount={1200} percentage={45} isSuccess />,
+    );
 
-    expect(screen.getByLabelText("Threshold met")).toBeInTheDocument();
+    expect(screen.getByLabelText("Objectif atteint")).toBeInTheDocument();
   });
 
   it("shows X icon when threshold exceeded", () => {
     render(
       <MetricCard
-        title="Core"
+        title="Essentiel"
         amount={1500}
         percentage={60}
         isSuccess={false}
       />,
     );
 
-    expect(screen.getByLabelText("Threshold exceeded")).toBeInTheDocument();
+    expect(screen.getByLabelText("Objectif dépassé")).toBeInTheDocument();
   });
 
   it("shows Savings indicator when compound is positive", () => {
     render(
       <MetricCard
-        title="Compound"
+        title="Épargne"
         amount={500}
         percentage={20}
         isSuccess
@@ -50,13 +57,13 @@ describe("MetricCard", () => {
       />,
     );
 
-    expect(screen.getByText("Savings")).toBeInTheDocument();
+    expect(screen.getByText("Épargne")).toBeInTheDocument();
   });
 
   it("shows Withdrawal indicator when compound is negative", () => {
     render(
       <MetricCard
-        title="Compound"
+        title="Épargne"
         amount={1082}
         percentage={-75.3}
         isSuccess={false}
@@ -64,15 +71,20 @@ describe("MetricCard", () => {
       />,
     );
 
-    expect(screen.getByText("Withdrawal")).toBeInTheDocument();
+    expect(screen.getByText("Retrait")).toBeInTheDocument();
   });
 
   it("does not show direction indicator for non-Compound categories", () => {
     render(
-      <MetricCard title="Core" amount={1200} percentage={48.5} isSuccess />,
+      <MetricCard
+        title="Essentiel"
+        amount={1200}
+        percentage={48.5}
+        isSuccess
+      />,
     );
 
-    expect(screen.queryByText("Savings")).not.toBeInTheDocument();
-    expect(screen.queryByText("Withdrawal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Épargne")).not.toBeInTheDocument();
+    expect(screen.queryByText("Retrait")).not.toBeInTheDocument();
   });
 });

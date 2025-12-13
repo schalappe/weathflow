@@ -79,7 +79,7 @@ describe("Additional Strategic Tests", () => {
 
     // [>]: Should show retry button.
     expect(
-      screen.getByRole("button", { name: /try again/i }),
+      screen.getByRole("button", { name: /Réessayer/i }),
     ).toBeInTheDocument();
   });
 
@@ -95,15 +95,17 @@ describe("Additional Strategic Tests", () => {
     fireEvent.change(input, { target: { files: [csvFile] } });
 
     await waitFor(() => {
-      expect(screen.getByText("Jan 2025")).toBeInTheDocument();
+      expect(screen.getByText("janvier 2025")).toBeInTheDocument();
     });
 
     // [>]: Deselect all months.
-    fireEvent.click(screen.getByRole("button", { name: "Deselect All" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Tout désélectionner" }),
+    );
 
     // [>]: Categorize button should be disabled.
     const categorizeButton = screen.getByRole("button", {
-      name: /categorize with ai/i,
+      name: /Catégoriser avec l'IA/i,
     });
     expect(categorizeButton).toBeDisabled();
   });
@@ -126,9 +128,9 @@ describe("Additional Strategic Tests", () => {
       expect(uploadMock).toHaveBeenCalledWith(file1);
     });
 
-    // [>]: Clear mock and click start over button.
+    // [>]: Clear mock and click Recommencer button.
     uploadMock.mockClear();
-    fireEvent.click(screen.getByRole("button", { name: /start over/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Recommencer/i }));
 
     // [>]: Page reloads on cancel, so we can't test further here.
     // The test verifies the first upload worked.
@@ -148,8 +150,8 @@ describe("Additional Strategic Tests", () => {
   });
 
   it("month display formatting produces correct MMM YYYY format", () => {
-    expect(formatMonthDisplay(2025, 1)).toBe("Jan 2025");
-    expect(formatMonthDisplay(2025, 12)).toBe("Dec 2025");
+    expect(formatMonthDisplay(2025, 1)).toBe("janvier 2025");
+    expect(formatMonthDisplay(2025, 12)).toBe("décembre 2025");
   });
 
   it("dropzone shows file type validation error for non-CSV", () => {

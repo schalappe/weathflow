@@ -8,8 +8,8 @@ describe("ImportOptions", () => {
       <ImportOptions mode="merge" onModeChange={vi.fn()} isDisabled={false} />,
     );
 
-    expect(screen.getByLabelText(/replace/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/merge/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Remplacer/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Fusionner/i)).toBeInTheDocument();
   });
 
   it("mode change triggers callback with correct value", () => {
@@ -23,7 +23,7 @@ describe("ImportOptions", () => {
     );
 
     // [>]: Click the Replace option.
-    fireEvent.click(screen.getByLabelText(/replace/i));
+    fireEvent.click(screen.getByLabelText(/Remplacer/i));
 
     expect(onModeChange).toHaveBeenCalledWith("replace");
   });

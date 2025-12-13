@@ -55,17 +55,17 @@ describe("AdvicePanel - State Management", () => {
     render(<AdvicePanel year={2025} month={12} />);
 
     await waitFor(() => {
-      expect(screen.getByText("No insights available")).toBeInTheDocument();
+      expect(screen.getByText("Aucun conseil disponible")).toBeInTheDocument();
     });
 
     expect(
       screen.getByText(
-        "Generate personalized advice based on your last 3 months of transactions.",
+        "Générez des conseils personnalisés basés sur vos 3 derniers mois de transactions.",
       ),
     ).toBeInTheDocument();
 
     expect(
-      screen.getByRole("button", { name: /Generate Insights/i }),
+      screen.getByRole("button", { name: /Générer des conseils/i }),
     ).toBeInTheDocument();
   });
 
@@ -82,14 +82,14 @@ describe("AdvicePanel - State Management", () => {
     render(<AdvicePanel year={2025} month={12} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Trend Analysis")).toBeInTheDocument();
+      expect(screen.getByText("Analyse des tendances")).toBeInTheDocument();
     });
 
     // [>]: All sections should be visible.
     expect(screen.getByText(mockAdvice.analysis)).toBeInTheDocument();
-    expect(screen.getByText("Areas to Watch")).toBeInTheDocument();
-    expect(screen.getByText("Recommendations")).toBeInTheDocument();
-    expect(screen.getByText("Keep it up!")).toBeInTheDocument();
+    expect(screen.getByText("Points de vigilance")).toBeInTheDocument();
+    expect(screen.getByText("Recommandations")).toBeInTheDocument();
+    expect(screen.getByText("Continuez comme ça !")).toBeInTheDocument();
     expect(screen.getByText(mockAdvice.encouragement)).toBeInTheDocument();
   });
 
@@ -102,7 +102,9 @@ describe("AdvicePanel - State Management", () => {
       expect(screen.getByText("Network error")).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("button", { name: /Retry/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Réessayer/i }),
+    ).toBeInTheDocument();
   });
 
   it("trend colors are correct: red for positive, green for negative", async () => {
@@ -167,15 +169,15 @@ describe("AdvicePanel - State Management", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /Regenerate/i }),
+        screen.getByRole("button", { name: /Régénérer/i }),
       ).toBeInTheDocument();
     });
 
     // [>]: Click regenerate button.
-    await user.click(screen.getByRole("button", { name: /Regenerate/i }));
+    await user.click(screen.getByRole("button", { name: /Régénérer/i }));
 
     // [>]: Should show loading state with spinner.
-    expect(screen.getByText("Regenerating...")).toBeInTheDocument();
+    expect(screen.getByText("Régénération...")).toBeInTheDocument();
   });
 });
 
@@ -206,12 +208,12 @@ describe("AdvicePanel - User Interactions", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /Generate Insights/i }),
+        screen.getByRole("button", { name: /Générer des conseils/i }),
       ).toBeInTheDocument();
     });
 
     await user.click(
-      screen.getByRole("button", { name: /Generate Insights/i }),
+      screen.getByRole("button", { name: /Générer des conseils/i }),
     );
 
     // [>]: Should call generateAdvice with regenerate=false.
@@ -221,7 +223,7 @@ describe("AdvicePanel - User Interactions", () => {
 
     // [>]: Should show advice content after generation.
     await waitFor(() => {
-      expect(screen.getByText("Trend Analysis")).toBeInTheDocument();
+      expect(screen.getByText("Analyse des tendances")).toBeInTheDocument();
     });
   });
 
@@ -247,11 +249,11 @@ describe("AdvicePanel - User Interactions", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /Regenerate/i }),
+        screen.getByRole("button", { name: /Régénérer/i }),
       ).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: /Regenerate/i }));
+    await user.click(screen.getByRole("button", { name: /Régénérer/i }));
 
     // [>]: Should call generateAdvice with regenerate=true (existing advice).
     await waitFor(() => {
@@ -278,7 +280,7 @@ describe("AdvicePanel - User Interactions", () => {
       expect(screen.getByText("Network error")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: /Retry/i }));
+    await user.click(screen.getByRole("button", { name: /Réessayer/i }));
 
     await waitFor(() => {
       expect(mockGetAdvice).toHaveBeenCalledTimes(2);
@@ -324,11 +326,11 @@ describe("AdvicePanel - User Interactions", () => {
 
     // [>]: Wait for advice to load.
     await waitFor(() => {
-      expect(screen.getByText("Trend Analysis")).toBeInTheDocument();
+      expect(screen.getByText("Analyse des tendances")).toBeInTheDocument();
     });
 
     // [>]: Click regenerate button.
-    await user.click(screen.getByRole("button", { name: /Regenerate/i }));
+    await user.click(screen.getByRole("button", { name: /Régénérer/i }));
 
     // [>]: Error banner should appear.
     await waitFor(() => {
@@ -355,11 +357,11 @@ describe("AdvicePanel - User Interactions", () => {
     render(<AdvicePanel year={2025} month={12} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Trend Analysis")).toBeInTheDocument();
+      expect(screen.getByText("Analyse des tendances")).toBeInTheDocument();
     });
 
     // [>]: Problem areas section should not be visible when empty.
-    expect(screen.queryByText("Areas to Watch")).not.toBeInTheDocument();
+    expect(screen.queryByText("Points de vigilance")).not.toBeInTheDocument();
   });
 
   it("hides recommendations section when array is empty", async () => {
@@ -377,11 +379,11 @@ describe("AdvicePanel - User Interactions", () => {
     render(<AdvicePanel year={2025} month={12} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Trend Analysis")).toBeInTheDocument();
+      expect(screen.getByText("Analyse des tendances")).toBeInTheDocument();
     });
 
     // [>]: Recommendations section should not be visible when empty.
-    expect(screen.queryByText("Recommendations")).not.toBeInTheDocument();
+    expect(screen.queryByText("Recommandations")).not.toBeInTheDocument();
   });
 
   it("shows gray color for neutral trend (0%)", async () => {
@@ -439,16 +441,16 @@ describe("AdvicePanel - User Interactions", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /Regenerate/i }),
+        screen.getByRole("button", { name: /Régénérer/i }),
       ).toBeInTheDocument();
     });
 
-    const button = screen.getByRole("button", { name: /Regenerate/i });
+    const button = screen.getByRole("button", { name: /Régénérer/i });
     await user.click(button);
 
     // [>]: Button should be disabled during regeneration.
     expect(
-      screen.getByRole("button", { name: /Regenerating/i }),
+      screen.getByRole("button", { name: /Régénération/i }),
     ).toBeDisabled();
   });
 });
@@ -468,10 +470,10 @@ describe("AdvicePanel - Error State Actionable Guidance", () => {
     });
 
     // [>]: Data-related error should show import link instead of retry.
-    const importLink = screen.getByRole("link", { name: /Import/i });
+    const importLink = screen.getByRole("link", { name: /Importer/i });
     expect(importLink).toHaveAttribute("href", "/import");
     expect(
-      screen.queryByRole("button", { name: /Retry/i }),
+      screen.queryByRole("button", { name: /Réessayer/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -489,7 +491,7 @@ describe("AdvicePanel - Error State Actionable Guidance", () => {
     });
 
     // [>]: Insufficient data should prompt import.
-    const importLink = screen.getByRole("link", { name: /Import/i });
+    const importLink = screen.getByRole("link", { name: /Importer/i });
     expect(importLink).toHaveAttribute("href", "/import");
   });
 
@@ -503,9 +505,11 @@ describe("AdvicePanel - Error State Actionable Guidance", () => {
     });
 
     // [>]: Network errors should show retry, not import link.
-    expect(screen.getByRole("button", { name: /Retry/i })).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /Import/i }),
+      screen.getByRole("button", { name: /Réessayer/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /Importer/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -519,6 +523,8 @@ describe("AdvicePanel - Error State Actionable Guidance", () => {
     });
 
     // [>]: Server errors can be retried.
-    expect(screen.getByRole("button", { name: /Retry/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Réessayer/i }),
+    ).toBeInTheDocument();
   });
 });

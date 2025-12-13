@@ -66,11 +66,11 @@ describe("HistoryClient - State Management", () => {
     render(<HistoryClient />);
 
     await waitFor(() => {
-      expect(screen.getByText("History")).toBeInTheDocument();
+      expect(screen.getByText("Historique")).toBeInTheDocument();
     });
 
     // [>]: Charts should be visible.
-    expect(screen.getByText("Score Evolution")).toBeInTheDocument();
+    expect(screen.getByText("Évolution du score")).toBeInTheDocument();
   });
 
   it("transitions to empty state when no months returned", async () => {
@@ -82,12 +82,12 @@ describe("HistoryClient - State Management", () => {
     render(<HistoryClient />);
 
     await waitFor(() => {
-      expect(screen.getByText("No historical data")).toBeInTheDocument();
+      expect(screen.getByText("Aucune donnée historique")).toBeInTheDocument();
     });
 
     expect(
       screen.getByText(
-        "Import your transactions to see your budget evolution over time and get personalized advice.",
+        "Importez vos transactions pour voir l'évolution de votre budget et recevoir des conseils personnalisés.",
       ),
     ).toBeInTheDocument();
   });
@@ -108,7 +108,7 @@ describe("HistoryClient - State Management", () => {
 
     // [>]: Wait for initial load.
     await waitFor(() => {
-      expect(screen.getByText("History")).toBeInTheDocument();
+      expect(screen.getByText("Historique")).toBeInTheDocument();
     });
 
     // [>]: Initial call should be with default period (12).
@@ -154,7 +154,7 @@ describe("HistoryClient - Data Fetching", () => {
 
     // [>]: Retry button should be visible.
     expect(
-      screen.getByRole("button", { name: /Try Again/i }),
+      screen.getByRole("button", { name: /Réessayer/i }),
     ).toBeInTheDocument();
   });
 
@@ -177,7 +177,7 @@ describe("HistoryClient - Data Fetching", () => {
     });
 
     // [>]: Click retry.
-    await user.click(screen.getByRole("button", { name: /Try Again/i }));
+    await user.click(screen.getByRole("button", { name: /Réessayer/i }));
 
     // [>]: Should fetch again.
     await waitFor(() => {
@@ -218,11 +218,11 @@ describe("HistoryClient - UI Rendering", () => {
     render(<HistoryClient />);
 
     await waitFor(() => {
-      expect(screen.getByText("No historical data")).toBeInTheDocument();
+      expect(screen.getByText("Aucune donnée historique")).toBeInTheDocument();
     });
 
     const importButton = screen.getByRole("link", {
-      name: /Import Transactions/i,
+      name: /Importer des transactions/i,
     });
     expect(importButton).toHaveAttribute("href", "/import");
   });
@@ -237,7 +237,7 @@ describe("HistoryClient - UI Rendering", () => {
     });
 
     expect(
-      screen.getByRole("button", { name: /Try Again/i }),
+      screen.getByRole("button", { name: /Réessayer/i }),
     ).toBeInTheDocument();
   });
 
@@ -255,10 +255,10 @@ describe("HistoryClient - UI Rendering", () => {
     render(<HistoryClient />);
 
     await waitFor(() => {
-      expect(screen.getByText("Score Evolution")).toBeInTheDocument();
+      expect(screen.getByText("Évolution du score")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Spending Breakdown")).toBeInTheDocument();
+    expect(screen.getByText("Répartition des dépenses")).toBeInTheDocument();
   });
 });
 

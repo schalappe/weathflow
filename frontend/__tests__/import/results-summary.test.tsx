@@ -11,7 +11,7 @@ const mockResults: MonthResult[] = [
     transactions_skipped: 0,
     low_confidence_count: 3,
     score: 3,
-    score_label: "Great",
+    score_label: "Excellent",
   },
   {
     year: 2025,
@@ -20,7 +20,7 @@ const mockResults: MonthResult[] = [
     transactions_skipped: 0,
     low_confidence_count: 0,
     score: 1,
-    score_label: "Need Improvement",
+    score_label: "À améliorer",
   },
 ];
 
@@ -35,13 +35,13 @@ describe("ResultsSummary", () => {
       />,
     );
 
-    // [>]: Check months are rendered.
-    expect(screen.getByText("Jan 2025")).toBeInTheDocument();
-    expect(screen.getByText("Feb 2025")).toBeInTheDocument();
+    // [>]: Check months are rendered (French format: janvier 2025, février 2025).
+    expect(screen.getByText("janvier 2025")).toBeInTheDocument();
+    expect(screen.getByText("février 2025")).toBeInTheDocument();
 
     // [>]: Check score labels are rendered.
-    expect(screen.getByText("Great")).toBeInTheDocument();
-    expect(screen.getByText("Need Improvement")).toBeInTheDocument();
+    expect(screen.getByText("Excellent")).toBeInTheDocument();
+    expect(screen.getByText("À améliorer")).toBeInTheDocument();
   });
 
   it("score badge displays correct color based on score value", () => {
@@ -54,12 +54,12 @@ describe("ResultsSummary", () => {
       />,
     );
 
-    // [>]: Check that the "Great" badge exists with Neutra green styling.
-    const greatBadge = screen.getByText("Great");
+    // [>]: Check that the "Excellent" badge exists with Neutra green styling.
+    const greatBadge = screen.getByText("Excellent");
     expect(greatBadge).toHaveClass("bg-[#788c5d]");
 
-    // [>]: Check that "Need Improvement" badge has Neutra coral styling.
-    const needImprovementBadge = screen.getByText("Need Improvement");
+    // [>]: Check that "À améliorer" badge has Neutra coral styling.
+    const needImprovementBadge = screen.getByText("À améliorer");
     expect(needImprovementBadge).toHaveClass("bg-[#d97757]");
   });
 
@@ -74,7 +74,7 @@ describe("ResultsSummary", () => {
     );
 
     const viewButton = screen.getByRole("button", {
-      name: /view transactions/i,
+      name: /Voir les transactions/i,
     });
     expect(viewButton).toBeDisabled();
   });
@@ -90,7 +90,7 @@ describe("ResultsSummary", () => {
     );
 
     expect(
-      screen.getByText(/some months were not found in the csv/i),
+      screen.getByText(/Certains mois n'ont pas été trouvés dans le CSV/i),
     ).toBeInTheDocument();
     expect(screen.getByText("2024-11, 2024-12")).toBeInTheDocument();
   });
@@ -106,7 +106,7 @@ describe("ResultsSummary", () => {
     );
 
     // [>]: Jan 2025 has 3 low confidence transactions.
-    expect(screen.getByText(/3 low confidence/i)).toBeInTheDocument();
+    expect(screen.getByText(/3 faible confiance/i)).toBeInTheDocument();
   });
 
   it("displays skipped transactions warning when greater than zero", () => {
@@ -118,7 +118,7 @@ describe("ResultsSummary", () => {
         transactions_skipped: 2,
         low_confidence_count: 0,
         score: 3,
-        score_label: "Great",
+        score_label: "Excellent",
       },
     ];
 
@@ -131,6 +131,6 @@ describe("ResultsSummary", () => {
       />,
     );
 
-    expect(screen.getByText(/2 skipped/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 ignorée/i)).toBeInTheDocument();
   });
 });

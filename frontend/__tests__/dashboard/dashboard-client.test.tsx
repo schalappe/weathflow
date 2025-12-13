@@ -159,7 +159,9 @@ describe("DashboardClient", () => {
     });
 
     // [>]: Verify the month selector is rendered with correct options.
-    const selector = screen.getByRole("combobox", { name: /sélectionner le mois/i });
+    const selector = screen.getByRole("combobox", {
+      name: /sélectionner le mois/i,
+    });
     expect(selector).toBeInTheDocument();
 
     // [>]: Verify getMonthDetail was called with the most recent month.
@@ -172,7 +174,9 @@ describe("DashboardClient", () => {
     );
 
     // [>]: Verify "octobre 2025" appears (in both selector and score card).
-    expect(screen.getAllByText("octobre 2025").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("octobre 2025").length).toBeGreaterThanOrEqual(
+      1,
+    );
   });
 
   it("pagination change fetches new page", async () => {
@@ -275,7 +279,9 @@ describe("DashboardClient", () => {
 
       // [>]: Open category filter and select CORE.
       fireEvent.click(screen.getByText("Toutes les catégories"));
-      const coreCheckbox = await screen.findByRole("checkbox", { name: /CORE/i });
+      const coreCheckbox = await screen.findByRole("checkbox", {
+        name: /Essentiel/i,
+      });
       fireEvent.click(coreCheckbox);
 
       // [>]: Should reset to page 1 with new filter.
@@ -317,7 +323,9 @@ describe("DashboardClient", () => {
 
       // [>]: Apply a filter first.
       fireEvent.click(screen.getByText("Toutes les catégories"));
-      const coreCheckbox = await screen.findByRole("checkbox", { name: /CORE/i });
+      const coreCheckbox = await screen.findByRole("checkbox", {
+        name: /Essentiel/i,
+      });
       fireEvent.click(coreCheckbox);
 
       await waitFor(() => {
@@ -331,7 +339,9 @@ describe("DashboardClient", () => {
       });
 
       // [>]: Change month via selector.
-      const selector = screen.getByRole("combobox", { name: /sélectionner le mois/i });
+      const selector = screen.getByRole("combobox", {
+        name: /sélectionner le mois/i,
+      });
       fireEvent.click(selector);
 
       // [>]: Select September 2025.
@@ -368,7 +378,9 @@ describe("DashboardClient", () => {
 
       // [>]: Select multiple categories.
       fireEvent.click(screen.getByText("Toutes les catégories"));
-      fireEvent.click(await screen.findByRole("checkbox", { name: /CORE/i }));
+      fireEvent.click(
+        await screen.findByRole("checkbox", { name: /Essentiel/i }),
+      );
 
       await waitFor(() => {
         expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
@@ -386,7 +398,9 @@ describe("DashboardClient", () => {
       });
 
       // [>]: Add another category.
-      fireEvent.click(await screen.findByRole("checkbox", { name: /CHOICE/i }));
+      fireEvent.click(
+        await screen.findByRole("checkbox", { name: /Plaisir/i }),
+      );
 
       await waitFor(() => {
         expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
