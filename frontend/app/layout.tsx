@@ -1,24 +1,10 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import Link from "next/link";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { Separator } from "@/components/ui/separator";
 import { LayoutDashboard, Upload, TrendingUp, Wallet } from "lucide-react";
 import "./globals.css";
-
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
 
 export const metadata: Metadata = {
   title: "Money Map Manager",
@@ -31,12 +17,15 @@ function NavBar() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         {/* Logo and Brand */}
         <Link href="/" className="group flex items-center gap-3">
-          <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-violet-500 via-purple-500 to-indigo-600 shadow-lg shadow-violet-500/20 transition-all duration-300 group-hover:shadow-violet-500/30 group-hover:scale-105">
+          <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#d97757] via-[#e08363] to-[#6a9bcc] shadow-lg shadow-[#d97757]/20 transition-all duration-300 group-hover:shadow-[#d97757]/30 group-hover:scale-105">
             <Wallet className="h-4.5 w-4.5 text-white" strokeWidth={2.5} />
             <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />
           </div>
           <div className="flex flex-col">
-            <span className="text-base font-semibold tracking-tight text-foreground">
+            <span
+              className="text-base font-semibold tracking-tight text-foreground"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
               Money Map
             </span>
             <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
@@ -97,15 +86,24 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Neutra Theme Fonts */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Delius&family=Google+Sans+Text:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap"
+          rel="stylesheet"
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.classList.add('dark')}}catch(e){}})()`,
           }}
         />
       </head>
-      <body
-        className={`${spaceGrotesk.variable} ${ibmPlexMono.variable} antialiased min-h-screen bg-background`}
-      >
+      <body className="antialiased min-h-screen bg-background">
         <ThemeProvider>
           <div className="relative flex min-h-screen flex-col">
             <NavBar />

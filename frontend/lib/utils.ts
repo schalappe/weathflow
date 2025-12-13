@@ -52,47 +52,47 @@ export function pluralize(
   return `${count} ${count === 1 ? singular : plural || singular + "s"}`;
 }
 
-// [>]: Score colors matching spec: Great=#22c55e, Okay=#eab308, Need Improvement=#f97316, Poor=#ef4444.
+// [>]: Score colors - Neutra theme: Great=green, Okay=yellow, Need Improvement=orange, Poor=red.
 export const SCORE_COLORS: Record<number, string> = {
-  0: "bg-red-500",
-  1: "bg-orange-500",
-  2: "bg-yellow-500",
-  3: "bg-green-500",
+  0: "bg-[#c45a3b]",
+  1: "bg-[#d97757]",
+  2: "bg-[#e8b931]",
+  3: "bg-[#788c5d]",
 };
 
-// [>]: Score colors as hex values for Recharts (matches SCORE_COLORS).
+// [>]: Score colors as hex values for Recharts - Neutra theme.
 export const SCORE_COLORS_HEX: Record<number, string> = {
-  0: "#ef4444",
-  1: "#f97316",
-  2: "#eab308",
-  3: "#22c55e",
+  0: "#c45a3b",
+  1: "#d97757",
+  2: "#e8b931",
+  3: "#788c5d",
 };
 
-// [>]: Category colors for pie chart (hex) - typed with MoneyMapType for compile-time safety.
+// [>]: Category colors for pie chart (hex) - Neutra theme palette.
 export const CATEGORY_COLORS: Record<MoneyMapType, string> = {
-  INCOME: "#3b82f6",
-  CORE: "#8b5cf6",
-  CHOICE: "#f59e0b",
-  COMPOUND: "#10b981",
-  EXCLUDED: "#6b7280",
+  INCOME: "#6a9bcc",
+  CORE: "#d97757",
+  CHOICE: "#e8b931",
+  COMPOUND: "#788c5d",
+  EXCLUDED: "#b0aea5",
 };
 
-// [>]: Metric card accent Tailwind border classes.
+// [>]: Metric card accent Tailwind border classes - Neutra theme.
 export const CATEGORY_TAILWIND: Record<MoneyMapType, string> = {
-  INCOME: "border-l-blue-500",
-  CORE: "border-l-violet-500",
-  CHOICE: "border-l-amber-500",
-  COMPOUND: "border-l-emerald-500",
-  EXCLUDED: "border-l-gray-500",
+  INCOME: "border-l-[#6a9bcc]",
+  CORE: "border-l-[#d97757]",
+  CHOICE: "border-l-[#e8b931]",
+  COMPOUND: "border-l-[#788c5d]",
+  EXCLUDED: "border-l-[#b0aea5]",
 };
 
-// [>]: Badge colors for transaction categories.
+// [>]: Badge colors for transaction categories - Neutra theme.
 export const CATEGORY_BADGE_CLASSES: Record<MoneyMapType, string> = {
-  INCOME: "bg-blue-500 text-white",
-  CORE: "bg-violet-500 text-white",
-  CHOICE: "bg-amber-500 text-white",
-  COMPOUND: "bg-emerald-500 text-white",
-  EXCLUDED: "bg-gray-500 text-white",
+  INCOME: "bg-[#6a9bcc] text-white",
+  CORE: "bg-[#d97757] text-white",
+  CHOICE: "bg-[#e8b931] text-[#141413]",
+  COMPOUND: "bg-[#788c5d] text-white",
+  EXCLUDED: "bg-[#b0aea5] text-[#141413]",
 };
 
 // [>]: Money Map thresholds. Core/Choice must be <= target, Compound must be >= target.

@@ -42,9 +42,9 @@ export function ScoreCard({ score, scoreLabel, monthDisplay }: ScoreCardProps) {
 
   return (
     <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-card via-card to-muted/30">
-      {/* Background decoration */}
-      <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-gradient-to-br from-violet-500/5 to-purple-500/10 blur-2xl" />
-      <div className="absolute -bottom-4 -left-4 h-24 w-24 rounded-full bg-gradient-to-tr from-indigo-500/5 to-blue-500/10 blur-2xl" />
+      {/* Background decoration - Neutra theme */}
+      <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-gradient-to-br from-[#d97757]/5 to-[#e8b931]/10 blur-2xl" />
+      <div className="absolute -bottom-4 -left-4 h-24 w-24 rounded-full bg-gradient-to-tr from-[#6a9bcc]/5 to-[#788c5d]/10 blur-2xl" />
 
       <CardContent className="relative flex items-center justify-between p-6">
         {/* Month Display */}

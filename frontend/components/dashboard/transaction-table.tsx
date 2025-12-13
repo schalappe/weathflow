@@ -47,26 +47,27 @@ interface TransactionTableProps {
   selectedMonth: { year: number; month: number };
 }
 
+// [>]: Neutra theme category styles.
 const CATEGORY_STYLES: Record<string, { bg: string; text: string }> = {
   INCOME: {
-    bg: "bg-blue-500/10 hover:bg-blue-500/20",
-    text: "text-blue-700 dark:text-blue-300",
+    bg: "bg-[#6a9bcc]/10 hover:bg-[#6a9bcc]/20",
+    text: "text-[#5a8ab8] dark:text-[#7aa8d4]",
   },
   CORE: {
-    bg: "bg-violet-500/10 hover:bg-violet-500/20",
-    text: "text-violet-700 dark:text-violet-300",
+    bg: "bg-[#d97757]/10 hover:bg-[#d97757]/20",
+    text: "text-[#c46647] dark:text-[#e08363]",
   },
   CHOICE: {
-    bg: "bg-amber-500/10 hover:bg-amber-500/20",
-    text: "text-amber-700 dark:text-amber-300",
+    bg: "bg-[#e8b931]/10 hover:bg-[#e8b931]/20",
+    text: "text-[#c9a02a] dark:text-[#f0c43d]",
   },
   COMPOUND: {
-    bg: "bg-emerald-500/10 hover:bg-emerald-500/20",
-    text: "text-emerald-700 dark:text-emerald-300",
+    bg: "bg-[#788c5d]/10 hover:bg-[#788c5d]/20",
+    text: "text-[#6a7d50] dark:text-[#8a9e6a]",
   },
   EXCLUDED: {
-    bg: "bg-gray-500/10 hover:bg-gray-500/20",
-    text: "text-gray-600 dark:text-gray-400",
+    bg: "bg-[#b0aea5]/10 hover:bg-[#b0aea5]/20",
+    text: "text-[#8a8880] dark:text-[#b0aea5]",
   },
 };
 
@@ -205,8 +206,8 @@ export function TransactionTable({
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-amber-500/10">
-                                  <Pencil className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-[#e8b931]/10">
+                                  <Pencil className="h-3 w-3 text-[#c9a02a] dark:text-[#f0c43d]" />
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent>
@@ -222,7 +223,7 @@ export function TransactionTable({
                         className={cn(
                           "font-mono text-sm font-semibold tabular-nums",
                           tx.amount >= 0
-                            ? "text-emerald-600 dark:text-emerald-400"
+                            ? "text-[#788c5d] dark:text-[#8a9e6a]"
                             : "text-foreground",
                         )}
                       >
