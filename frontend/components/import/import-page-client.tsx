@@ -26,6 +26,7 @@ import { ProgressPanel } from "./progress-panel";
 import { ResultsSummary } from "./results-summary";
 import { uploadCSV, categorize } from "@/lib/api-client";
 import { getMonthKeys } from "@/lib/utils";
+import { t } from "@/lib/translations";
 import type {
   ImportState,
   ImportAction,
@@ -228,10 +229,10 @@ export function ImportPageClient() {
       {/* Page header */}
       <div className="space-y-2">
         <h1 className="text-2xl font-bold tracking-tight">
-          Import Transactions
+          {t.import.title}
         </h1>
         <p className="text-muted-foreground">
-          Upload your Bankin&apos; CSV export to categorize transactions with AI
+          {t.import.subtitle}
         </p>
       </div>
 
@@ -251,7 +252,7 @@ export function ImportPageClient() {
               className="gap-2"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              Try Again
+              {t.import.retry}
             </Button>
           </AlertDescription>
         </Alert>
@@ -278,9 +279,9 @@ export function ImportPageClient() {
               <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
             </div>
             <div className="space-y-1 text-center">
-              <p className="font-medium">Analyzing file...</p>
+              <p className="font-medium">{t.import.analyzing}</p>
               <p className="text-sm text-muted-foreground">
-                Detecting months and transactions
+                {t.import.detectingMonths}
               </p>
             </div>
           </CardContent>
@@ -296,10 +297,10 @@ export function ImportPageClient() {
                 <FileSpreadsheet className="h-5 w-5 text-violet-600 dark:text-violet-400" />
               </div>
               <div>
-                <CardTitle className="text-lg">File Analysis</CardTitle>
+                <CardTitle className="text-lg">{t.fileAnalysis.title}</CardTitle>
                 <CardDescription>
-                  {state.uploadResponse.total_transactions} transactions across{" "}
-                  {state.uploadResponse.months_detected.length} months
+                  {state.uploadResponse.total_transactions} {t.fileAnalysis.transactions}{" "}
+                  {state.uploadResponse.months_detected.length} {t.fileAnalysis.months}
                 </CardDescription>
               </div>
             </div>
@@ -331,7 +332,7 @@ export function ImportPageClient() {
                 className="gap-2 text-muted-foreground"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Start Over
+                {t.fileAnalysis.startOver}
               </Button>
               <Button
                 onClick={handleCategorize}
@@ -339,7 +340,7 @@ export function ImportPageClient() {
                 className="gap-2"
               >
                 <Sparkles className="h-4 w-4" />
-                Categorize with AI
+                {t.fileAnalysis.categorize}
               </Button>
             </div>
           </CardContent>

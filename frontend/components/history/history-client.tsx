@@ -13,6 +13,7 @@ import { ScoreChart } from "./score-chart";
 import { SpendingBreakdownChart } from "./breakdown-chart";
 import { getMonthsHistory } from "@/lib/api-client";
 import { getErrorMessage } from "@/lib/utils";
+import { t } from "@/lib/translations";
 import type { MonthHistory } from "@/types";
 
 type HistoryPageState = "loading" | "loaded" | "empty" | "error";
@@ -158,17 +159,16 @@ export function HistoryClient() {
               </div>
               <div className="space-y-2">
                 <h2 className="text-xl font-semibold tracking-tight">
-                  No historical data
+                  {t.history.empty.title}
                 </h2>
                 <p className="text-sm text-muted-foreground max-w-xs">
-                  Import your transactions to see your budget evolution over
-                  time and get personalized advice.
+                  {t.history.empty.description}
                 </p>
               </div>
               <Button asChild className="gap-2">
                 <Link href="/import">
                   <Upload className="h-4 w-4" />
-                  Import Transactions
+                  {t.history.empty.button}
                 </Link>
               </Button>
             </CardContent>
@@ -192,7 +192,7 @@ export function HistoryClient() {
               className="gap-2"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              Try Again
+              {t.history.retry}
             </Button>
           </AlertDescription>
         </Alert>
@@ -205,9 +205,9 @@ export function HistoryClient() {
           {/* Header Row */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">History</h1>
+              <h1 className="text-2xl font-bold tracking-tight">{t.history.title}</h1>
               <p className="text-sm text-muted-foreground">
-                Track your budget evolution and get personalized insights
+                {t.history.subtitle}
               </p>
             </div>
             <PeriodSelector

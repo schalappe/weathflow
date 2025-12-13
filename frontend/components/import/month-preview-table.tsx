@@ -16,6 +16,7 @@ import {
   formatMonthKey,
   sortMonthsChronologically,
 } from "@/lib/utils";
+import { t } from "@/lib/translations";
 import type { MonthSummaryResponse } from "@/types";
 
 interface MonthPreviewTableProps {
@@ -44,10 +45,10 @@ export function MonthPreviewTable({
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-12"></TableHead>
-              <TableHead>Month</TableHead>
-              <TableHead className="text-right">Transactions</TableHead>
-              <TableHead className="text-right">Income</TableHead>
-              <TableHead className="text-right">Expenses</TableHead>
+              <TableHead>{t.monthPreview.headers.month}</TableHead>
+              <TableHead className="text-right">{t.monthPreview.headers.transactions}</TableHead>
+              <TableHead className="text-right">{t.monthPreview.headers.income}</TableHead>
+              <TableHead className="text-right">{t.monthPreview.headers.expenses}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -95,7 +96,7 @@ export function MonthPreviewTable({
           onClick={onSelectAll}
           disabled={isDisabled}
         >
-          Select All
+          {t.monthPreview.selectAll}
         </Button>
         <Button
           variant="outline"
@@ -103,10 +104,10 @@ export function MonthPreviewTable({
           onClick={onDeselectAll}
           disabled={isDisabled}
         >
-          Deselect All
+          {t.monthPreview.deselectAll}
         </Button>
         <span className="ml-auto text-sm text-muted-foreground">
-          {selectedMonths.size} of {months.length} months selected
+          {selectedMonths.size} {t.monthPreview.of} {months.length} {t.monthPreview.selected}
         </span>
       </div>
     </div>

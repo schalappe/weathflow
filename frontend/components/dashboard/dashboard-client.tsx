@@ -25,6 +25,7 @@ import {
   getErrorMessage,
   TRANSACTIONS_PER_PAGE,
 } from "@/lib/utils";
+import { t } from "@/lib/translations";
 import type {
   DashboardState,
   DashboardAction,
@@ -314,17 +315,16 @@ export function DashboardClient() {
               </div>
               <div className="space-y-2">
                 <h2 className="text-xl font-semibold tracking-tight">
-                  No data yet
+                  {t.dashboard.empty.title}
                 </h2>
                 <p className="text-sm text-muted-foreground max-w-xs">
-                  Import your first Bankin&apos; CSV export to see your Money
-                  Map dashboard and start tracking your 50/30/20 budget.
+                  {t.dashboard.empty.description}
                 </p>
               </div>
               <Button asChild className="gap-2">
                 <Link href="/import">
                   <Upload className="h-4 w-4" />
-                  Import Transactions
+                  {t.dashboard.empty.button}
                 </Link>
               </Button>
             </CardContent>
@@ -348,7 +348,7 @@ export function DashboardClient() {
               className="gap-2"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              Try Again
+              {t.dashboard.retry}
             </Button>
           </AlertDescription>
         </Alert>
@@ -363,9 +363,9 @@ export function DashboardClient() {
             {/* Header Row */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+                <h1 className="text-2xl font-bold tracking-tight">{t.dashboard.title}</h1>
                 <p className="text-sm text-muted-foreground">
-                  Your Money Map overview for the selected period
+                  {t.dashboard.subtitle}
                 </p>
               </div>
               <div className="flex items-center gap-3">

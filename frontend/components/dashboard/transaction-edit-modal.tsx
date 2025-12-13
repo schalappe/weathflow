@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { formatCurrency, formatTransactionDate } from "@/lib/utils";
+import { t } from "@/lib/translations";
 import { MONEY_MAP_TYPES, SUBCATEGORY_OPTIONS } from "@/lib/category-options";
 import type {
   TransactionResponse,
@@ -98,26 +99,26 @@ export function TransactionEditModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit Transaction</DialogTitle>
+          <DialogTitle>{t.editModal.title}</DialogTitle>
           <DialogDescription>
-            Update the category for this transaction.
+            {t.editModal.description}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Transaction details (read-only) */}
-          <div className="space-y-2 rounded-lg bg-slate-50 p-3 text-sm">
+          <div className="space-y-2 rounded-lg bg-muted/50 p-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Description</span>
+              <span className="text-muted-foreground">{t.editModal.labels.description}</span>
               <span className="max-w-[200px] truncate font-medium">
                 {transaction.description}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Amount</span>
+              <span className="text-muted-foreground">{t.editModal.labels.amount}</span>
               <span
                 className={
-                  transaction.amount >= 0 ? "text-green-600" : "text-red-600"
+                  transaction.amount >= 0 ? "text-[#788c5d]" : "text-[#d97757]"
                 }
               >
                 {transaction.amount >= 0 ? "+" : ""}
@@ -125,26 +126,26 @@ export function TransactionEditModal({
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Date</span>
+              <span className="text-muted-foreground">{t.editModal.labels.date}</span>
               <span>{formatTransactionDate(transaction.date)}</span>
             </div>
           </div>
 
           {/* Category Type Select */}
           <div className="space-y-2">
-            <Label htmlFor="category-type">Category Type</Label>
+            <Label htmlFor="category-type">{t.editModal.categoryType}</Label>
             <Select
               value={selectedType || undefined}
               onValueChange={handleTypeChange}
               disabled={isSaving}
             >
               <SelectTrigger id="category-type" className="w-full">
-                <SelectValue placeholder="Select category type" />
+                <SelectValue placeholder={t.editModal.selectCategoryType} />
               </SelectTrigger>
               <SelectContent>
                 {MONEY_MAP_TYPES.map((type) => (
                   <SelectItem key={type} value={type}>
-                    {type}
+                    {t.categories[type as keyof typeof t.categories]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -154,19 +155,19 @@ export function TransactionEditModal({
           {/* Subcategory Select */}
           {showSubcategory && (
             <div className="space-y-2">
-              <Label htmlFor="subcategory">Subcategory</Label>
+              <Label htmlFor="subcategory">{t.editModal.subcategory}</Label>
               <Select
                 value={selectedSubcategory || undefined}
                 onValueChange={handleSubcategoryChange}
                 disabled={isSaving}
               >
                 <SelectTrigger id="subcategory" className="w-full">
-                  <SelectValue placeholder="Select subcategory" />
+                  <SelectValue placeholder={t.editModal.selectSubcategory} />
                 </SelectTrigger>
                 <SelectContent>
                   {subcategoryOptions.map((sub) => (
                     <SelectItem key={sub} value={sub}>
-                      {sub}
+                      {t.subcategories[sub as keyof typeof t.subcategories] || sub}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -184,11 +185,11 @@ export function TransactionEditModal({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isSaving}>
-            Cancel
+            {t.editModal.cancel}
           </Button>
           <Button onClick={handleSave} disabled={!hasChanges || isSaving}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save Changes
+            {t.editModal.save}
           </Button>
         </DialogFooter>
       </DialogContent>

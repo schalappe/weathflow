@@ -19,7 +19,7 @@ export function formatCurrency(amount: number): string {
 
 export function formatMonthDisplay(year: number, month: number): string {
   const date = new Date(year, month - 1);
-  return date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  return date.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 }
 
 export function formatMonthKey(year: number, month: number): string {

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/chart";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { SCORE_COLORS_HEX } from "@/lib/utils";
+import { t } from "@/lib/translations";
 import { TrendingUp, Trophy, Target, AlertTriangle, XCircle } from "lucide-react";
 import type { MonthHistory } from "@/types";
 
@@ -54,7 +55,7 @@ const LINE_COLOR = "#6a9bcc";
 
 const chartConfig = {
   score: {
-    label: "Score",
+    label: t.scoreChart.tooltipScore,
     color: LINE_COLOR,
   },
 } satisfies ChartConfig;
@@ -83,8 +84,8 @@ function transformToChartData(months: MonthHistory[], period: number): ChartData
     const key = `${year}-${month}`;
     const monthData = monthMap.get(key);
 
-    const label = date.toLocaleDateString("en-US", { month: "short" });
-    const fullLabel = date.toLocaleDateString("en-US", {
+    const label = date.toLocaleDateString("fr-FR", { month: "short" });
+    const fullLabel = date.toLocaleDateString("fr-FR", {
       month: "long",
       year: "numeric",
     });
@@ -108,7 +109,7 @@ const chartErrorFallback = (
     className="flex h-[250px] items-center justify-center text-muted-foreground"
     data-testid="chart-error"
   >
-    Unable to display chart
+    {t.scoreChart.error}
   </div>
 );
 
@@ -136,14 +137,14 @@ function CustomTooltipContent({
           className="h-3.5 w-3.5"
           style={{ color: scoreColor }}
         />
-        <span className="text-muted-foreground">Score:</span>
+        <span className="text-muted-foreground">{t.scoreChart.tooltipScore} :</span>
         <span
           className="font-mono font-semibold tabular-nums"
           style={{ color: scoreColor }}
         >
           {data.score}/3
         </span>
-        <span className="text-muted-foreground">— {data.scoreLabel}</span>
+        <span className="text-muted-foreground">— {t.score.labels[data.scoreLabel as keyof typeof t.score.labels] || data.scoreLabel}</span>
       </div>
     </div>
   );
@@ -151,9 +152,9 @@ function CustomTooltipContent({
 
 // [>]: Generate subtitle based on period selection.
 function getPeriodDescription(period: number): string {
-  if (period === 0) return "All time performance";
-  if (period === 1) return "Last month performance";
-  return `Last ${period} months performance`;
+  if (period === 0) return t.scoreChart.allTime;
+  if (period === 1) return t.scoreChart.lastMonth;
+  return t.scoreChart.lastMonths.replace("{n}", String(period));
 }
 
 export function ScoreChart({ months, period }: ScoreChartProps) {
@@ -168,7 +169,7 @@ export function ScoreChart({ months, period }: ScoreChartProps) {
             <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <CardTitle className="text-base">Score Evolution</CardTitle>
+            <CardTitle className="text-base">{t.scoreChart.title}</CardTitle>
             <CardDescription>{getPeriodDescription(period)}</CardDescription>
           </div>
         </div>
@@ -180,7 +181,7 @@ export function ScoreChart({ months, period }: ScoreChartProps) {
               className="flex h-[250px] items-center justify-center text-muted-foreground"
               data-testid="empty-state"
             >
-              No historical data available
+              {t.scoreChart.empty}
             </div>
           ) : (
             <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">

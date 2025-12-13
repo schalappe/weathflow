@@ -3,6 +3,7 @@
 import { useCallback, useState, useRef } from "react";
 import { Upload, FileCheck, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { t } from "@/lib/translations";
 
 interface FileDropzoneProps {
   onFileSelected: (file: File) => void;
@@ -26,9 +27,7 @@ export function FileDropzone({
     (selectedFile: File) => {
       // [>]: Only accept .csv files.
       if (!selectedFile.name.toLowerCase().endsWith(".csv")) {
-        onValidationError(
-          "Invalid file type. Please select a CSV file (.csv extension required).",
-        );
+        onValidationError(t.dropzone.invalidFile);
         return;
       }
       onFileSelected(selectedFile);
@@ -149,23 +148,23 @@ export function FileDropzone({
       {/* Text */}
       <div className="text-center">
         {isDragging ? (
-          <p className="text-lg font-medium text-primary">Drop to upload</p>
+          <p className="text-lg font-medium text-primary">{t.dropzone.dropToUpload}</p>
         ) : hasFile && !hasError ? (
           <>
             <p className="text-lg font-medium text-emerald-700 dark:text-emerald-400">
               {file.name}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Click or drag to replace
+              {t.dropzone.clickToReplace}
             </p>
           </>
         ) : (
           <>
             <p className="text-lg font-medium text-foreground">
-              Drag your CSV file here
+              {t.dropzone.dragHere}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              or click to select
+              {t.dropzone.orClick}
             </p>
           </>
         )}
@@ -179,7 +178,7 @@ export function FileDropzone({
       {/* File format hint */}
       {!hasFile && !hasError && (
         <p className="text-xs text-muted-foreground/70">
-          Accepted format: .csv
+          {t.dropzone.acceptedFormat}
         </p>
       )}
     </div>

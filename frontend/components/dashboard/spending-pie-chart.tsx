@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CATEGORY_COLORS, formatCurrency } from "@/lib/utils";
+import { t } from "@/lib/translations";
 
 interface SpendingPieChartProps {
   core: number;
@@ -31,20 +32,20 @@ interface SpendingPieChartProps {
 // [>]: Chart configuration with Money Map category colors and icons.
 const chartConfig = {
   amount: {
-    label: "Amount",
+    label: t.spendingChart.amount,
   },
   core: {
-    label: "Core",
+    label: t.metrics.Core,
     color: CATEGORY_COLORS.CORE,
     icon: Home,
   },
   choice: {
-    label: "Choice",
+    label: t.metrics.Choice,
     color: CATEGORY_COLORS.CHOICE,
     icon: ShoppingBag,
   },
   compound: {
-    label: "Compound",
+    label: t.metrics.Compound,
     color: CATEGORY_COLORS.COMPOUND,
     icon: PiggyBank,
   },
@@ -121,7 +122,7 @@ export function SpendingPieChart({
       <CardHeader className="flex-row items-start space-y-0 pb-0">
         <div className="grid gap-1">
           <CardTitle className="text-base font-semibold">
-            Spending Distribution
+            {t.spendingChart.title}
           </CardTitle>
         </div>
         {!isEmpty && (
@@ -131,9 +132,9 @@ export function SpendingPieChart({
           >
             <SelectTrigger
               className="ml-auto h-7 w-[120px] rounded-lg pl-2.5"
-              aria-label="Select a category"
+              aria-label={t.spendingChart.selectCategory}
             >
-              <SelectValue placeholder="Select category" />
+              <SelectValue placeholder={t.spendingChart.selectCategory} />
             </SelectTrigger>
             <SelectContent align="end" className="rounded-xl">
               {categories.map((key) => {
@@ -168,7 +169,7 @@ export function SpendingPieChart({
             className="flex h-[280px] items-center justify-center text-muted-foreground"
             data-testid="empty-state"
           >
-            No spending data available
+            {t.spendingChart.empty}
           </div>
         ) : (
           <ChartContainer

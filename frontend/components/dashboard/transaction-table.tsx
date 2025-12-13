@@ -23,6 +23,7 @@ import {
   cn,
   getActiveFilterCount,
 } from "@/lib/utils";
+import { t } from "@/lib/translations";
 import {
   TransactionFilters,
   getMonthBounds,
@@ -95,10 +96,10 @@ export function TransactionTable({
             </div>
             <div>
               <CardTitle className="text-base font-semibold">
-                Transactions
+                {t.transactions.title}
               </CardTitle>
               <span className="text-xs text-muted-foreground">
-                {pagination.total_items || 0} total
+                {pagination.total_items || 0} {t.transactions.total}
               </span>
             </div>
           </div>
@@ -156,18 +157,18 @@ export function TransactionTable({
             {hasActiveFilters ? (
               <>
                 <p className="text-sm text-muted-foreground">
-                  No transactions match your filters
+                  {t.transactions.noMatch}
                 </p>
                 <button
                   type="button"
                   onClick={() => onFiltersChange(DEFAULT_FILTERS)}
                   className="text-sm font-medium text-primary hover:underline"
                 >
-                  Clear all filters
+                  {t.transactions.clearFilters}
                 </button>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">No transactions</p>
+              <p className="text-sm text-muted-foreground">{t.transactions.empty}</p>
             )}
           </div>
         ) : (
@@ -175,16 +176,16 @@ export function TransactionTable({
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="w-[70px] text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Date
+                  {t.transactions.headers.date}
                 </TableHead>
                 <TableHead className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Description
+                  {t.transactions.headers.description}
                 </TableHead>
                 <TableHead className="w-[100px] text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Amount
+                  {t.transactions.headers.amount}
                 </TableHead>
                 <TableHead className="w-[110px] text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Category
+                  {t.transactions.headers.category}
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -217,7 +218,7 @@ export function TransactionTable({
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>Manually corrected</p>
+                                <p>{t.transactions.manuallyCorrected}</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -246,7 +247,7 @@ export function TransactionTable({
                             categoryStyle.text,
                           )}
                         >
-                          {tx.money_map_type}
+                          {t.categories[tx.money_map_type as keyof typeof t.categories]}
                         </span>
                       )}
                     </TableCell>

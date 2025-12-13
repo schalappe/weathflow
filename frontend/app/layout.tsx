@@ -4,11 +4,12 @@ import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LayoutDashboard, Upload, TrendingUp, Wallet } from "lucide-react";
+import { t } from "@/lib/translations";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Money Map Manager",
-  description: "Personal finance with the 50/30/20 framework",
+  title: t.meta.title,
+  description: t.meta.description,
 };
 
 function NavBar() {
@@ -38,13 +39,13 @@ function NavBar() {
         <nav className="flex items-center">
           <div className="flex items-center gap-1 rounded-full bg-muted/50 p-1">
             <NavLink href="/" icon={<LayoutDashboard className="h-4 w-4" />}>
-              Dashboard
+              {t.nav.dashboard}
             </NavLink>
             <NavLink href="/import" icon={<Upload className="h-4 w-4" />}>
-              Import
+              {t.nav.import}
             </NavLink>
             <NavLink href="/history" icon={<TrendingUp className="h-4 w-4" />}>
-              History
+              {t.nav.history}
             </NavLink>
           </div>
         </nav>
@@ -84,7 +85,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="fr" suppressHydrationWarning>
       <head>
         {/* Neutra Theme Fonts */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -114,8 +115,8 @@ export default function RootLayout({
             <footer className="border-t border-border/50 py-6">
               <div className="mx-auto max-w-7xl px-6">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Money Map Manager</span>
-                  <span>Built for the 50/30/20 framework</span>
+                  <span>{t.brand.footer}</span>
+                  <span>{t.brand.footerTagline}</span>
                 </div>
               </div>
             </footer>

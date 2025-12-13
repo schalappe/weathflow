@@ -5,6 +5,7 @@ import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { exportMonthData, type ExportFormat } from "@/lib/api-client";
+import { t } from "@/lib/translations";
 
 interface ExportButtonsProps {
   year: number;
@@ -31,7 +32,7 @@ export function ExportButtons({ year, month, disabled }: ExportButtonsProps) {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        toast.success(`${format.toUpperCase()} exported successfully`);
+        toast.success(`${format.toUpperCase()} ${t.export.success}`);
       } finally {
         window.URL.revokeObjectURL(url);
       }
@@ -40,11 +41,11 @@ export function ExportButtons({ year, month, disabled }: ExportButtonsProps) {
         `Export error for ${year}-${String(month).padStart(2, "0")} (${format}):`,
         error,
       );
-      toast.error("Export failed", {
+      toast.error(t.export.error, {
         description:
           error instanceof Error
             ? error.message
-            : "An unexpected error occurred",
+            : t.common.error,
       });
     } finally {
       setExportingFormat(null);
@@ -62,7 +63,7 @@ export function ExportButtons({ year, month, disabled }: ExportButtonsProps) {
         disabled={disabled || exportingFormat !== null}
       >
         <Download className="h-4 w-4" />
-        {isExporting ? "Exporting..." : format.toUpperCase()}
+        {isExporting ? t.export.exporting : format.toUpperCase()}
       </Button>
     );
   }

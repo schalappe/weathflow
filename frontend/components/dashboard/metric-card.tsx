@@ -12,6 +12,7 @@ import {
   PiggyBank,
 } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
+import { t } from "@/lib/translations";
 
 interface MetricCardProps {
   title: string;
@@ -21,7 +22,7 @@ interface MetricCardProps {
   compoundDirection?: "positive" | "negative";
 }
 
-// [>]: Neutra theme category configuration.
+// [>]: Neutra theme category configuration with French labels.
 const CATEGORY_CONFIG: Record<
   string,
   {
@@ -30,6 +31,7 @@ const CATEGORY_CONFIG: Record<
     accentBg: string;
     accentText: string;
     target?: string;
+    label: string;
   }
 > = {
   Income: {
@@ -37,6 +39,7 @@ const CATEGORY_CONFIG: Record<
     glowClass: "metric-glow-income",
     accentBg: "bg-[#6a9bcc]/10",
     accentText: "text-[#6a9bcc] dark:text-[#7aa8d4]",
+    label: t.metrics.Income,
   },
   Core: {
     icon: <Home className="h-5 w-5" />,
@@ -44,6 +47,7 @@ const CATEGORY_CONFIG: Record<
     accentBg: "bg-[#d97757]/10",
     accentText: "text-[#d97757] dark:text-[#e08363]",
     target: "≤ 50%",
+    label: t.metrics.Core,
   },
   Choice: {
     icon: <ShoppingBag className="h-5 w-5" />,
@@ -51,6 +55,7 @@ const CATEGORY_CONFIG: Record<
     accentBg: "bg-[#e8b931]/10",
     accentText: "text-[#c9a02a] dark:text-[#f0c43d]",
     target: "≤ 30%",
+    label: t.metrics.Choice,
   },
   Compound: {
     icon: <PiggyBank className="h-5 w-5" />,
@@ -58,6 +63,7 @@ const CATEGORY_CONFIG: Record<
     accentBg: "bg-[#788c5d]/10",
     accentText: "text-[#788c5d] dark:text-[#8a9e6a]",
     target: "≥ 20%",
+    label: t.metrics.Compound,
   },
 };
 
@@ -100,11 +106,11 @@ export function MetricCard({
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-medium text-foreground">
-                {title}
+                {config.label}
               </span>
               {config.target && (
                 <span className="text-[10px] font-medium text-muted-foreground">
-                  Target: {config.target}
+                  {t.metrics.target} : {config.target}
                 </span>
               )}
             </div>
@@ -121,9 +127,9 @@ export function MetricCard({
               )}
             >
               {isSuccess ? (
-                <CheckCircle2 className="h-4 w-4" aria-label="Threshold met" />
+                <CheckCircle2 className="h-4 w-4" aria-label={t.metrics.thresholdMet} />
               ) : (
-                <XCircle className="h-4 w-4" aria-label="Threshold exceeded" />
+                <XCircle className="h-4 w-4" aria-label={t.metrics.thresholdExceeded} />
               )}
             </div>
           )}
@@ -147,12 +153,12 @@ export function MetricCard({
                 {compoundDirection === "positive" ? (
                   <>
                     <TrendingUp className="h-3 w-3" />
-                    <span>Savings</span>
+                    <span>{t.metrics.savings}</span>
                   </>
                 ) : (
                   <>
                     <TrendingDown className="h-3 w-3" />
-                    <span>Withdrawal</span>
+                    <span>{t.metrics.withdrawal}</span>
                   </>
                 )}
               </span>
@@ -164,7 +170,7 @@ export function MetricCard({
             <div className="mt-3 space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">
-                  {percentage.toFixed(1)}% of income
+                  {percentage.toFixed(1)}% {t.metrics.ofIncome}
                 </span>
                 {config.target && (
                   <span
@@ -175,7 +181,7 @@ export function MetricCard({
                         : "text-[#d97757] dark:text-[#e08363]",
                     )}
                   >
-                    {isSuccess ? "On track" : "Over target"}
+                    {isSuccess ? t.metrics.onTrack : t.metrics.overTarget}
                   </span>
                 )}
               </div>

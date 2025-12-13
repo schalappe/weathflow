@@ -33,6 +33,7 @@ import {
   formatCurrency,
   getErrorMessage,
 } from "@/lib/utils";
+import { t } from "@/lib/translations";
 import type { AdviceData, ProblemArea } from "@/types";
 
 type AdvicePanelState = "loading" | "loaded" | "empty" | "error";
@@ -155,7 +156,7 @@ export function AdvicePanel({ year, month, className }: AdvicePanelProps) {
             type: "FETCH_ERROR",
             payload: getErrorMessage(
               error,
-              "Impossible de charger les conseils",
+              t.advice.loadError,
             ),
           });
         }
@@ -188,7 +189,7 @@ export function AdvicePanel({ year, month, className }: AdvicePanelProps) {
       console.error("[AdvicePanel] Failed to generate advice:", error);
       dispatch({
         type: "REGENERATE_ERROR",
-        payload: getErrorMessage(error, "Impossible de generer les conseils"),
+        payload: getErrorMessage(error, t.advice.generateError),
       });
     }
   }, [year, month, state.panelState]);
@@ -205,9 +206,9 @@ export function AdvicePanel({ year, month, className }: AdvicePanelProps) {
             <Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />
           </div>
           <div>
-            <CardTitle className="text-lg">Personalized Insights</CardTitle>
+            <CardTitle className="text-lg">{t.advice.title}</CardTitle>
             <CardDescription>
-              AI-powered recommendations based on your spending patterns
+              {t.advice.subtitle}
             </CardDescription>
           </div>
         </div>
@@ -281,22 +282,21 @@ function EmptyState({ onGenerate, isLoading }: EmptyStateProps) {
         <Sparkles className="h-7 w-7 text-violet-600 dark:text-violet-400" />
       </div>
       <div className="space-y-1.5">
-        <h3 className="font-semibold">No insights available</h3>
+        <h3 className="font-semibold">{t.advice.empty.title}</h3>
         <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-          Generate personalized advice based on your last 3 months of
-          transactions.
+          {t.advice.empty.description}
         </p>
       </div>
       <Button onClick={onGenerate} disabled={isLoading} className="gap-2">
         {isLoading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            Generating...
+            {t.advice.generating}
           </>
         ) : (
           <>
             <Sparkles className="h-4 w-4" />
-            Generate Insights
+            {t.advice.empty.button}
           </>
         )}
       </Button>
@@ -337,7 +337,7 @@ function ErrorState({ error, onRetry }: ErrorStateProps) {
           <Button variant="outline" size="sm" asChild className="gap-2">
             <Link href="/import">
               <Upload className="h-4 w-4" />
-              Import Data
+              {t.advice.importData}
             </Link>
           </Button>
         ) : (
@@ -348,7 +348,7 @@ function ErrorState({ error, onRetry }: ErrorStateProps) {
             className="gap-2"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            Retry
+            {t.advice.retry}
           </Button>
         )}
       </AlertDescription>
@@ -426,7 +426,7 @@ function AdviceContent({
       <section className="space-y-3">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-4.5 w-4.5 text-violet-600 dark:text-violet-400" />
-          <h4 className="font-semibold">Trend Analysis</h4>
+          <h4 className="font-semibold">{t.advice.sections.analysis}</h4>
         </div>
         <p className="text-sm text-muted-foreground leading-relaxed">
           {advice.analysis}
@@ -440,7 +440,7 @@ function AdviceContent({
           <section className="space-y-3">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />
-              <h4 className="font-semibold">Areas to Watch</h4>
+              <h4 className="font-semibold">{t.advice.sections.problems}</h4>
             </div>
             <ul className="space-y-2">
               {advice.problem_areas.map((area, index) => (
@@ -458,7 +458,7 @@ function AdviceContent({
           <section className="space-y-3">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
-              <h4 className="font-semibold">Recommendations</h4>
+              <h4 className="font-semibold">{t.advice.sections.recommendations}</h4>
             </div>
             <ol className="space-y-2 text-sm text-muted-foreground">
               {advice.recommendations.map((rec, index) => (
@@ -482,7 +482,7 @@ function AdviceContent({
       <section className="space-y-3">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4.5 w-4.5 text-violet-600 dark:text-violet-400" />
-          <h4 className="font-semibold">Keep it up!</h4>
+          <h4 className="font-semibold">{t.advice.sections.encouragement}</h4>
         </div>
         <p className="text-sm text-muted-foreground leading-relaxed">
           {advice.encouragement}
@@ -493,7 +493,7 @@ function AdviceContent({
       <div className="flex items-center justify-between border-t pt-4">
         {generatedAt && (
           <p className="text-xs text-muted-foreground">
-            Generated {formatAdviceTimestamp(generatedAt)}
+            {t.advice.generated} {formatAdviceTimestamp(generatedAt)}
           </p>
         )}
         <Button
@@ -506,12 +506,12 @@ function AdviceContent({
           {isRegenerating ? (
             <>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Regenerating...
+              {t.advice.regenerating}
             </>
           ) : (
             <>
               <RefreshCw className="h-3.5 w-3.5" />
-              Regenerate
+              {t.advice.regenerate}
             </>
           )}
         </Button>

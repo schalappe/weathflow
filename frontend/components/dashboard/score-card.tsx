@@ -2,6 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { t } from "@/lib/translations";
 import type { ScoreLabel } from "@/types";
 import { Sparkles, TrendingUp, TrendingDown, Minus } from "lucide-react";
 
@@ -18,22 +19,22 @@ const SCORE_CONFIG: Record<
   3: {
     gradient: "score-gradient-great",
     icon: <Sparkles className="h-5 w-5" />,
-    description: "Excellent budget control",
+    description: t.score.descriptions[3],
   },
   2: {
     gradient: "score-gradient-okay",
     icon: <TrendingUp className="h-5 w-5" />,
-    description: "Good progress, room to improve",
+    description: t.score.descriptions[2],
   },
   1: {
     gradient: "score-gradient-need-improvement",
     icon: <TrendingDown className="h-5 w-5" />,
-    description: "Some categories need attention",
+    description: t.score.descriptions[1],
   },
   0: {
     gradient: "score-gradient-poor",
     icon: <Minus className="h-5 w-5" />,
-    description: "Budget targets not met",
+    description: t.score.descriptions[0],
   },
 };
 
@@ -50,7 +51,7 @@ export function ScoreCard({ score, scoreLabel, monthDisplay }: ScoreCardProps) {
         {/* Month Display */}
         <div className="flex flex-col gap-1">
           <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Current Period
+            {t.score.currentPeriod}
           </span>
           <span className="text-2xl font-bold tracking-tight capitalize">
             {monthDisplay}

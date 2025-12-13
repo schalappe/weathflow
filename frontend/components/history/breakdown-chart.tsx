@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/chart";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { CATEGORY_COLORS, sortMonthsChronologically, cn } from "@/lib/utils";
+import { t } from "@/lib/translations";
 import { BarChart3, Home, ShoppingBag, PiggyBank } from "lucide-react";
 import type { MonthHistory } from "@/types";
 
@@ -38,26 +39,26 @@ interface BreakdownChartDataPoint {
 // [>]: Chart config with icons for tooltip display.
 const chartConfig = {
   core: {
-    label: "Core",
+    label: t.metrics.Core,
     color: CATEGORY_COLORS.CORE,
     icon: Home,
   },
   choice: {
-    label: "Choice",
+    label: t.metrics.Choice,
     color: CATEGORY_COLORS.CHOICE,
     icon: ShoppingBag,
   },
   compound: {
-    label: "Compound",
+    label: t.metrics.Compound,
     color: CATEGORY_COLORS.COMPOUND,
     icon: PiggyBank,
   },
 } satisfies ChartConfig;
 
 const LEGEND_ITEMS = [
-  { name: "Core", color: CATEGORY_COLORS.CORE, icon: Home },
-  { name: "Choice", color: CATEGORY_COLORS.CHOICE, icon: ShoppingBag },
-  { name: "Compound", color: CATEGORY_COLORS.COMPOUND, icon: PiggyBank },
+  { name: t.metrics.Core, color: CATEGORY_COLORS.CORE, icon: Home },
+  { name: t.metrics.Choice, color: CATEGORY_COLORS.CHOICE, icon: ShoppingBag },
+  { name: t.metrics.Compound, color: CATEGORY_COLORS.COMPOUND, icon: PiggyBank },
 ];
 
 function isValidMonthData(m: MonthHistory): boolean {
@@ -128,8 +129,8 @@ function transformToChartData(
       m.compound_percentage,
     );
     return {
-      label: date.toLocaleDateString("en-US", { month: "short" }),
-      fullLabel: date.toLocaleDateString("en-US", {
+      label: date.toLocaleDateString("fr-FR", { month: "short" }),
+      fullLabel: date.toLocaleDateString("fr-FR", {
         month: "long",
         year: "numeric",
       }),
@@ -148,7 +149,7 @@ const chartErrorFallback = (
     className="flex h-[250px] items-center justify-center text-muted-foreground"
     data-testid="chart-error"
   >
-    Unable to display chart
+    {t.breakdownChart.error}
   </div>
 );
 
@@ -174,21 +175,21 @@ function CustomTooltipContent({
   const categories = [
     {
       key: "core",
-      label: "Core",
+      label: t.metrics.Core,
       icon: Home,
       color: CATEGORY_COLORS.CORE,
       value: data.originalCore,
     },
     {
       key: "choice",
-      label: "Choice",
+      label: t.metrics.Choice,
       icon: ShoppingBag,
       color: CATEGORY_COLORS.CHOICE,
       value: data.originalChoice,
     },
     {
       key: "compound",
-      label: "Compound",
+      label: t.metrics.Compound,
       icon: PiggyBank,
       color: CATEGORY_COLORS.COMPOUND,
       value: data.originalCompound,
@@ -229,8 +230,8 @@ export function SpendingBreakdownChart({
               <BarChart3 className="h-5 w-5 text-[#d97757] dark:text-[#e08363]" />
             </div>
             <div>
-              <CardTitle className="text-base">Spending Breakdown</CardTitle>
-              <CardDescription>Monthly category distribution</CardDescription>
+              <CardTitle className="text-base">{t.breakdownChart.title}</CardTitle>
+              <CardDescription>{t.breakdownChart.subtitle}</CardDescription>
             </div>
           </div>
           {/* [>]: Custom legend with icons matching the chart. */}
@@ -256,7 +257,7 @@ export function SpendingBreakdownChart({
               className="flex h-[250px] items-center justify-center text-muted-foreground"
               data-testid="empty-state"
             >
-              No spending data available
+              {t.breakdownChart.empty}
             </div>
           ) : (
             <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
