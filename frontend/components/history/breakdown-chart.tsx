@@ -7,11 +7,17 @@ import {
   YAxis,
   ResponsiveContainer,
   Tooltip,
-  Legend,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { CATEGORY_COLORS, sortMonthsChronologically, cn } from "@/lib/utils";
+import { BarChart3, Home, ShoppingBag, PiggyBank } from "lucide-react";
 import type { MonthHistory } from "@/types";
 
 interface SpendingBreakdownChartProps {
@@ -19,27 +25,23 @@ interface SpendingBreakdownChartProps {
   className?: string;
 }
 
-// [>]: Chart data point with percentage values for stacked bars.
 interface BreakdownChartDataPoint {
   label: string;
   fullLabel: string;
   core: number;
   choice: number;
   compound: number;
-  // [>]: Original values preserved for tooltip display.
   originalCore: number;
   originalChoice: number;
   originalCompound: number;
 }
 
-// [>]: Map dataKey to original value field for tooltip display.
 const ORIGINAL_VALUE_MAP: Record<string, keyof BreakdownChartDataPoint> = {
   core: "originalCore",
   choice: "originalChoice",
   compound: "originalCompound",
 };
 
-// [>]: Custom tooltip matching app styling, shows original percentages.
 function CustomTooltip({
   active,
   payload,
@@ -57,14 +59,12 @@ function CustomTooltip({
 }) {
   if (!active || !payload?.length) return null;
 
-  // [>]: Access fullLabel from first payload item's data.
   const displayLabel = payload[0]?.payload.fullLabel ?? label;
 
   return (
-    <div className="rounded-md border bg-background p-2 shadow-md">
-      <p className="font-medium">{displayLabel}</p>
+    <div className="rounded-lg border border-border/50 bg-card p-3 shadow-lg">
+      <p className="font-medium mb-2">{displayLabel}</p>
       {payload.map((entry) => {
-        // [>]: Use original value for display, not normalized value.
         const originalKey = ORIGINAL_VALUE_MAP[entry.dataKey];
         const displayValue = originalKey
           ? (entry.payload[originalKey] as number)
@@ -72,12 +72,11 @@ function CustomTooltip({
         return (
           <div key={entry.name} className="flex items-center gap-2 text-sm">
             <div
-              className="h-3 w-3 rounded"
+              className="h-2.5 w-2.5 rounded-sm"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-muted-foreground">
-              {entry.name}: {displayValue.toFixed(1)}%
-            </span>
+            <span className="text-muted-foreground">{entry.name}:</span>
+            <span className="font-medium">{displayValue.toFixed(1)}%</span>
           </div>
         );
       })}
@@ -85,7 +84,6 @@ function CustomTooltip({
   );
 }
 
-// [>]: Validate month data has required numeric properties.
 function isValidMonthData(m: MonthHistory): boolean {
   return (
     typeof m?.year === "number" &&
@@ -98,16 +96,12 @@ function isValidMonthData(m: MonthHistory): boolean {
   );
 }
 
-// [>]: Normalize percentages for stacked bar display when compound is negative.
 function normalizePercentages(
   core: number,
   choice: number,
   compound: number,
 ): { core: number; choice: number; compound: number } {
-  // [>]: When compound is negative, spending exceeds income.
-  // Normalize to show relative proportions of spending categories.
   if (compound < 0) {
-    // [>]: Use absolute values of spending categories only.
     const totalSpending = core + choice;
     if (totalSpending === 0) return { core: 0, choice: 0, compound: 0 };
     return {
@@ -117,7 +111,6 @@ function normalizePercentages(
     };
   }
 
-  // [>]: Normal case: all positive, sum to ~100%.
   const total = core + choice + compound;
   if (total === 0) return { core: 0, choice: 0, compound: 0 };
   return {
@@ -127,11 +120,9 @@ function normalizePercentages(
   };
 }
 
-// [>]: Filter empty months, sort chronologically, map to chart format.
 function transformToChartData(
   months: MonthHistory[],
 ): BreakdownChartDataPoint[] {
-  // [!]: Guard against non-array input.
   if (!Array.isArray(months)) {
     console.warn(
       "[SpendingBreakdownChart] Invalid months data: expected array",
@@ -139,7 +130,6 @@ function transformToChartData(
     return [];
   }
 
-  // [>]: Filter out invalid months and months where all percentages are zero.
   const validMonths = months.filter((m) => {
     if (!isValidMonthData(m)) {
       console.warn("[SpendingBreakdownChart] Skipping invalid month data:", m);
@@ -177,7 +167,6 @@ function transformToChartData(
   });
 }
 
-// [>]: Chart error fallback displayed when Recharts encounters an error.
 const chartErrorFallback = (
   <div
     className="flex h-[250px] items-center justify-center text-muted-foreground"
@@ -187,6 +176,12 @@ const chartErrorFallback = (
   </div>
 );
 
+const LEGEND_ITEMS = [
+  { name: "Core", color: CATEGORY_COLORS.CORE, icon: Home },
+  { name: "Choice", color: CATEGORY_COLORS.CHOICE, icon: ShoppingBag },
+  { name: "Compound", color: CATEGORY_COLORS.COMPOUND, icon: PiggyBank },
+];
+
 export function SpendingBreakdownChart({
   months,
   className,
@@ -195,9 +190,33 @@ export function SpendingBreakdownChart({
   const isEmpty = chartData.length === 0;
 
   return (
-    <Card className={cn(className)}>
-      <CardHeader>
-        <CardTitle>Spending Breakdown by Month</CardTitle>
+    <Card className={cn("border-0 shadow-lg", className)}>
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/10 to-purple-500/20">
+              <BarChart3 className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Spending Breakdown</CardTitle>
+              <CardDescription>Monthly category distribution</CardDescription>
+            </div>
+          </div>
+          {/* Custom Legend */}
+          <div className="flex items-center gap-4">
+            {LEGEND_ITEMS.map((item) => (
+              <div key={item.name} className="flex items-center gap-1.5">
+                <div
+                  className="h-2.5 w-2.5 rounded-sm"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span className="text-xs text-muted-foreground">
+                  {item.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <ErrorBoundary fallback={chartErrorFallback}>
@@ -210,33 +229,43 @@ export function SpendingBreakdownChart({
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={chartData}>
-                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+              <BarChart data={chartData} barCategoryGap="20%">
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  axisLine={{ stroke: "hsl(var(--border))" }}
+                  tickLine={false}
+                />
                 <YAxis
                   domain={[0, 100]}
                   ticks={[0, 25, 50, 75, 100]}
                   tickFormatter={(v) => `${v}%`}
                   width={40}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  axisLine={{ stroke: "hsl(var(--border))" }}
+                  tickLine={false}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend />
                 <Bar
                   dataKey="core"
                   name="Core"
                   stackId="spending"
                   fill={CATEGORY_COLORS.CORE}
+                  radius={[0, 0, 0, 0]}
                 />
                 <Bar
                   dataKey="choice"
                   name="Choice"
                   stackId="spending"
                   fill={CATEGORY_COLORS.CHOICE}
+                  radius={[0, 0, 0, 0]}
                 />
                 <Bar
                   dataKey="compound"
                   name="Compound"
                   stackId="spending"
                   fill={CATEGORY_COLORS.COMPOUND}
+                  radius={[4, 4, 0, 0]}
                 />
               </BarChart>
             </ResponsiveContainer>

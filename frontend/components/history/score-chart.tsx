@@ -9,16 +9,22 @@ import {
   Tooltip,
   ReferenceArea,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { SCORE_COLORS_HEX } from "@/lib/utils";
+import { TrendingUp } from "lucide-react";
 import type { MonthHistory } from "@/types";
 
 interface ScoreChartProps {
   months: MonthHistory[];
 }
 
-// [>]: Chart data point with null score for missing months.
 interface ChartDataPoint {
   label: string;
   score: number | null;
@@ -26,7 +32,6 @@ interface ChartDataPoint {
   fullLabel: string;
 }
 
-// [>]: Custom tooltip matching app styling.
 function CustomTooltip({
   active,
   payload,
@@ -40,18 +45,18 @@ function CustomTooltip({
   if (data.score === null) return null;
 
   return (
-    <div className="rounded-md border bg-background p-2 shadow-md">
+    <div className="rounded-lg border border-border/50 bg-card p-3 shadow-lg">
       <p className="font-medium">{data.fullLabel}</p>
       <p className="text-sm text-muted-foreground">
-        Score: {data.score}/3 - {data.scoreLabel}
+        Score:{" "}
+        <span className="font-semibold text-foreground">{data.score}/3</span> -{" "}
+        {data.scoreLabel}
       </p>
     </div>
   );
 }
 
-// [>]: Generate last 12 months range and fill gaps with null.
 function transformToChartData(months: MonthHistory[]): ChartDataPoint[] {
-  // [!]: Guard against non-array input.
   if (!Array.isArray(months)) {
     console.warn("[ScoreChart] Invalid months data: expected array");
     return [];
@@ -60,14 +65,12 @@ function transformToChartData(months: MonthHistory[]): ChartDataPoint[] {
   const now = new Date();
   const result: ChartDataPoint[] = [];
 
-  // [>]: Build lookup map for O(1) access.
   const monthMap = new Map<string, MonthHistory>();
   for (const m of months) {
     const key = `${m.year}-${m.month}`;
     monthMap.set(key, m);
   }
 
-  // [>]: Generate 12 months going backwards from current month.
   for (let i = 11; i >= 0; i--) {
     const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const year = date.getFullYear();
@@ -92,7 +95,6 @@ function transformToChartData(months: MonthHistory[]): ChartDataPoint[] {
   return result;
 }
 
-// [>]: Chart error fallback displayed when Recharts encounters an error.
 const chartErrorFallback = (
   <div
     className="flex h-[250px] items-center justify-center text-muted-foreground"
@@ -107,9 +109,17 @@ export function ScoreChart({ months }: ScoreChartProps) {
   const isEmpty = chartData.every((d) => d.score === null);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Score Evolution (Last 12 Months)</CardTitle>
+    <Card className="border-0 shadow-lg">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/20">
+            <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <CardTitle className="text-base">Score Evolution</CardTitle>
+            <CardDescription>Last 12 months performance</CardDescription>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <ErrorBoundary fallback={chartErrorFallback}>
@@ -123,36 +133,58 @@ export function ScoreChart({ months }: ScoreChartProps) {
           ) : (
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={chartData}>
-                {/* [>]: Background zones for score thresholds (10% opacity). */}
+                {/* Background zones for score thresholds */}
                 <ReferenceArea
                   y1={0}
                   y2={1}
                   fill={SCORE_COLORS_HEX[0]}
-                  fillOpacity={0.1}
+                  fillOpacity={0.08}
                 />
                 <ReferenceArea
                   y1={1}
                   y2={2}
                   fill={SCORE_COLORS_HEX[1]}
-                  fillOpacity={0.1}
+                  fillOpacity={0.08}
                 />
                 <ReferenceArea
                   y1={2}
                   y2={3}
                   fill={SCORE_COLORS_HEX[3]}
-                  fillOpacity={0.1}
+                  fillOpacity={0.08}
                 />
 
-                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                <YAxis domain={[0, 3]} ticks={[0, 1, 2, 3]} width={30} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  axisLine={{ stroke: "hsl(var(--border))" }}
+                  tickLine={false}
+                />
+                <YAxis
+                  domain={[0, 3]}
+                  ticks={[0, 1, 2, 3]}
+                  width={30}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  axisLine={{ stroke: "hsl(var(--border))" }}
+                  tickLine={false}
+                />
                 <Tooltip content={<CustomTooltip />} />
                 <Line
                   type="monotone"
                   dataKey="score"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  dot={{ fill: "#3b82f6", r: 4 }}
-                  activeDot={{ r: 6 }}
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2.5}
+                  dot={{
+                    fill: "hsl(var(--primary))",
+                    r: 4,
+                    strokeWidth: 2,
+                    stroke: "hsl(var(--card))",
+                  }}
+                  activeDot={{
+                    r: 6,
+                    fill: "hsl(var(--primary))",
+                    stroke: "hsl(var(--card))",
+                    strokeWidth: 2,
+                  }}
                   connectNulls={false}
                 />
               </LineChart>
