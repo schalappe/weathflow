@@ -162,17 +162,16 @@ function DashboardSkeleton() {
       </div>
       {/* Score card skeleton */}
       <Skeleton className="h-24 w-full rounded-xl" />
-      {/* Metric cards skeleton */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <Skeleton key={i} className="h-36 w-full rounded-xl" />
-        ))}
+      {/* Metrics Grid: 2x2 cards + Spending Distribution skeleton */}
+      <div className="grid gap-4 lg:grid-cols-3 lg:grid-rows-2">
+        <Skeleton className="h-36 w-full rounded-xl" />
+        <Skeleton className="h-36 w-full rounded-xl" />
+        <Skeleton className="h-full min-h-[300px] w-full rounded-xl lg:row-span-2" />
+        <Skeleton className="h-36 w-full rounded-xl" />
+        <Skeleton className="h-36 w-full rounded-xl" />
       </div>
-      {/* Charts skeleton */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Skeleton className="h-[380px] w-full rounded-xl lg:col-span-1" />
-        <Skeleton className="h-[380px] w-full rounded-xl lg:col-span-2" />
-      </div>
+      {/* Row 3: Transactions skeleton */}
+      <Skeleton className="h-[400px] w-full rounded-xl" />
     </div>
   );
 }
@@ -395,37 +394,17 @@ export function DashboardClient() {
               )}
             />
 
-            {/* Metric Cards Grid */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="animate-fade-in-up opacity-0 stagger-1">
+            {/* Metrics Grid: 2x2 cards + Spending Distribution (spans 2 rows) */}
+            <div className="grid gap-4 lg:grid-cols-3 lg:grid-rows-[1fr_1fr]">
+              {/* Income - Row 1, Col 1 */}
+              <div className="animate-fade-in-up opacity-0 stagger-1 h-full">
                 <MetricCard
                   title="Income"
                   amount={state.monthDetail.month.total_income}
                 />
               </div>
-              <div className="animate-fade-in-up opacity-0 stagger-2">
-                <MetricCard
-                  title="Core"
-                  amount={Math.abs(state.monthDetail.month.total_core)}
-                  percentage={state.monthDetail.month.core_percentage}
-                  isSuccess={meetsThreshold(
-                    "CORE",
-                    state.monthDetail.month.core_percentage,
-                  )}
-                />
-              </div>
-              <div className="animate-fade-in-up opacity-0 stagger-3">
-                <MetricCard
-                  title="Choice"
-                  amount={Math.abs(state.monthDetail.month.total_choice)}
-                  percentage={state.monthDetail.month.choice_percentage}
-                  isSuccess={meetsThreshold(
-                    "CHOICE",
-                    state.monthDetail.month.choice_percentage,
-                  )}
-                />
-              </div>
-              <div className="animate-fade-in-up opacity-0 stagger-4">
+              {/* Compound - Row 1, Col 2 */}
+              <div className="animate-fade-in-up opacity-0 stagger-2 h-full">
                 <MetricCard
                   title="Compound"
                   amount={Math.abs(state.monthDetail.month.total_compound)}
@@ -441,29 +420,52 @@ export function DashboardClient() {
                   }
                 />
               </div>
-            </div>
-
-            {/* Pie Chart and Transaction Table */}
-            <div className="grid gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-1">
+              {/* Spending Distribution - Row 1-2, Col 3 (spans 2 rows) */}
+              <div className="animate-fade-in-up opacity-0 stagger-3 lg:row-span-2 h-full">
                 <SpendingPieChart
                   core={state.monthDetail.month.total_core}
                   choice={state.monthDetail.month.total_choice}
                   compound={state.monthDetail.month.total_compound}
                 />
               </div>
-              <div className="lg:col-span-2">
-                <TransactionTable
-                  transactions={state.monthDetail.transactions}
-                  pagination={state.monthDetail.pagination}
-                  onPageChange={handlePageChange}
-                  onTransactionClick={handleTransactionClick}
-                  isLoading={isLoading}
-                  filters={state.filters}
-                  onFiltersChange={handleFiltersChange}
-                  selectedMonth={state.selectedMonth}
+              {/* Core - Row 2, Col 1 */}
+              <div className="animate-fade-in-up opacity-0 stagger-4 h-full">
+                <MetricCard
+                  title="Core"
+                  amount={Math.abs(state.monthDetail.month.total_core)}
+                  percentage={state.monthDetail.month.core_percentage}
+                  isSuccess={meetsThreshold(
+                    "CORE",
+                    state.monthDetail.month.core_percentage,
+                  )}
                 />
               </div>
+              {/* Choice - Row 2, Col 2 */}
+              <div className="animate-fade-in-up opacity-0 stagger-5 h-full">
+                <MetricCard
+                  title="Choice"
+                  amount={Math.abs(state.monthDetail.month.total_choice)}
+                  percentage={state.monthDetail.month.choice_percentage}
+                  isSuccess={meetsThreshold(
+                    "CHOICE",
+                    state.monthDetail.month.choice_percentage,
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Row 3: Transactions Table (full width) */}
+            <div className="animate-fade-in-up opacity-0 stagger-6">
+              <TransactionTable
+                transactions={state.monthDetail.transactions}
+                pagination={state.monthDetail.pagination}
+                onPageChange={handlePageChange}
+                onTransactionClick={handleTransactionClick}
+                isLoading={isLoading}
+                filters={state.filters}
+                onFiltersChange={handleFiltersChange}
+                selectedMonth={state.selectedMonth}
+              />
             </div>
           </div>
         )}

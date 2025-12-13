@@ -73,7 +73,7 @@ export function MetricCard({
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden border-0 transition-all duration-300 hover:scale-[1.02]",
+        "group relative overflow-hidden border-0 transition-all duration-300 hover:scale-[1.02] h-full",
         config.glowClass,
       )}
     >

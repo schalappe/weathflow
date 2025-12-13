@@ -258,6 +258,12 @@
 .stagger-4 {
   animation-delay: 0.2s;
 }
+.stagger-5 {
+  animation-delay: 0.25s;
+}
+.stagger-6 {
+  animation-delay: 0.3s;
+}
 
 /* Metric card glow effects - Neutra accent colors */
 .metric-glow-income {
