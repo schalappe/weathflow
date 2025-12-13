@@ -228,12 +228,8 @@ export function ImportPageClient() {
     <div className="mx-auto max-w-3xl space-y-8">
       {/* Page header */}
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight">
-          {t.import.title}
-        </h1>
-        <p className="text-muted-foreground">
-          {t.import.subtitle}
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">{t.import.title}</h1>
+        <p className="text-muted-foreground">{t.import.subtitle}</p>
       </div>
 
       {/* Error alert */}
@@ -297,10 +293,14 @@ export function ImportPageClient() {
                 <FileSpreadsheet className="h-5 w-5 text-violet-600 dark:text-violet-400" />
               </div>
               <div>
-                <CardTitle className="text-lg">{t.fileAnalysis.title}</CardTitle>
+                <CardTitle className="text-lg">
+                  {t.fileAnalysis.title}
+                </CardTitle>
                 <CardDescription>
-                  {state.uploadResponse.total_transactions} {t.fileAnalysis.transactions}{" "}
-                  {state.uploadResponse.months_detected.length} {t.fileAnalysis.months}
+                  {state.uploadResponse.total_transactions}{" "}
+                  {t.fileAnalysis.transactions}{" "}
+                  {state.uploadResponse.months_detected.length}{" "}
+                  {t.fileAnalysis.months}
                 </CardDescription>
               </div>
             </div>

@@ -127,9 +127,15 @@ export function MetricCard({
               )}
             >
               {isSuccess ? (
-                <CheckCircle2 className="h-4 w-4" aria-label={t.metrics.thresholdMet} />
+                <CheckCircle2
+                  className="h-4 w-4"
+                  aria-label={t.metrics.thresholdMet}
+                />
               ) : (
-                <XCircle className="h-4 w-4" aria-label={t.metrics.thresholdExceeded} />
+                <XCircle
+                  className="h-4 w-4"
+                  aria-label={t.metrics.thresholdExceeded}
+                />
               )}
             </div>
           )}

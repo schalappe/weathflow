@@ -168,7 +168,9 @@ export function TransactionTable({
                 </button>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">{t.transactions.empty}</p>
+              <p className="text-sm text-muted-foreground">
+                {t.transactions.empty}
+              </p>
             )}
           </div>
         ) : (
@@ -247,7 +249,11 @@ export function TransactionTable({
                             categoryStyle.text,
                           )}
                         >
-                          {t.categories[tx.money_map_type as keyof typeof t.categories]}
+                          {
+                            t.categories[
+                              tx.money_map_type as keyof typeof t.categories
+                            ]
+                          }
                         </span>
                       )}
                     </TableCell>

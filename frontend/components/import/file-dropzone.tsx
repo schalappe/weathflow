@@ -148,7 +148,9 @@ export function FileDropzone({
       {/* Text */}
       <div className="text-center">
         {isDragging ? (
-          <p className="text-lg font-medium text-primary">{t.dropzone.dropToUpload}</p>
+          <p className="text-lg font-medium text-primary">
+            {t.dropzone.dropToUpload}
+          </p>
         ) : hasFile && !hasError ? (
           <>
             <p className="text-lg font-medium text-emerald-700 dark:text-emerald-400">

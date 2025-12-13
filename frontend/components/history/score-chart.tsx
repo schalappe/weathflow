@@ -17,7 +17,13 @@ import {
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { SCORE_COLORS_HEX } from "@/lib/utils";
 import { t } from "@/lib/translations";
-import { TrendingUp, Trophy, Target, AlertTriangle, XCircle } from "lucide-react";
+import {
+  TrendingUp,
+  Trophy,
+  Target,
+  AlertTriangle,
+  XCircle,
+} from "lucide-react";
 import type { MonthHistory } from "@/types";
 
 interface ScoreChartProps {
@@ -60,7 +66,10 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-function transformToChartData(months: MonthHistory[], period: number): ChartDataPoint[] {
+function transformToChartData(
+  months: MonthHistory[],
+  period: number,
+): ChartDataPoint[] {
   if (!Array.isArray(months)) {
     console.warn("[ScoreChart] Invalid months data: expected array");
     return [];
@@ -133,18 +142,21 @@ function CustomTooltipContent({
     <div className="grid min-w-[10rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
       <div className="font-medium">{data.fullLabel}</div>
       <div className="flex items-center gap-2">
-        <Icon
-          className="h-3.5 w-3.5"
-          style={{ color: scoreColor }}
-        />
-        <span className="text-muted-foreground">{t.scoreChart.tooltipScore} :</span>
+        <Icon className="h-3.5 w-3.5" style={{ color: scoreColor }} />
+        <span className="text-muted-foreground">
+          {t.scoreChart.tooltipScore} :
+        </span>
         <span
           className="font-mono font-semibold tabular-nums"
           style={{ color: scoreColor }}
         >
           {data.score}/3
         </span>
-        <span className="text-muted-foreground">— {t.score.labels[data.scoreLabel as keyof typeof t.score.labels] || data.scoreLabel}</span>
+        <span className="text-muted-foreground">
+          —{" "}
+          {t.score.labels[data.scoreLabel as keyof typeof t.score.labels] ||
+            data.scoreLabel}
+        </span>
       </div>
     </div>
   );
@@ -184,7 +196,10 @@ export function ScoreChart({ months, period }: ScoreChartProps) {
               {t.scoreChart.empty}
             </div>
           ) : (
-            <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
+            <ChartContainer
+              config={chartConfig}
+              className="aspect-auto h-[250px] w-full"
+            >
               <LineChart
                 accessibilityLayer
                 data={chartData}
@@ -217,7 +232,8 @@ export function ScoreChart({ months, period }: ScoreChartProps) {
                   stroke="var(--color-score)"
                   strokeWidth={2.5}
                   dot={({ cx, cy, payload }) => {
-                    if (payload.score === null) return <g key={payload.label} />;
+                    if (payload.score === null)
+                      return <g key={payload.label} />;
                     return (
                       <circle
                         key={payload.label}

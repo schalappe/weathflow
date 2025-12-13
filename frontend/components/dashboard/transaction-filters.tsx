@@ -120,7 +120,9 @@ export function TransactionFilters({
             <span className="flex items-center gap-2">
               {filters.categoryTypes.length > 0 ? (
                 <>
-                  <span className="hidden sm:inline">{t.filters.categories}</span>
+                  <span className="hidden sm:inline">
+                    {t.filters.categories}
+                  </span>
                   <Badge
                     variant="secondary"
                     className="rounded-full px-2 py-0.5 text-xs"
@@ -182,7 +184,9 @@ export function TransactionFilters({
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {filters.dateFrom ? formatDateDisplay(filters.dateFrom) : t.filters.from}
+            {filters.dateFrom
+              ? formatDateDisplay(filters.dateFrom)
+              : t.filters.from}
             {filters.dateFrom && (
               <X
                 className="ml-2 h-3 w-3 opacity-50 hover:opacity-100"

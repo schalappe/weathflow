@@ -49,7 +49,9 @@ export function ResultsSummary({
           </p>
           <p className="text-sm text-emerald-700 dark:text-emerald-300">
             {totalTransactions} {t.results.transactionsCategorized}{" "}
-            {results.length} {results.length === 1 ? t.progress.month : t.progress.months} ({totalApiCalls} {t.results.apiCalls})
+            {results.length}{" "}
+            {results.length === 1 ? t.progress.month : t.progress.months} (
+            {totalApiCalls} {t.results.apiCalls})
           </p>
         </div>
       </div>
@@ -102,7 +104,9 @@ export function ResultsSummary({
 
 function MonthResultCard({ result }: { result: MonthResult }) {
   const scoreColor = SCORE_COLORS[result.score] || "bg-gray-500";
-  const translatedLabel = t.score.labels[result.score_label as keyof typeof t.score.labels] || result.score_label;
+  const translatedLabel =
+    t.score.labels[result.score_label as keyof typeof t.score.labels] ||
+    result.score_label;
 
   return (
     <Card>
@@ -117,7 +121,9 @@ function MonthResultCard({ result }: { result: MonthResult }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="text-lg font-semibold">{t.results.score} : {result.score}/3</div>
+        <div className="text-lg font-semibold">
+          {t.results.score} : {result.score}/3
+        </div>
 
         {/* Stats */}
         <div className="flex flex-col gap-1 text-sm text-muted-foreground">

@@ -100,22 +100,24 @@ export function TransactionEditModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t.editModal.title}</DialogTitle>
-          <DialogDescription>
-            {t.editModal.description}
-          </DialogDescription>
+          <DialogDescription>{t.editModal.description}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Transaction details (read-only) */}
           <div className="space-y-2 rounded-lg bg-muted/50 p-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">{t.editModal.labels.description}</span>
+              <span className="text-muted-foreground">
+                {t.editModal.labels.description}
+              </span>
               <span className="max-w-[200px] truncate font-medium">
                 {transaction.description}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">{t.editModal.labels.amount}</span>
+              <span className="text-muted-foreground">
+                {t.editModal.labels.amount}
+              </span>
               <span
                 className={
                   transaction.amount >= 0 ? "text-[#788c5d]" : "text-[#d97757]"
@@ -126,7 +128,9 @@ export function TransactionEditModal({
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">{t.editModal.labels.date}</span>
+              <span className="text-muted-foreground">
+                {t.editModal.labels.date}
+              </span>
               <span>{formatTransactionDate(transaction.date)}</span>
             </div>
           </div>
@@ -167,7 +171,8 @@ export function TransactionEditModal({
                 <SelectContent>
                   {subcategoryOptions.map((sub) => (
                     <SelectItem key={sub} value={sub}>
-                      {t.subcategories[sub as keyof typeof t.subcategories] || sub}
+                      {t.subcategories[sub as keyof typeof t.subcategories] ||
+                        sub}
                     </SelectItem>
                   ))}
                 </SelectContent>

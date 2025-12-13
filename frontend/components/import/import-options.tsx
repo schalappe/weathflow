@@ -18,7 +18,9 @@ export function ImportOptions({
 }: ImportOptionsProps) {
   return (
     <div className="space-y-3">
-      <p className="text-sm font-medium text-foreground">{t.importOptions.label}</p>
+      <p className="text-sm font-medium text-foreground">
+        {t.importOptions.label}
+      </p>
       <RadioGroup
         value={mode}
         onValueChange={(value) => onModeChange(value as ImportMode)}

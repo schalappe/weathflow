@@ -58,7 +58,11 @@ const chartConfig = {
 const LEGEND_ITEMS = [
   { name: t.metrics.Core, color: CATEGORY_COLORS.CORE, icon: Home },
   { name: t.metrics.Choice, color: CATEGORY_COLORS.CHOICE, icon: ShoppingBag },
-  { name: t.metrics.Compound, color: CATEGORY_COLORS.COMPOUND, icon: PiggyBank },
+  {
+    name: t.metrics.Compound,
+    color: CATEGORY_COLORS.COMPOUND,
+    icon: PiggyBank,
+  },
 ];
 
 function isValidMonthData(m: MonthHistory): boolean {
@@ -230,7 +234,9 @@ export function SpendingBreakdownChart({
               <BarChart3 className="h-5 w-5 text-[#d97757] dark:text-[#e08363]" />
             </div>
             <div>
-              <CardTitle className="text-base">{t.breakdownChart.title}</CardTitle>
+              <CardTitle className="text-base">
+                {t.breakdownChart.title}
+              </CardTitle>
               <CardDescription>{t.breakdownChart.subtitle}</CardDescription>
             </div>
           </div>
@@ -260,7 +266,10 @@ export function SpendingBreakdownChart({
               {t.breakdownChart.empty}
             </div>
           ) : (
-            <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
+            <ChartContainer
+              config={chartConfig}
+              className="aspect-auto h-[250px] w-full"
+            >
               <BarChart
                 accessibilityLayer
                 data={chartData}

@@ -19,7 +19,8 @@ export function ProgressPanel({
       <div className="flex items-center gap-3">
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
         <p className="text-lg font-medium">
-          {t.progress.processing} {selectedMonthCount} {selectedMonthCount === 1 ? t.progress.month : t.progress.months}...
+          {t.progress.processing} {selectedMonthCount}{" "}
+          {selectedMonthCount === 1 ? t.progress.month : t.progress.months}...
         </p>
       </div>
 
@@ -28,9 +29,7 @@ export function ProgressPanel({
         <Progress value={undefined} className="h-2 animate-pulse" />
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        {t.progress.note}
-      </p>
+      <p className="text-sm text-muted-foreground">{t.progress.note}</p>
 
       <Button variant="outline" onClick={onCancel}>
         {t.progress.cancel}

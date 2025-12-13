@@ -46,9 +46,15 @@ export function MonthPreviewTable({
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-12"></TableHead>
               <TableHead>{t.monthPreview.headers.month}</TableHead>
-              <TableHead className="text-right">{t.monthPreview.headers.transactions}</TableHead>
-              <TableHead className="text-right">{t.monthPreview.headers.income}</TableHead>
-              <TableHead className="text-right">{t.monthPreview.headers.expenses}</TableHead>
+              <TableHead className="text-right">
+                {t.monthPreview.headers.transactions}
+              </TableHead>
+              <TableHead className="text-right">
+                {t.monthPreview.headers.income}
+              </TableHead>
+              <TableHead className="text-right">
+                {t.monthPreview.headers.expenses}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -107,7 +113,8 @@ export function MonthPreviewTable({
           {t.monthPreview.deselectAll}
         </Button>
         <span className="ml-auto text-sm text-muted-foreground">
-          {selectedMonths.size} {t.monthPreview.of} {months.length} {t.monthPreview.selected}
+          {selectedMonths.size} {t.monthPreview.of} {months.length}{" "}
+          {t.monthPreview.selected}
         </span>
       </div>
     </div>

@@ -154,10 +154,7 @@ export function AdvicePanel({ year, month, className }: AdvicePanelProps) {
         if (isMounted) {
           dispatch({
             type: "FETCH_ERROR",
-            payload: getErrorMessage(
-              error,
-              t.advice.loadError,
-            ),
+            payload: getErrorMessage(error, t.advice.loadError),
           });
         }
       }
@@ -207,9 +204,7 @@ export function AdvicePanel({ year, month, className }: AdvicePanelProps) {
           </div>
           <div>
             <CardTitle className="text-lg">{t.advice.title}</CardTitle>
-            <CardDescription>
-              {t.advice.subtitle}
-            </CardDescription>
+            <CardDescription>{t.advice.subtitle}</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -458,7 +453,9 @@ function AdviceContent({
           <section className="space-y-3">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
-              <h4 className="font-semibold">{t.advice.sections.recommendations}</h4>
+              <h4 className="font-semibold">
+                {t.advice.sections.recommendations}
+              </h4>
             </div>
             <ol className="space-y-2 text-sm text-muted-foreground">
               {advice.recommendations.map((rec, index) => (

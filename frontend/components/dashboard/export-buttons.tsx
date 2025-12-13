@@ -42,10 +42,7 @@ export function ExportButtons({ year, month, disabled }: ExportButtonsProps) {
         error,
       );
       toast.error(t.export.error, {
-        description:
-          error instanceof Error
-            ? error.message
-            : t.common.error,
+        description: error instanceof Error ? error.message : t.common.error,
       });
     } finally {
       setExportingFormat(null);
