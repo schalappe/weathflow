@@ -103,12 +103,27 @@ def generate_advice(
         # ##>: Fetch history and prepare data for advice generation.
         history_months = months_service.get_months_history(month_repo, limit=3)
 
-        current_data = advice_service.month_to_month_data(month_record)
-        history_data = [
-            advice_service.month_to_month_data(m)
-            for m in history_months
-            if not (m.year == request.year and m.month == request.month)
-        ]
+        # ##>: Build history data with past advice for each month.
+        history_data = []
+        for m in history_months:
+            if m.year == request.year and m.month == request.month:
+                continue
+            past_advice_record = advice_service.get_advice_by_month_id(advice_repo, m.id)
+            past_recommendations = (
+                advice_service.extract_recommendations_from_advice(past_advice_record.advice_text)
+                if past_advice_record
+                else None
+            )
+            history_data.append(advice_service.month_to_month_data(m, past_recommendations))
+
+        # ##>: Current month also gets its past advice (if regenerating).
+        current_past_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
+        current_recommendations = (
+            advice_service.extract_recommendations_from_advice(current_past_advice.advice_text)
+            if current_past_advice
+            else None
+        )
+        current_data = advice_service.month_to_month_data(month_record, current_recommendations)
 
         advice_response = generator.generate_advice(current_data, history_data)
 

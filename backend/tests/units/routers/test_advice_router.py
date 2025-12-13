@@ -156,13 +156,14 @@ class TestPostGenerateAdvice(unittest.TestCase):
         mock_advice_service.create_or_update_advice.return_value = mock_stored_advice
         mock_advice_service.month_to_month_data.return_value = MagicMock()
         mock_advice_service.advice_response_to_json.return_value = "{}"
+        # ##>: get_advice_by_month_id is now called to fetch past advice for context.
+        mock_advice_service.get_advice_by_month_id.return_value = None
 
         response = client.post("/api/advice/generate", json={"year": 2025, "month": 10, "regenerate": True})
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertFalse(data["was_cached"])
-        mock_advice_service.get_advice_by_month_id.assert_not_called()
 
     @patch("app.api.advice.months_service")
     def test_returns_404_when_month_not_found(self, mock_months_service: MagicMock) -> None:

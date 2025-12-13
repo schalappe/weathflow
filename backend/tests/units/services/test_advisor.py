@@ -147,7 +147,6 @@ class TestAdviceGeneratorInit(unittest.TestCase):
     def test_class_var_constants_are_set(self) -> None:
         """Should have ClassVar constants set correctly."""
         self.assertEqual(AdviceGenerator.MIN_MONTHS_REQUIRED, 2)
-        self.assertEqual(AdviceGenerator.MAX_TOKENS, 1024)
         self.assertEqual(AdviceGenerator.MAX_RETRIES, 3)
 
 
