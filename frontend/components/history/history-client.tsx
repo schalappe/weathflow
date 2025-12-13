@@ -219,7 +219,7 @@ export function HistoryClient() {
 
           {/* Charts Grid */}
           <div className="grid gap-6 lg:grid-cols-2">
-            <ScoreChart months={state.months} />
+            <ScoreChart months={state.months} period={state.period} />
             <SpendingBreakdownChart months={state.months} />
           </div>
 

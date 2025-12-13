@@ -21,6 +21,7 @@ import type { MonthHistory } from "@/types";
 
 interface ScoreChartProps {
   months: MonthHistory[];
+  period: number;
 }
 
 interface ChartDataPoint {
@@ -58,7 +59,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-function transformToChartData(months: MonthHistory[]): ChartDataPoint[] {
+function transformToChartData(months: MonthHistory[], period: number): ChartDataPoint[] {
   if (!Array.isArray(months)) {
     console.warn("[ScoreChart] Invalid months data: expected array");
     return [];
@@ -73,7 +74,9 @@ function transformToChartData(months: MonthHistory[]): ChartDataPoint[] {
     monthMap.set(key, m);
   }
 
-  for (let i = 11; i >= 0; i--) {
+  // [>]: Use period to determine how many months to display.
+  const monthCount = period === 0 ? 12 : period;
+  for (let i = monthCount - 1; i >= 0; i--) {
     const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
@@ -146,8 +149,15 @@ function CustomTooltipContent({
   );
 }
 
-export function ScoreChart({ months }: ScoreChartProps) {
-  const chartData = transformToChartData(months);
+// [>]: Generate subtitle based on period selection.
+function getPeriodDescription(period: number): string {
+  if (period === 0) return "All time performance";
+  if (period === 1) return "Last month performance";
+  return `Last ${period} months performance`;
+}
+
+export function ScoreChart({ months, period }: ScoreChartProps) {
+  const chartData = transformToChartData(months, period);
   const isEmpty = chartData.every((d) => d.score === null);
 
   return (
@@ -159,7 +169,7 @@ export function ScoreChart({ months }: ScoreChartProps) {
           </div>
           <div>
             <CardTitle className="text-base">Score Evolution</CardTitle>
-            <CardDescription>Last 12 months performance</CardDescription>
+            <CardDescription>{getPeriodDescription(period)}</CardDescription>
           </div>
         </div>
       </CardHeader>
