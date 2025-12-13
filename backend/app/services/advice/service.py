@@ -46,6 +46,38 @@ def get_advice_by_month_id(advice_repo: AdviceRepository, month_id: int) -> Advi
         raise AdviceQueryError(month_id, str(error)) from error
 
 
+def get_advice_by_month_ids(advice_repo: AdviceRepository, month_ids: list[int]) -> dict[int, Advice]:
+    """
+    Retrieve stored advice for multiple months in a single query.
+
+    Eliminates N+1 queries when fetching advice for multiple months.
+
+    Parameters
+    ----------
+    advice_repo : AdviceRepository
+        Repository for advice data access.
+    month_ids : list[int]
+        List of month IDs to look up.
+
+    Returns
+    -------
+    dict[int, Advice]
+        Mapping of month_id to Advice record. Missing months are not included.
+
+    Raises
+    ------
+    AdviceQueryError
+        If database query fails.
+    """
+    try:
+        result = advice_repo.get_by_month_ids(month_ids)
+        logger.info("Retrieved {} advice records for {} month_ids", len(result), len(month_ids))
+        return result
+    except SQLAlchemyError as error:
+        logger.exception("Database error retrieving advice for month_ids={}", month_ids)
+        raise AdviceQueryError(0, str(error)) from error
+
+
 def create_or_update_advice(advice_repo: AdviceRepository, month_id: int, advice_text: str) -> Advice:
     """
     Create or update advice for a month (upsert pattern).
@@ -180,8 +212,13 @@ def extract_recommendations_from_advice(advice_text: str) -> list[str]:
         recommendations = data.get("recommendations", [])
         if isinstance(recommendations, list):
             return [str(r) for r in recommendations]
+        logger.warning("Advice JSON has non-list recommendations field: type={}", type(recommendations).__name__)
         return []
-    except (json.JSONDecodeError, TypeError, AttributeError):
+    except json.JSONDecodeError as error:
+        logger.warning("Failed to parse advice JSON for recommendations extraction: {}", error)
+        return []
+    except (TypeError, AttributeError) as error:
+        logger.warning("Unexpected error extracting recommendations: {}: {}", type(error).__name__, error)
         return []
 
 

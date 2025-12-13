@@ -3,7 +3,7 @@
 from typing import Any
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
@@ -63,6 +63,32 @@ class MonthRepository:
         """
         return self._db.query(Month).filter(Month.year == year, Month.month == month).first()
 
+    def get_by_year_month_with_transactions(self, year: int, month: int) -> Month | None:
+        """
+        Get month by year and month number with transactions eager-loaded.
+
+        Uses selectinload to fetch all transactions in a single additional query,
+        avoiding N+1 queries when accessing month.transactions.
+
+        Parameters
+        ----------
+        year : int
+            Year (e.g., 2025).
+        month : int
+            Month number (1-12).
+
+        Returns
+        -------
+        Month | None
+            Month record with transactions loaded, or None if not found.
+        """
+        return (
+            self._db.query(Month)
+            .options(selectinload(Month.transactions))
+            .filter(Month.year == year, Month.month == month)
+            .first()
+        )
+
     def get_all_with_transaction_counts(self) -> list[Any]:
         """
         Get all months with transaction counts using optimized JOIN.
@@ -101,6 +127,33 @@ class MonthRepository:
         """
         result = self._db.query(Month).order_by(Month.year.desc(), Month.month.desc()).limit(limit).all()
         # ##>: Reverse to get chronological order (oldest first).
+        result.reverse()
+        return result
+
+    def get_recent_with_transactions(self, limit: int) -> list[Month]:
+        """
+        Get most recent N months with transactions eager-loaded.
+
+        Uses selectinload to fetch all transactions in a single additional query,
+        avoiding N+1 queries when accessing month.transactions.
+
+        Parameters
+        ----------
+        limit : int
+            Maximum number of months to return.
+
+        Returns
+        -------
+        list[Month]
+            List of Month records with transactions loaded, ordered chronologically.
+        """
+        result = (
+            self._db.query(Month)
+            .options(selectinload(Month.transactions))
+            .order_by(Month.year.desc(), Month.month.desc())
+            .limit(limit)
+            .all()
+        )
         result.reverse()
         return result
 

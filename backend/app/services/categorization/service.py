@@ -251,7 +251,6 @@ class TransactionCategorizer:
             response = self._client.messages.create(
                 model=self._model,
                 max_tokens=self.MAX_TOKENS,
-                system=CATEGORIZATION_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_prompt}],
             )
         except anthropic.AuthenticationError as e:

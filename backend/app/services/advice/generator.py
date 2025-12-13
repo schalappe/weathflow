@@ -235,7 +235,6 @@ class AdviceGenerator:
             response = self._client.messages.create(
                 model=self._model,
                 max_tokens=4096,
-                system=ADVICE_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_prompt}],
             )
         except anthropic.AuthenticationError as e:

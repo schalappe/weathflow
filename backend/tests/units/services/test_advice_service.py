@@ -1,9 +1,14 @@
 """Unit tests for advice service functions."""
 
+import json
+import unittest
+from datetime import date
+
 from sqlalchemy.orm import Session
 
 from app.db.models.advice import Advice
 from app.db.models.month import Month
+from app.db.models.transaction import Transaction
 from app.repositories.advice import AdviceRepository
 from app.services.advice import service as advice_service
 from app.services.advice.models import AdviceResponse, ProblemArea
@@ -47,6 +52,28 @@ def _create_advice_response() -> AdviceResponse:
         ],
         encouragement="Continuez sur cette lancée!",
     )
+
+
+def _create_transaction(
+    session: Session,
+    month: Month,
+    description: str,
+    amount: float,
+    money_map_type: str,
+    subcategory: str | None = None,
+) -> Transaction:
+    """Create a test transaction."""
+    tx = Transaction(
+        month_id=month.id,
+        date=date(month.year, month.month, 15),
+        description=description,
+        amount=amount,
+        money_map_type=money_map_type,
+        money_map_subcategory=subcategory,
+    )
+    session.add(tx)
+    session.flush()
+    return tx
 
 
 class TestGetAdviceByMonthId(DatabaseTestCase):
@@ -152,3 +179,182 @@ class TestAdviceResponseToJson(DatabaseTestCase):
         self.assertIn("encouragement", result)
         self.assertIn("Subscriptions", result)
         self.assertIn("+20%", result)
+
+
+class TestExtractAllTransactions(DatabaseTestCase):
+    """Tests for _extract_all_transactions function."""
+
+    def test_groups_transactions_by_category(self) -> None:
+        """Should group transactions into CORE, CHOICE, COMPOUND categories."""
+        month = _create_month(self.session)
+        _create_transaction(self.session, month, "Rent", -1000.0, "CORE", "Housing")
+        _create_transaction(self.session, month, "Netflix", -15.99, "CHOICE", "Subscriptions")
+        _create_transaction(self.session, month, "Savings", -500.0, "COMPOUND", "Savings")
+        self.session.commit()
+        self.session.refresh(month)
+
+        result = advice_service._extract_all_transactions(month.transactions)
+
+        self.assertIn("CORE", result)
+        self.assertIn("CHOICE", result)
+        self.assertIn("COMPOUND", result)
+        self.assertEqual(len(result["CORE"]), 1)
+        self.assertEqual(len(result["CHOICE"]), 1)
+        self.assertEqual(len(result["COMPOUND"]), 1)
+        self.assertEqual(result["CORE"][0].description, "Rent")
+        self.assertEqual(result["CHOICE"][0].description, "Netflix")
+        self.assertEqual(result["COMPOUND"][0].description, "Savings")
+
+    def test_excludes_income_and_excluded_transactions(self) -> None:
+        """Should not include INCOME or EXCLUDED transactions."""
+        month = _create_month(self.session)
+        _create_transaction(self.session, month, "Salary", 3000.0, "INCOME")
+        _create_transaction(self.session, month, "Transfer", -100.0, "EXCLUDED")
+        _create_transaction(self.session, month, "Groceries", -150.0, "CORE", "Food")
+        self.session.commit()
+        self.session.refresh(month)
+
+        result = advice_service._extract_all_transactions(month.transactions)
+
+        self.assertEqual(len(result["CORE"]), 1)
+        self.assertEqual(len(result["CHOICE"]), 0)
+        self.assertEqual(len(result["COMPOUND"]), 0)
+        # ##>: INCOME and EXCLUDED should not appear in any category.
+        all_descriptions = [tx.description for txs in result.values() for tx in txs]
+        self.assertNotIn("Salary", all_descriptions)
+        self.assertNotIn("Transfer", all_descriptions)
+
+    def test_sorts_transactions_by_absolute_amount_descending(self) -> None:
+        """Should sort transactions by absolute amount, largest first."""
+        month = _create_month(self.session)
+        _create_transaction(self.session, month, "Small", -10.0, "CORE")
+        _create_transaction(self.session, month, "Large", -500.0, "CORE")
+        _create_transaction(self.session, month, "Medium", -100.0, "CORE")
+        self.session.commit()
+        self.session.refresh(month)
+
+        result = advice_service._extract_all_transactions(month.transactions)
+
+        self.assertEqual(result["CORE"][0].description, "Large")
+        self.assertEqual(result["CORE"][1].description, "Medium")
+        self.assertEqual(result["CORE"][2].description, "Small")
+
+    def test_returns_empty_dict_for_empty_transactions(self) -> None:
+        """Should return dict with empty lists when no transactions."""
+        result = advice_service._extract_all_transactions([])
+
+        self.assertEqual(result["CORE"], [])
+        self.assertEqual(result["CHOICE"], [])
+        self.assertEqual(result["COMPOUND"], [])
+
+    def test_converts_to_transaction_sample_with_absolute_amount(self) -> None:
+        """Should convert amounts to absolute values in TransactionSample."""
+        month = _create_month(self.session)
+        _create_transaction(self.session, month, "Expense", -150.0, "CHOICE", "Dining")
+        self.session.commit()
+        self.session.refresh(month)
+
+        result = advice_service._extract_all_transactions(month.transactions)
+
+        tx_sample = result["CHOICE"][0]
+        self.assertEqual(tx_sample.description, "Expense")
+        self.assertEqual(tx_sample.amount, 150.0)  # Absolute value.
+        self.assertEqual(tx_sample.subcategory, "Dining")
+
+
+class TestExtractRecommendationsFromAdvice(unittest.TestCase):
+    """Tests for extract_recommendations_from_advice function."""
+
+    def test_extracts_recommendations_from_valid_json(self) -> None:
+        """Should extract recommendations list from valid JSON."""
+        advice_text = json.dumps(
+            {
+                "analysis": "Test",
+                "recommendations": ["Rec 1", "Rec 2", "Rec 3"],
+                "encouragement": "Good job!",
+            }
+        )
+
+        result = advice_service.extract_recommendations_from_advice(advice_text)
+
+        self.assertEqual(result, ["Rec 1", "Rec 2", "Rec 3"])
+
+    def test_returns_empty_list_for_invalid_json(self) -> None:
+        """Should return empty list when JSON is invalid."""
+        result = advice_service.extract_recommendations_from_advice("not valid json {{{")
+
+        self.assertEqual(result, [])
+
+    def test_returns_empty_list_when_key_missing(self) -> None:
+        """Should return empty list when recommendations key is missing."""
+        advice_text = json.dumps({"analysis": "Test", "encouragement": "Good job!"})
+
+        result = advice_service.extract_recommendations_from_advice(advice_text)
+
+        self.assertEqual(result, [])
+
+    def test_returns_empty_list_when_not_a_list(self) -> None:
+        """Should return empty list when recommendations is not a list."""
+        advice_text = json.dumps({"recommendations": "not a list"})
+
+        result = advice_service.extract_recommendations_from_advice(advice_text)
+
+        self.assertEqual(result, [])
+
+    def test_converts_non_string_items_to_strings(self) -> None:
+        """Should convert non-string items to strings."""
+        advice_text = json.dumps({"recommendations": [1, 2.5, True, "text"]})
+
+        result = advice_service.extract_recommendations_from_advice(advice_text)
+
+        self.assertEqual(result, ["1", "2.5", "True", "text"])
+
+
+class TestMonthToMonthDataWithNewFields(DatabaseTestCase):
+    """Tests for month_to_month_data with transactions and past_advice fields."""
+
+    def test_includes_past_advice_when_provided(self) -> None:
+        """Should include past_advice in MonthData when provided."""
+        month = _create_month(self.session)
+        past_advice = ["Reduce spending", "Save more"]
+
+        result = advice_service.month_to_month_data(month, past_advice)
+
+        self.assertEqual(result.past_advice, ["Reduce spending", "Save more"])
+
+    def test_past_advice_is_none_when_not_provided(self) -> None:
+        """Should have None past_advice when not provided."""
+        month = _create_month(self.session)
+
+        result = advice_service.month_to_month_data(month)
+
+        self.assertIsNone(result.past_advice)
+
+    def test_includes_transactions_grouped_by_category(self) -> None:
+        """Should include transactions grouped by category."""
+        month = _create_month(self.session)
+        _create_transaction(self.session, month, "Rent", -1200.0, "CORE", "Housing")
+        _create_transaction(self.session, month, "Uber Eats", -45.0, "CHOICE", "Food Delivery")
+        self.session.commit()
+        self.session.refresh(month)
+
+        result = advice_service.month_to_month_data(month)
+
+        self.assertIsNotNone(result.transactions)
+        assert result.transactions is not None
+        self.assertEqual(len(result.transactions["CORE"]), 1)
+        self.assertEqual(len(result.transactions["CHOICE"]), 1)
+        self.assertEqual(result.transactions["CORE"][0].description, "Rent")
+        self.assertEqual(result.transactions["CHOICE"][0].description, "Uber Eats")
+
+    def test_handles_month_with_no_transactions(self) -> None:
+        """Should handle month with empty transactions list."""
+        month = _create_month(self.session)
+
+        result = advice_service.month_to_month_data(month)
+
+        self.assertIsNotNone(result.transactions)
+        assert result.transactions is not None
+        self.assertEqual(result.transactions["CORE"], [])
+        self.assertEqual(result.transactions["CHOICE"], [])
+        self.assertEqual(result.transactions["COMPOUND"], [])
