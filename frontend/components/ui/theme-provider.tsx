@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useEffect, useState } from "react";
+import { createContext, useCallback, useState } from "react";
 
 export type Theme = "light" | "dark";
 
@@ -14,22 +14,23 @@ export const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 const STORAGE_KEY = "theme";
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // [>]: Default to light, inline script will set correct value before hydration.
-  const [theme, setTheme] = useState<Theme>("light");
-
-  // [>]: Sync state with localStorage on mount. Try-catch handles private browsing.
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-      if (stored === "light" || stored === "dark") {
-        setTheme(stored);
-        document.documentElement.classList.toggle("dark", stored === "dark");
-      }
-    } catch {
-      // [>]: localStorage unavailable (private browsing), use default.
+// [>]: Read initial theme from localStorage. Runs once during state initialization.
+function getInitialTheme(): Theme {
+  if (typeof window === "undefined") return "light";
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
+    if (stored === "light" || stored === "dark") {
+      return stored;
     }
-  }, []);
+  } catch {
+    // [>]: localStorage unavailable (private browsing), use default.
+  }
+  return "light";
+}
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  // [>]: Lazy initialization reads localStorage once, avoids cascading renders.
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {

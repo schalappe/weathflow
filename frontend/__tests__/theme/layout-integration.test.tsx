@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import userEvent from "@testing-library/user-event";
+import Link from "next/link";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { createLocalStorageMock } from "../utils/test-factories";
@@ -13,8 +14,8 @@ function MockLayout({ children }: { children: React.ReactNode }) {
     <ThemeProvider>
       <header data-testid="navbar">
         <nav>
-          <a href="/">Home</a>
-          <a href="/import">Import</a>
+          <Link href="/">Home</Link>
+          <Link href="/import">Import</Link>
         </nav>
         <ThemeToggle />
       </header>
