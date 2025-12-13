@@ -62,6 +62,9 @@ class TestAdviceRepository(DatabaseTestCase):
         advice = Advice(month_id=self.month.id, advice_text='{"summary": "Old advice"}')
         self.session.add(advice)
         self.session.commit()
+
+        # ##>: Refresh to get timezone-naive datetime from DB (SQLite doesn't preserve timezone).
+        self.session.refresh(advice)
         original_timestamp = advice.generated_at
 
         # Allow time difference
@@ -72,7 +75,11 @@ class TestAdviceRepository(DatabaseTestCase):
         repo = AdviceRepository(self.session)
         result = repo.upsert(self.month.id, '{"summary": "Updated advice"}')
 
-        assert result.generated_at > original_timestamp
+        # ##>: Compare timezone-naive datetimes (strip timezone from result for SQLite compatibility).
+        result_timestamp = result.generated_at.replace(tzinfo=None) if result.generated_at.tzinfo else result.generated_at
+        original_naive = original_timestamp.replace(tzinfo=None) if original_timestamp.tzinfo else original_timestamp
+
+        assert result_timestamp > original_naive
 
     def test_delete_removes_advice(self) -> None:
         """delete removes advice from database."""
