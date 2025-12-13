@@ -1,7 +1,6 @@
 """Service functions for advice storage and retrieval."""
 
-import logging
-
+from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.models.advice import Advice
@@ -9,8 +8,6 @@ from app.db.models.month import Month
 from app.repositories.advice import AdviceRepository
 from app.services.advice.models import AdviceResponse, MonthData
 from app.services.exceptions import AdviceQueryError
-
-logger = logging.getLogger(__name__)
 
 
 def get_advice_by_month_id(advice_repo: AdviceRepository, month_id: int) -> Advice | None:

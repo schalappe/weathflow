@@ -3,18 +3,17 @@
 import csv
 import io
 import json
-import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+
+from loguru import logger
 
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
 from app.services.exceptions import ExportSerializationError, MonthNotFoundError
-
-logger = logging.getLogger(__name__)
 
 # ##>: CSV column headers for CSV export output.
 EXPORT_HEADERS = [

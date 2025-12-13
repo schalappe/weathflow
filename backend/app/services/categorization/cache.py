@@ -1,16 +1,15 @@
 """In-memory cache with JSON persistence for transaction categorizations."""
 
 import json
-import logging
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, ClassVar
 
+from loguru import logger
+
 from app.db.enums import MoneyMapType
 from app.services.categorization.models import CachedCategorization
-
-logger = logging.getLogger(__name__)
 
 
 class CategorizationCache:

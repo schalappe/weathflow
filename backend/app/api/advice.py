@@ -1,8 +1,7 @@
 """FastAPI router for Advice API endpoints."""
 
-import logging
-
 from fastapi import HTTPException, Path
+from loguru import logger
 
 from app.api.deps import AdviceGen, AdviceRepo, MonthRepo, create_router
 from app.responses.advice import (
@@ -23,7 +22,6 @@ from app.services.exceptions import (
 )
 
 router = create_router("advice")
-logger = logging.getLogger(__name__)
 
 
 def _http_detail_for_advice_error(error: AdviceGenerationError) -> str:

@@ -5,8 +5,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
 
 from app.api import advice, months, transactions, upload
+from app.config.logging import configure_logging
 from app.config.settings import get_settings
 from app.db.database import init_db
 
@@ -14,8 +16,11 @@ from app.db.database import init_db
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage application lifecycle: initialize database on startup."""
+    configure_logging()
+    logger.info("Starting Money Map Manager API")
     init_db()
     yield
+    logger.info("Shutting down Money Map Manager API")
 
 
 settings = get_settings()

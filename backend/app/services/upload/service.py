@@ -1,8 +1,9 @@
 """Upload service for CSV processing and transaction categorization."""
 
-import logging
 import re
 from typing import Any, Literal
+
+from loguru import logger
 
 from app.config.settings import get_settings
 from app.db.models.month import Month
@@ -15,8 +16,6 @@ from app.services.categorization.service import TransactionCategorizer
 from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError
 from app.services.upload.models import MonthData, ParsedTransaction
 from app.services.upload.parser import BankinCSVParser
-
-logger = logging.getLogger(__name__)
 
 LOW_CONFIDENCE_THRESHOLD = 0.8
 MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")

@@ -1,11 +1,11 @@
 """Advice generation service using Claude API."""
 
 import json
-import logging
 from typing import ClassVar
 
 import anthropic
 from anthropic import Anthropic
+from loguru import logger
 
 from app.services.advice.models import AdviceResponse, MonthData, ProblemArea
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
@@ -15,8 +15,6 @@ from app.services.exceptions import (
     AdviceParseError,
     InsufficientDataError,
 )
-
-logger = logging.getLogger(__name__)
 
 
 def calculate_trend(current: float, previous: float) -> str:

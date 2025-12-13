@@ -1,6 +1,6 @@
 """Service functions for transaction operations."""
 
-import logging
+from loguru import logger
 
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
@@ -9,8 +9,6 @@ from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
 from app.services.calculation.service import calculate_and_update_month
 from app.services.exceptions import InvalidSubcategoryError, TransactionNotFoundError
-
-logger = logging.getLogger(__name__)
 
 # ##>: Allowed subcategories per MoneyMapType from requirements.md.
 ALLOWED_SUBCATEGORIES: dict[MoneyMapType, list[str]] = {

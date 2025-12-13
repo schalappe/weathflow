@@ -1,11 +1,11 @@
 """Transaction categorization service using Claude API."""
 
 import json
-import logging
 from typing import ClassVar
 
 import anthropic
 from anthropic import Anthropic
+from loguru import logger
 
 from app.db.enums import MoneyMapType
 from app.services.categorization.cache import CategorizationCache
@@ -18,8 +18,6 @@ from app.services.exceptions import (
     CategorizationError,
     InvalidResponseError,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class TransactionCategorizer:

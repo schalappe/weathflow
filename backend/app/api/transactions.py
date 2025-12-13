@@ -1,8 +1,7 @@
 """FastAPI router for Transaction API endpoints."""
 
-import logging
-
 from fastapi import HTTPException, Path
+from loguru import logger
 from sqlalchemy import func
 
 from app.api.deps import DbSession, MonthRepo, TransactionRepo, create_router
@@ -18,7 +17,6 @@ from app.services.exceptions import (
 )
 
 router = create_router("transactions")
-logger = logging.getLogger(__name__)
 
 
 @router.patch("/{transaction_id}", response_model=UpdateTransactionResponse)

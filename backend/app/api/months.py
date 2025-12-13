@@ -3,12 +3,12 @@
 # ruff: noqa: B008
 
 import io
-import logging
 from datetime import date
 from math import ceil
 
 from fastapi import HTTPException, Path, Query
 from fastapi.responses import StreamingResponse
+from loguru import logger
 from pydantic import ValidationError
 
 from app.api.deps import MonthRepo, TransactionRepo, create_router
@@ -25,7 +25,6 @@ from app.services.data import months as months_service
 from app.services.exceptions import InvalidCategoryTypeError, MonthDataError, MonthNotFoundError
 
 router = create_router("months")
-logger = logging.getLogger(__name__)
 
 
 def _http_detail_for_db_error(error: MonthDataError) -> str:

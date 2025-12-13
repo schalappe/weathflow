@@ -5,8 +5,7 @@ This module provides pure calculation functions and database integration
 for computing monthly budget scores based on the 50/30/20 framework.
 """
 
-import logging
-
+from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.enums import SCORE_TO_LABEL, ScoreLabel
@@ -15,8 +14,6 @@ from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
 from app.services.calculation.models import MonthStats
 from app.services.exceptions import MonthNotFoundError, ScorePersistenceError, TransactionAggregationError
-
-logger = logging.getLogger(__name__)
 
 # ##>: Money Map threshold constants for the 50/30/20 rule.
 CORE_THRESHOLD = 50.0

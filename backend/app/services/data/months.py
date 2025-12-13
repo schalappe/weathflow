@@ -1,9 +1,9 @@
 """Service functions for retrieving month and transaction data."""
 
-import logging
 from datetime import date
 from typing import Any
 
+from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.enums import MoneyMapType
@@ -14,8 +14,6 @@ from app.repositories.transaction import TransactionRepository
 from app.responses._types import ScoreTrendLiteral
 from app.responses.history import HistorySummary, MonthReference
 from app.services.exceptions import InvalidCategoryTypeError, MonthQueryError, TransactionQueryError
-
-logger = logging.getLogger(__name__)
 
 
 def get_all_months_with_counts(month_repo: MonthRepository) -> list[Any]:
