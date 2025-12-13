@@ -1,9 +1,26 @@
 "use client";
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CATEGORY_COLORS, formatCurrency } from "@/lib/utils";
+import * as React from "react";
+import { Label, Pie, PieChart, Sector } from "recharts";
+import { type PieSectorDataItem } from "recharts/types/polar/Pie";
 import { Home, ShoppingBag, PiggyBank } from "lucide-react";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ChartContainer,
+  ChartStyle,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { CATEGORY_COLORS, formatCurrency } from "@/lib/utils";
 
 interface SpendingPieChartProps {
   core: number;
@@ -11,38 +28,141 @@ interface SpendingPieChartProps {
   compound: number;
 }
 
-const CATEGORY_ICONS = {
-  Core: Home,
-  Choice: ShoppingBag,
-  Compound: PiggyBank,
-};
+// [>]: Chart configuration with Money Map category colors and icons.
+const chartConfig = {
+  amount: {
+    label: "Amount",
+  },
+  core: {
+    label: "Core",
+    color: CATEGORY_COLORS.CORE,
+    icon: Home,
+  },
+  choice: {
+    label: "Choice",
+    color: CATEGORY_COLORS.CHOICE,
+    icon: ShoppingBag,
+  },
+  compound: {
+    label: "Compound",
+    color: CATEGORY_COLORS.COMPOUND,
+    icon: PiggyBank,
+  },
+} satisfies ChartConfig;
+
+type CategoryKey = "core" | "choice" | "compound";
 
 export function SpendingPieChart({
   core,
   choice,
   compound,
 }: SpendingPieChartProps) {
-  const data = [
-    { name: "Core", value: Math.abs(core), color: CATEGORY_COLORS.CORE },
-    { name: "Choice", value: Math.abs(choice), color: CATEGORY_COLORS.CHOICE },
-    {
-      name: "Compound",
-      value: Math.abs(compound),
-      color: CATEGORY_COLORS.COMPOUND,
-    },
-  ];
+  const id = "spending-distribution";
 
-  const total = data.reduce((sum, item) => sum + item.value, 0);
+  // [>]: Build chart data with absolute values and fill colors.
+  const chartData = React.useMemo(
+    () => [
+      {
+        category: "core" as CategoryKey,
+        amount: Math.abs(core),
+        fill: "var(--color-core)",
+      },
+      {
+        category: "choice" as CategoryKey,
+        amount: Math.abs(choice),
+        fill: "var(--color-choice)",
+      },
+      {
+        category: "compound" as CategoryKey,
+        amount: Math.abs(compound),
+        fill: "var(--color-compound)",
+      },
+    ],
+    [core, choice, compound],
+  );
+
+  const total = chartData.reduce((sum, item) => sum + item.amount, 0);
   const isEmpty = total === 0;
 
+  // [>]: Default to the category with the highest amount.
+  const defaultCategory = React.useMemo(() => {
+    if (isEmpty) return "core";
+    const maxItem = chartData.reduce((max, item) =>
+      item.amount > max.amount ? item : max,
+    );
+    return maxItem.category;
+  }, [chartData, isEmpty]);
+
+  const [activeCategory, setActiveCategory] =
+    React.useState<CategoryKey>(defaultCategory);
+
+  const activeIndex = React.useMemo(
+    () => chartData.findIndex((item) => item.category === activeCategory),
+    [activeCategory, chartData],
+  );
+
+  const categories = React.useMemo(
+    () => chartData.map((item) => item.category),
+    [chartData],
+  );
+
+  // [>]: Calculate percentage for center label.
+  const activePercentage = React.useMemo(() => {
+    if (total === 0) return "0";
+    return (((chartData[activeIndex]?.amount || 0) / total) * 100).toFixed(1);
+  }, [chartData, activeIndex, total]);
+
   return (
-    <Card className="border-0 metric-glow-core h-full">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">
-          Spending Distribution
-        </CardTitle>
+    <Card
+      data-chart={id}
+      className="flex flex-col border-0 metric-glow-core h-full"
+    >
+      <ChartStyle id={id} config={chartConfig} />
+      <CardHeader className="flex-row items-start space-y-0 pb-0">
+        <div className="grid gap-1">
+          <CardTitle className="text-base font-semibold">
+            Spending Distribution
+          </CardTitle>
+        </div>
+        {!isEmpty && (
+          <Select
+            value={activeCategory}
+            onValueChange={(value) => setActiveCategory(value as CategoryKey)}
+          >
+            <SelectTrigger
+              className="ml-auto h-7 w-[120px] rounded-lg pl-2.5"
+              aria-label="Select a category"
+            >
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent align="end" className="rounded-xl">
+              {categories.map((key) => {
+                const config = chartConfig[key];
+                if (!config) return null;
+
+                return (
+                  <SelectItem
+                    key={key}
+                    value={key}
+                    className="rounded-lg [&_span]:flex"
+                  >
+                    <div className="flex items-center gap-2 text-xs">
+                      <span
+                        className="flex h-3 w-3 shrink-0 rounded-sm"
+                        style={{
+                          backgroundColor: config.color,
+                        }}
+                      />
+                      {config.label}
+                    </div>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-1 flex-col justify-center pb-4">
         {isEmpty ? (
           <div
             className="flex h-[280px] items-center justify-center text-muted-foreground"
@@ -51,81 +171,76 @@ export function SpendingPieChart({
             No spending data available
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
-            {/* Chart */}
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie
-                  data={data}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={75}
-                  paddingAngle={3}
-                  cornerRadius={4}
-                >
-                  {data.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={entry.color}
-                      className="transition-all duration-300 hover:opacity-80"
+          <ChartContainer
+            id={id}
+            config={chartConfig}
+            className="mx-auto aspect-square w-full max-w-[280px] min-h-[250px]"
+          >
+            <PieChart>
+              <ChartTooltip
+                cursor={false}
+                content={
+                  <ChartTooltipContent
+                    hideLabel
+                    formatter={(value) => formatCurrency(value as number)}
+                  />
+                }
+              />
+              <Pie
+                data={chartData}
+                dataKey="amount"
+                nameKey="category"
+                innerRadius={60}
+                outerRadius={85}
+                strokeWidth={5}
+                activeIndex={activeIndex}
+                activeShape={({
+                  outerRadius = 0,
+                  ...props
+                }: PieSectorDataItem) => (
+                  <g>
+                    <Sector {...props} outerRadius={outerRadius + 10} />
+                    <Sector
+                      {...props}
+                      outerRadius={outerRadius + 22}
+                      innerRadius={outerRadius + 12}
                     />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value: number) => formatCurrency(value)}
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                  }}
-                  itemStyle={{
-                    color: "hsl(var(--foreground))",
+                  </g>
+                )}
+              >
+                <Label
+                  content={({ viewBox }) => {
+                    if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                      const activeData = chartData[activeIndex];
+                      return (
+                        <text
+                          x={viewBox.cx}
+                          y={viewBox.cy}
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                        >
+                          <tspan
+                            x={viewBox.cx}
+                            y={viewBox.cy}
+                            className="fill-foreground text-2xl font-bold"
+                          >
+                            {activePercentage}%
+                          </tspan>
+                          <tspan
+                            x={viewBox.cx}
+                            y={(viewBox.cy || 0) + 22}
+                            className="fill-muted-foreground text-sm"
+                          >
+                            {chartConfig[activeCategory]?.label}
+                          </tspan>
+                        </text>
+                      );
+                    }
                   }}
                 />
-              </PieChart>
-            </ResponsiveContainer>
-
-            {/* Custom Legend */}
-            <div className="flex flex-col gap-2">
-              {data.map((item) => {
-                const Icon =
-                  CATEGORY_ICONS[item.name as keyof typeof CATEGORY_ICONS];
-                const percentage =
-                  total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                return (
-                  <div
-                    key={item.name}
-                    className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 transition-colors hover:bg-muted"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="flex h-6 w-6 items-center justify-center rounded"
-                        style={{ backgroundColor: `${item.color}20` }}
-                      >
-                        <Icon
-                          className="h-3.5 w-3.5"
-                          style={{ color: item.color }}
-                        />
-                      </div>
-                      <span className="text-sm font-medium">{item.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm tabular-nums text-muted-foreground">
-                        {percentage}%
-                      </span>
-                      <span className="text-sm font-semibold tabular-nums">
-                        {formatCurrency(item.value)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+              </Pie>
+            </PieChart>
+          </ChartContainer>
         )}
       </CardContent>
     </Card>
