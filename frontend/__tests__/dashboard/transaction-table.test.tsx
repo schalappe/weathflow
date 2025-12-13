@@ -109,15 +109,15 @@ describe("TransactionTable", () => {
       />,
     );
 
-    // [>]: Positive amount should have + prefix and green color.
+    // [>]: Positive amount should have + prefix and Neutra green color.
     const positiveAmount = screen.getByText(/\+3[\s\u00A0]000[\s\u00A0]€/);
     expect(positiveAmount).toBeInTheDocument();
-    expect(positiveAmount).toHaveClass("text-green-600");
+    expect(positiveAmount).toHaveClass("text-[#788c5d]");
 
-    // [>]: Negative amount should have red color (already has - from number).
+    // [>]: Negative amount should have foreground color (no special styling).
     const negativeAmount = screen.getByText(/-86[\s\u00A0]€/);
     expect(negativeAmount).toBeInTheDocument();
-    expect(negativeAmount).toHaveClass("text-red-600");
+    expect(negativeAmount).toHaveClass("text-foreground");
   });
 
   it("renders pagination controls", () => {
@@ -135,11 +135,22 @@ describe("TransactionTable", () => {
       />,
     );
 
-    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Next" })).not.toBeDisabled();
+    // [>]: New UI shows "page / total_pages" format with icon buttons.
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    // [>]: Icon buttons don't have text labels, get all buttons and check state.
+    const buttons = screen.getAllByRole("button");
+    const prevButton = buttons.find((btn) =>
+      btn.querySelector("svg.lucide-chevron-left"),
+    );
+    const nextButton = buttons.find((btn) =>
+      btn.querySelector("svg.lucide-chevron-right"),
+    );
+
+    expect(prevButton).toBeDisabled();
+    expect(nextButton).not.toBeDisabled();
+
+    fireEvent.click(nextButton!);
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
 

@@ -3,7 +3,6 @@
 import { Pencil, ChevronLeft, ChevronRight, Receipt } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
@@ -21,7 +20,6 @@ import {
 import {
   formatCurrency,
   formatTransactionDate,
-  CATEGORY_BADGE_CLASSES,
   cn,
   getActiveFilterCount,
 } from "@/lib/utils";
@@ -98,7 +96,7 @@ export function TransactionTable({
                 Transactions
               </CardTitle>
               <span className="text-xs text-muted-foreground">
-                {pagination.total || 0} total
+                {pagination.total_items || 0} total
               </span>
             </div>
           </div>

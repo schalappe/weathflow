@@ -40,7 +40,7 @@ describe("History Page", () => {
 
     // [>]: Should show content from HistoryClient (empty state in this case).
     await waitFor(() => {
-      expect(screen.getByText("Aucune donnee historique")).toBeInTheDocument();
+      expect(screen.getByText("No historical data")).toBeInTheDocument();
     });
   });
 

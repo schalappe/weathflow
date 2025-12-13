@@ -48,7 +48,7 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
       render(<DashboardClient />);
 
       await waitFor(() => {
-        expect(screen.getByText("No months imported yet")).toBeInTheDocument();
+        expect(screen.getByText("No data yet")).toBeInTheDocument();
       });
 
       // [>]: Should have CTA to import page (button says "Import Transactions").
@@ -180,15 +180,17 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
       render(<DashboardClient />);
 
       // [>]: Wait for full render.
+      // [>]: New UI shows score and /3 as separate elements.
       await waitFor(() => {
-        expect(screen.getByText("Score: 3/3")).toBeInTheDocument();
+        expect(screen.getByText("3")).toBeInTheDocument();
+        expect(screen.getByText("/3")).toBeInTheDocument();
       });
 
-      // [>]: Verify all metric cards rendered.
-      expect(screen.getByText("Income")).toBeInTheDocument();
-      expect(screen.getByText("Core")).toBeInTheDocument();
-      expect(screen.getByText("Choice")).toBeInTheDocument();
-      expect(screen.getByText("Compound")).toBeInTheDocument();
+      // [>]: Verify all metric cards rendered (use getAllByText since categories may appear multiple times).
+      expect(screen.getAllByText("Income").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Core").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Choice").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Compound").length).toBeGreaterThan(0);
 
       // [>]: Verify transaction table.
       expect(screen.getByText("Transactions")).toBeInTheDocument();

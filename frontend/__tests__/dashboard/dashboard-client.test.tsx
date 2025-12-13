@@ -108,8 +108,9 @@ describe("DashboardClient", () => {
 
     render(<DashboardClient />);
 
-    // [>]: Should show loading state initially.
-    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+    // [>]: Should show loading skeleton initially (animate-pulse class).
+    const skeletons = document.querySelectorAll(".animate-pulse");
+    expect(skeletons.length).toBeGreaterThan(0);
 
     // [>]: Wait for API call.
     await waitFor(() => {
@@ -135,8 +136,10 @@ describe("DashboardClient", () => {
     });
 
     // [>]: Should display the most recent month (October 2025).
+    // [>]: New UI shows score and /3 as separate elements.
     await waitFor(() => {
-      expect(screen.getByText("Score: 3/3")).toBeInTheDocument();
+      expect(screen.getByText("3")).toBeInTheDocument();
+      expect(screen.getByText("/3")).toBeInTheDocument();
     });
   });
 
@@ -150,7 +153,8 @@ describe("DashboardClient", () => {
 
     // [>]: Wait for initial load - most recent month (October 2025) should be auto-selected.
     await waitFor(() => {
-      expect(screen.getByText("Score: 3/3")).toBeInTheDocument();
+      expect(screen.getByText("3")).toBeInTheDocument();
+      expect(screen.getByText("/3")).toBeInTheDocument();
     });
 
     // [>]: Verify the month selector is rendered with correct options.
@@ -181,9 +185,13 @@ describe("DashboardClient", () => {
       expect(screen.getByText("Transactions")).toBeInTheDocument();
     });
 
-    // [>]: Click next page.
-    const nextButton = screen.getByRole("button", { name: /next/i });
-    fireEvent.click(nextButton);
+    // [>]: Click next page (icon button with ChevronRight).
+    const buttons = screen.getAllByRole("button");
+    const nextButton = buttons.find((btn) =>
+      btn.querySelector("svg.lucide-chevron-right"),
+    );
+    expect(nextButton).toBeDefined();
+    fireEvent.click(nextButton!);
 
     // [>]: Should fetch page 2.
     await waitFor(() => {
@@ -246,9 +254,13 @@ describe("DashboardClient", () => {
         expect(screen.getByText("Transactions")).toBeInTheDocument();
       });
 
-      // [>]: Navigate to page 2.
-      const nextButton = screen.getByRole("button", { name: /next/i });
-      fireEvent.click(nextButton);
+      // [>]: Navigate to page 2 (icon button with ChevronRight).
+      const buttons = screen.getAllByRole("button");
+      const nextButton = buttons.find((btn) =>
+        btn.querySelector("svg.lucide-chevron-right"),
+      );
+      expect(nextButton).toBeDefined();
+      fireEvent.click(nextButton!);
 
       await waitFor(() => {
         expect(apiClient.getMonthDetail).toHaveBeenCalledWith(

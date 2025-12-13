@@ -4,13 +4,7 @@ import { MetricCard } from "@/components/dashboard/metric-card";
 
 describe("MetricCard", () => {
   it("renders category title and formatted amount", () => {
-    render(
-      <MetricCard
-        title="Income"
-        amount={2500}
-        colorClass="border-l-blue-500"
-      />,
-    );
+    render(<MetricCard title="Income" amount={2500} />);
 
     expect(screen.getByText("Income")).toBeInTheDocument();
     // [>]: French locale formats 2500 as "2 500 €".
@@ -19,28 +13,15 @@ describe("MetricCard", () => {
 
   it("renders percentage for non-Income categories", () => {
     render(
-      <MetricCard
-        title="Core"
-        amount={1200}
-        percentage={48.5}
-        isSuccess={true}
-        colorClass="border-l-violet-500"
-      />,
+      <MetricCard title="Core" amount={1200} percentage={48.5} isSuccess />,
     );
 
-    expect(screen.getByText("48.5%")).toBeInTheDocument();
+    // [>]: New UI shows "X% of income" format.
+    expect(screen.getByText("48.5% of income")).toBeInTheDocument();
   });
 
   it("shows checkmark when threshold met", () => {
-    render(
-      <MetricCard
-        title="Core"
-        amount={1200}
-        percentage={45}
-        isSuccess={true}
-        colorClass="border-l-violet-500"
-      />,
-    );
+    render(<MetricCard title="Core" amount={1200} percentage={45} isSuccess />);
 
     expect(screen.getByLabelText("Threshold met")).toBeInTheDocument();
   });
@@ -52,7 +33,6 @@ describe("MetricCard", () => {
         amount={1500}
         percentage={60}
         isSuccess={false}
-        colorClass="border-l-violet-500"
       />,
     );
 
@@ -65,8 +45,7 @@ describe("MetricCard", () => {
         title="Compound"
         amount={500}
         percentage={20}
-        isSuccess={true}
-        colorClass="border-l-amber-500"
+        isSuccess
         compoundDirection="positive"
       />,
     );
@@ -81,7 +60,6 @@ describe("MetricCard", () => {
         amount={1082}
         percentage={-75.3}
         isSuccess={false}
-        colorClass="border-l-amber-500"
         compoundDirection="negative"
       />,
     );
@@ -91,13 +69,7 @@ describe("MetricCard", () => {
 
   it("does not show direction indicator for non-Compound categories", () => {
     render(
-      <MetricCard
-        title="Core"
-        amount={1200}
-        percentage={48.5}
-        isSuccess={true}
-        colorClass="border-l-violet-500"
-      />,
+      <MetricCard title="Core" amount={1200} percentage={48.5} isSuccess />,
     );
 
     expect(screen.queryByText("Savings")).not.toBeInTheDocument();

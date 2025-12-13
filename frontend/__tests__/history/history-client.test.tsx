@@ -47,8 +47,9 @@ describe("HistoryClient - State Management", () => {
 
     render(<HistoryClient />);
 
-    // [>]: Should show loading spinner initially.
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    // [>]: Should show skeleton loader (animate-pulse elements).
+    const skeletons = document.querySelectorAll(".animate-pulse");
+    expect(skeletons.length).toBeGreaterThan(0);
   });
 
   it("transitions to loaded state with months data", async () => {
@@ -65,13 +66,11 @@ describe("HistoryClient - State Management", () => {
     render(<HistoryClient />);
 
     await waitFor(() => {
-      expect(screen.getByText("Historique")).toBeInTheDocument();
+      expect(screen.getByText("History")).toBeInTheDocument();
     });
 
     // [>]: Charts should be visible.
-    expect(
-      screen.getByText("Score Evolution (Last 12 Months)"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Score Evolution")).toBeInTheDocument();
   });
 
   it("transitions to empty state when no months returned", async () => {
@@ -83,12 +82,12 @@ describe("HistoryClient - State Management", () => {
     render(<HistoryClient />);
 
     await waitFor(() => {
-      expect(screen.getByText("Aucune donnee historique")).toBeInTheDocument();
+      expect(screen.getByText("No historical data")).toBeInTheDocument();
     });
 
     expect(
       screen.getByText(
-        "Importez vos premieres transactions pour voir l'evolution de votre budget.",
+        "Import your transactions to see your budget evolution over time and get personalized advice.",
       ),
     ).toBeInTheDocument();
   });
@@ -109,7 +108,7 @@ describe("HistoryClient - State Management", () => {
 
     // [>]: Wait for initial load.
     await waitFor(() => {
-      expect(screen.getByText("Historique")).toBeInTheDocument();
+      expect(screen.getByText("History")).toBeInTheDocument();
     });
 
     // [>]: Initial call should be with default period (12).
@@ -155,7 +154,7 @@ describe("HistoryClient - Data Fetching", () => {
 
     // [>]: Retry button should be visible.
     expect(
-      screen.getByRole("button", { name: "Reessayer" }),
+      screen.getByRole("button", { name: /Try Again/i }),
     ).toBeInTheDocument();
   });
 
@@ -178,7 +177,7 @@ describe("HistoryClient - Data Fetching", () => {
     });
 
     // [>]: Click retry.
-    await user.click(screen.getByRole("button", { name: "Reessayer" }));
+    await user.click(screen.getByRole("button", { name: /Try Again/i }));
 
     // [>]: Should fetch again.
     await waitFor(() => {
@@ -192,7 +191,7 @@ describe("HistoryClient - UI Rendering", () => {
     vi.clearAllMocks();
   });
 
-  it("shows loading spinner during initial load", async () => {
+  it("shows loading skeleton during initial load", async () => {
     mockGetMonthsHistory.mockImplementation(
       () =>
         new Promise((resolve) =>
@@ -205,10 +204,12 @@ describe("HistoryClient - UI Rendering", () => {
 
     render(<HistoryClient />);
 
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    // [>]: Skeleton loader uses animate-pulse class.
+    const skeletons = document.querySelectorAll(".animate-pulse");
+    expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("shows empty state with French message and import button", async () => {
+  it("shows empty state with message and import button", async () => {
     mockGetMonthsHistory.mockResolvedValue({
       months: [],
       summary: createMockSummary(),
@@ -217,11 +218,11 @@ describe("HistoryClient - UI Rendering", () => {
     render(<HistoryClient />);
 
     await waitFor(() => {
-      expect(screen.getByText("Aucune donnee historique")).toBeInTheDocument();
+      expect(screen.getByText("No historical data")).toBeInTheDocument();
     });
 
     const importButton = screen.getByRole("link", {
-      name: "Importer des transactions",
+      name: /Import Transactions/i,
     });
     expect(importButton).toHaveAttribute("href", "/import");
   });
@@ -236,7 +237,7 @@ describe("HistoryClient - UI Rendering", () => {
     });
 
     expect(
-      screen.getByRole("button", { name: "Reessayer" }),
+      screen.getByRole("button", { name: /Try Again/i }),
     ).toBeInTheDocument();
   });
 
@@ -254,12 +255,10 @@ describe("HistoryClient - UI Rendering", () => {
     render(<HistoryClient />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Score Evolution (Last 12 Months)"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Score Evolution")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Spending Breakdown by Month")).toBeInTheDocument();
+    expect(screen.getByText("Spending Breakdown")).toBeInTheDocument();
   });
 });
 

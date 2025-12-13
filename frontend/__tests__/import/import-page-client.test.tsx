@@ -103,7 +103,7 @@ describe("ImportPageClient", () => {
 
     // [>]: Click categorize button.
     const categorizeButton = screen.getByRole("button", {
-      name: /categorize selected months/i,
+      name: /categorize with ai/i,
     });
     fireEvent.click(categorizeButton);
 
@@ -170,7 +170,7 @@ describe("ImportPageClient", () => {
 
     // [>]: Click categorize -> categorizing -> results.
     fireEvent.click(
-      screen.getByRole("button", { name: /categorize selected months/i }),
+      screen.getByRole("button", { name: /categorize with ai/i }),
     );
 
     // [>]: Results state - success message visible.
@@ -206,7 +206,7 @@ describe("ImportPageClient", () => {
 
     // [>]: Click categorize button.
     fireEvent.click(
-      screen.getByRole("button", { name: /categorize selected months/i }),
+      screen.getByRole("button", { name: /categorize with ai/i }),
     );
 
     // [>]: Error shows in both Alert and FileDropzone, use getAllByText.

@@ -103,7 +103,7 @@ describe("Additional Strategic Tests", () => {
 
     // [>]: Categorize button should be disabled.
     const categorizeButton = screen.getByRole("button", {
-      name: /categorize selected months/i,
+      name: /categorize with ai/i,
     });
     expect(categorizeButton).toBeDisabled();
   });
@@ -126,9 +126,9 @@ describe("Additional Strategic Tests", () => {
       expect(uploadMock).toHaveBeenCalledWith(file1);
     });
 
-    // [>]: Clear mock and try again button.
+    // [>]: Clear mock and click start over button.
     uploadMock.mockClear();
-    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    fireEvent.click(screen.getByRole("button", { name: /start over/i }));
 
     // [>]: Page reloads on cancel, so we can't test further here.
     // The test verifies the first upload worked.

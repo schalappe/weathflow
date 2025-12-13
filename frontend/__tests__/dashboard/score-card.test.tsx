@@ -8,7 +8,9 @@ describe("ScoreCard", () => {
       <ScoreCard score={2} scoreLabel="Okay" monthDisplay="octobre 2025" />,
     );
 
-    expect(screen.getByText("Score: 2/3")).toBeInTheDocument();
+    // [>]: New UI shows score and /3 as separate elements.
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("/3")).toBeInTheDocument();
   });
 
   it("renders correct label for each score", () => {
@@ -32,17 +34,21 @@ describe("ScoreCard", () => {
     expect(screen.getByText("Need Improvement")).toBeInTheDocument();
   });
 
-  it("applies correct color class based on score", () => {
+  it("applies correct gradient class based on score", () => {
     const { rerender } = render(
       <ScoreCard score={3} scoreLabel="Great" monthDisplay="octobre 2025" />,
     );
-    // [>]: Score 3 should have green badge.
-    expect(screen.getByText("Great")).toHaveClass("bg-green-500");
+    // [>]: Neutra theme uses gradient classes instead of solid colors.
+    expect(screen.getByText("Great").closest("div")).toHaveClass(
+      "score-gradient-great",
+    );
 
     rerender(
       <ScoreCard score={2} scoreLabel="Okay" monthDisplay="octobre 2025" />,
     );
-    expect(screen.getByText("Okay")).toHaveClass("bg-yellow-500");
+    expect(screen.getByText("Okay").closest("div")).toHaveClass(
+      "score-gradient-okay",
+    );
 
     rerender(
       <ScoreCard
@@ -51,11 +57,15 @@ describe("ScoreCard", () => {
         monthDisplay="octobre 2025"
       />,
     );
-    expect(screen.getByText("Need Improvement")).toHaveClass("bg-orange-500");
+    expect(screen.getByText("Need Improvement").closest("div")).toHaveClass(
+      "score-gradient-need-improvement",
+    );
 
     rerender(
       <ScoreCard score={0} scoreLabel="Poor" monthDisplay="octobre 2025" />,
     );
-    expect(screen.getByText("Poor")).toHaveClass("bg-red-500");
+    expect(screen.getByText("Poor").closest("div")).toHaveClass(
+      "score-gradient-poor",
+    );
   });
 });

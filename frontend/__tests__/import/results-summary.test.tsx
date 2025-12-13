@@ -54,13 +54,13 @@ describe("ResultsSummary", () => {
       />,
     );
 
-    // [>]: Check that the "Great" badge exists with green styling.
+    // [>]: Check that the "Great" badge exists with Neutra green styling.
     const greatBadge = screen.getByText("Great");
-    expect(greatBadge).toHaveClass("bg-green-500");
+    expect(greatBadge).toHaveClass("bg-[#788c5d]");
 
-    // [>]: Check that "Need Improvement" badge has orange styling.
+    // [>]: Check that "Need Improvement" badge has Neutra coral styling.
     const needImprovementBadge = screen.getByText("Need Improvement");
-    expect(needImprovementBadge).toHaveClass("bg-orange-500");
+    expect(needImprovementBadge).toHaveClass("bg-[#d97757]");
   });
 
   it("View transactions button is disabled with tooltip", () => {

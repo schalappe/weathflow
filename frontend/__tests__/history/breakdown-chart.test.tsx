@@ -21,7 +21,7 @@ describe("SpendingBreakdownChart", () => {
 
     const { container } = render(<SpendingBreakdownChart months={months} />);
 
-    expect(screen.getByText("Spending Breakdown by Month")).toBeInTheDocument();
+    expect(screen.getByText("Spending Breakdown")).toBeInTheDocument();
     expect(
       container.querySelector(".recharts-responsive-container"),
     ).toBeInTheDocument();

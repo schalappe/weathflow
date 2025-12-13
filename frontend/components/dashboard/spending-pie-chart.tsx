@@ -2,7 +2,7 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CATEGORY_COLORS, formatCurrency, cn } from "@/lib/utils";
+import { CATEGORY_COLORS, formatCurrency } from "@/lib/utils";
 import { Home, ShoppingBag, PiggyBank } from "lucide-react";
 
 interface SpendingPieChartProps {

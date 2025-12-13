@@ -18,7 +18,6 @@ interface MetricCardProps {
   amount: number;
   percentage?: number;
   isSuccess?: boolean;
-  colorClass: string;
   compoundDirection?: "positive" | "negative";
 }
 
@@ -67,7 +66,6 @@ export function MetricCard({
   amount,
   percentage,
   isSuccess,
-  colorClass,
   compoundDirection,
 }: MetricCardProps) {
   const config = CATEGORY_CONFIG[title] || CATEGORY_CONFIG.Income;
@@ -123,9 +121,9 @@ export function MetricCard({
               )}
             >
               {isSuccess ? (
-                <CheckCircle2 className="h-4 w-4" />
+                <CheckCircle2 className="h-4 w-4" aria-label="Threshold met" />
               ) : (
-                <XCircle className="h-4 w-4" />
+                <XCircle className="h-4 w-4" aria-label="Threshold exceeded" />
               )}
             </div>
           )}

@@ -21,9 +21,7 @@ describe("ScoreChart", () => {
 
     const { container } = render(<ScoreChart months={months} />);
 
-    expect(
-      screen.getByText("Score Evolution (Last 12 Months)"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Score Evolution")).toBeInTheDocument();
     expect(
       container.querySelector(".recharts-responsive-container"),
     ).toBeInTheDocument();

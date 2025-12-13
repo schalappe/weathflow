@@ -23,7 +23,6 @@ import {
   formatMonthDisplay,
   meetsThreshold,
   getErrorMessage,
-  CATEGORY_TAILWIND,
   TRANSACTIONS_PER_PAGE,
 } from "@/lib/utils";
 import type {
@@ -402,7 +401,6 @@ export function DashboardClient() {
                 <MetricCard
                   title="Income"
                   amount={state.monthDetail.month.total_income}
-                  colorClass={CATEGORY_TAILWIND.INCOME}
                 />
               </div>
               <div className="animate-fade-in-up opacity-0 stagger-2">
@@ -414,7 +412,6 @@ export function DashboardClient() {
                     "CORE",
                     state.monthDetail.month.core_percentage,
                   )}
-                  colorClass={CATEGORY_TAILWIND.CORE}
                 />
               </div>
               <div className="animate-fade-in-up opacity-0 stagger-3">
@@ -426,7 +423,6 @@ export function DashboardClient() {
                     "CHOICE",
                     state.monthDetail.month.choice_percentage,
                   )}
-                  colorClass={CATEGORY_TAILWIND.CHOICE}
                 />
               </div>
               <div className="animate-fade-in-up opacity-0 stagger-4">
@@ -438,7 +434,6 @@ export function DashboardClient() {
                     "COMPOUND",
                     state.monthDetail.month.compound_percentage,
                   )}
-                  colorClass={CATEGORY_TAILWIND.COMPOUND}
                   compoundDirection={
                     state.monthDetail.month.total_compound >= 0
                       ? "positive"
