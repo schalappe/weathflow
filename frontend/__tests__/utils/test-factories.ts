@@ -1,4 +1,29 @@
 import type { AdviceData, MonthHistory, Score } from "@/types";
+import { vi } from "vitest";
+
+// [>]: Mock localStorage for theme and storage-related tests.
+export function createLocalStorageMock() {
+  let store: Record<string, string> = {};
+
+  const mock = {
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value;
+    }),
+    clear: () => {
+      store = {};
+    },
+    reset: () => {
+      store = {};
+      mock.getItem.mockClear();
+      mock.setItem.mockClear();
+    },
+  };
+
+  Object.defineProperty(window, "localStorage", { value: mock });
+
+  return mock;
+}
 
 // [>]: Factory for creating test MonthHistory data with flexible percentages.
 export function createMonthHistory(
