@@ -72,14 +72,14 @@ def update_transaction(
             updated_month_stats=MonthSummary.from_model(month, transaction_count),
         )
     except TransactionNotFoundError as error:
-        logger.warning("Transaction not found: transaction_id=%d", transaction_id)
+        logger.warning("Transaction not found: transaction_id={}", transaction_id)
         raise HTTPException(
             status_code=404,
             detail=f"Transaction with id={transaction_id} not found.",
         ) from error
     except InvalidSubcategoryError as error:
         logger.warning(
-            "Invalid subcategory: type=%s, subcategory=%s",
+            "Invalid subcategory: type={}, subcategory={}",
             error.money_map_type,
             error.subcategory,
         )
@@ -89,21 +89,21 @@ def update_transaction(
         ) from error
     except MonthNotFoundError as error:
         # ##>: Database inconsistency - transaction exists but its month does not.
-        logger.error("Month not found during recalculation: month_id=%d", error.month_id)
+        logger.error("Month not found during recalculation: month_id={}", error.month_id)
         raise HTTPException(
             status_code=500,
             detail="Failed to recalculate month statistics. Please contact support.",
         ) from error
     except ScoreCalculationError as error:
         # ##>: Catch all calculator errors (TransactionAggregationError, ScorePersistenceError).
-        logger.exception("Score calculation failed for transaction %d: %s", transaction_id, error)
+        logger.exception("Score calculation failed for transaction {}: {}", transaction_id, error)
         raise HTTPException(
             status_code=500,
             detail="Failed to recalculate month statistics. Please try again.",
         ) from error
     except Exception as error:
         logger.exception(
-            "Unexpected error updating transaction %d: error_type=%s",
+            "Unexpected error updating transaction {}: error_type={}",
             transaction_id,
             type(error).__name__,
         )

@@ -39,10 +39,10 @@ def get_all_months_with_counts(month_repo: MonthRepository) -> list[Any]:
     """
     try:
         result = month_repo.get_all_with_transaction_counts()
-        logger.info("Retrieved %d months with transaction counts", len(result))
+        logger.info("Retrieved {} months with transaction counts", len(result))
         return result
     except SQLAlchemyError as error:
-        logger.error("Database error retrieving months: %s", str(error))
+        logger.error("Database error retrieving months: {}", str(error))
         raise MonthQueryError(str(error)) from error
 
 
@@ -72,12 +72,12 @@ def get_month_by_year_month(month_repo: MonthRepository, year: int, month: int) 
     try:
         result = month_repo.get_by_year_month(year, month)
         if result:
-            logger.info("Found month: %d-%02d (id=%d)", year, month, result.id)
+            logger.info("Found month: {}-{:02d} (id={})", year, month, result.id)
         else:
-            logger.info("Month not found: %d-%02d", year, month)
+            logger.info("Month not found: {}-{:02d}", year, month)
         return result
     except SQLAlchemyError as error:
-        logger.error("Database error retrieving month %d-%02d: %s", year, month, str(error))
+        logger.error("Database error retrieving month {}-{:02d}: {}", year, month, str(error))
         raise MonthQueryError(str(error)) from error
 
 
@@ -137,7 +137,7 @@ def get_transactions_filtered(
             valid_types = {e.value for e in MoneyMapType}
             invalid_types = [c for c in category_types if c not in valid_types]
             if invalid_types:
-                logger.warning("Invalid category_types received: %s", invalid_types)
+                logger.warning("Invalid category_types received: {}", invalid_types)
                 raise InvalidCategoryTypeError(invalid_types, list(valid_types))
 
         transactions, total_count = transaction_repo.get_filtered(
@@ -151,7 +151,7 @@ def get_transactions_filtered(
         )
 
         logger.info(
-            "Retrieved %d/%d transactions for month_id=%d (page=%d, filters: categories=%s, search=%s)",
+            "Retrieved {}/{} transactions for month_id={} (page={}, filters: categories={}, search={})",
             len(transactions),
             total_count,
             month_id,
@@ -164,7 +164,7 @@ def get_transactions_filtered(
     except InvalidCategoryTypeError:
         raise
     except SQLAlchemyError as error:
-        logger.error("Database error retrieving transactions for month_id=%d: %s", month_id, str(error))
+        logger.error("Database error retrieving transactions for month_id={}: {}", month_id, str(error))
         raise TransactionQueryError(month_id, str(error)) from error
 
 
@@ -193,10 +193,10 @@ def get_all_transactions_for_month(transaction_repo: TransactionRepository, mont
     """
     try:
         result = transaction_repo.get_all_for_month(month_id)
-        logger.info("Retrieved %d transactions for export (month_id=%d)", len(result), month_id)
+        logger.info("Retrieved {} transactions for export (month_id={})", len(result), month_id)
         return result
     except SQLAlchemyError as error:
-        logger.error("Database error retrieving transactions for export (month_id=%d): %s", month_id, str(error))
+        logger.error("Database error retrieving transactions for export (month_id={}): {}", month_id, str(error))
         raise TransactionQueryError(month_id, str(error)) from error
 
 
@@ -225,10 +225,10 @@ def get_months_history(month_repo: MonthRepository, limit: int) -> list[Month]:
     """
     try:
         result = month_repo.get_recent(limit)
-        logger.info("Retrieved %d months for history", len(result))
+        logger.info("Retrieved {} months for history", len(result))
         return result
     except SQLAlchemyError as error:
-        logger.error("Database error retrieving months for history: %s", str(error))
+        logger.error("Database error retrieving months for history: {}", str(error))
         raise MonthQueryError(str(error)) from error
 
 

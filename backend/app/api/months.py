@@ -74,7 +74,7 @@ def list_months(month_repo: MonthRepo) -> MonthsListResponse:
         logger.exception("Database error in list_months")
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
     except Exception as error:
-        logger.exception("Unexpected error in list_months: error_type=%s", type(error).__name__)
+        logger.exception("Unexpected error in list_months: error_type={}", type(error).__name__)
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
@@ -114,7 +114,7 @@ def get_history(
                 month_list.append(MonthHistory.from_model(record))
             except ValidationError as ve:
                 logger.error(
-                    "Data integrity error for month %d-%02d (id=%d): %s",
+                    "Data integrity error for month {}-{:02d} (id={}): {}",
                     record.year,
                     record.month,
                     record.id,
@@ -135,7 +135,7 @@ def get_history(
         logger.exception("Database error in get_history")
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
     except Exception as error:
-        logger.exception("Unexpected error in get_history: error_type=%s", type(error).__name__)
+        logger.exception("Unexpected error in get_history: error_type={}", type(error).__name__)
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
@@ -245,14 +245,14 @@ def get_month_detail(
         raise
     except InvalidCategoryTypeError as error:
         # ##>: Return 400 for invalid category types with helpful message.
-        logger.warning("Invalid category types in request: %s", error.invalid_types)
+        logger.warning("Invalid category types in request: {}", error.invalid_types)
         raise HTTPException(status_code=400, detail=str(error)) from error
     except MonthDataError as error:
-        logger.exception("Database error in get_month_detail for %d-%02d", year, month)
+        logger.exception("Database error in get_month_detail for {}-{:02d}", year, month)
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
     except Exception as error:
         logger.exception(
-            "Unexpected error in get_month_detail for %d-%02d: error_type=%s", year, month, type(error).__name__
+            "Unexpected error in get_month_detail for {}-{:02d}: error_type={}", year, month, type(error).__name__
         )
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
@@ -301,11 +301,11 @@ def export_month_json(
             detail=f"No data found for {year}-{month:02d}. Please upload transactions for this month first.",
         ) from error
     except MonthDataError as error:
-        logger.exception("Database error in export_month_json for %d-%02d", year, month)
+        logger.exception("Database error in export_month_json for {}-{:02d}", year, month)
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
     except Exception as error:
         logger.exception(
-            "Unexpected error in export_month_json for %d-%02d: error_type=%s", year, month, type(error).__name__
+            "Unexpected error in export_month_json for {}-{:02d}: error_type={}", year, month, type(error).__name__
         )
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
@@ -354,10 +354,10 @@ def export_month_csv(
             detail=f"No data found for {year}-{month:02d}. Please upload transactions for this month first.",
         ) from error
     except MonthDataError as error:
-        logger.exception("Database error in export_month_csv for %d-%02d", year, month)
+        logger.exception("Database error in export_month_csv for {}-{:02d}", year, month)
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
     except Exception as error:
         logger.exception(
-            "Unexpected error in export_month_csv for %d-%02d: error_type=%s", year, month, type(error).__name__
+            "Unexpected error in export_month_csv for {}-{:02d}: error_type={}", year, month, type(error).__name__
         )
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error

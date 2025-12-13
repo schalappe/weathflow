@@ -154,13 +154,13 @@ def calculate_and_update_month(
     """
     month = month_repo.get_by_id(month_id)
     if month is None:
-        logger.warning("Month not found: month_id=%d", month_id)
+        logger.warning("Month not found: month_id={}", month_id)
         raise MonthNotFoundError(month_id)
 
     try:
         income, core, choice = transaction_repo.aggregate_totals(month_id)
     except SQLAlchemyError as error:
-        logger.error("Database error aggregating transactions for month_id=%d: %s", month_id, str(error))
+        logger.error("Database error aggregating transactions for month_id={}: {}", month_id, str(error))
         raise TransactionAggregationError(month_id, str(error)) from error
 
     stats = calculate_month_stats(income, core, choice)
@@ -174,13 +174,13 @@ def calculate_and_update_month(
         month_repo.commit()
     except SQLAlchemyError as error:
         month_repo.rollback()
-        logger.error("Failed to persist score for month %d: %s", month_id, str(error))
+        logger.error("Failed to persist score for month {}: {}", month_id, str(error))
         raise ScorePersistenceError(month_id) from error
 
     month_repo.refresh(month)
 
     logger.info(
-        "Updated month %d: income=%.2f, score=%d (%s)",
+        "Updated month {}: income={:.2f}, score={} ({})",
         month_id,
         stats.total_income,
         stats.score,

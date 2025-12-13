@@ -92,7 +92,7 @@ def generate_advice(
         if not request.regenerate:
             existing_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
             if existing_advice:
-                logger.info("Returning cached advice for %d-%02d", request.year, request.month)
+                logger.info("Returning cached advice for {}-{:02d}", request.year, request.month)
                 return GenerateAdviceResponse(
                     success=True,
                     advice=AdviceData.from_json(existing_advice.advice_text),
@@ -115,7 +115,7 @@ def generate_advice(
         advice_json = advice_service.advice_response_to_json(advice_response)
         stored_advice = advice_service.create_or_update_advice(advice_repo, month_record.id, advice_json)
 
-        logger.info("Generated new advice for %d-%02d", request.year, request.month)
+        logger.info("Generated new advice for {}-{:02d}", request.year, request.month)
         return GenerateAdviceResponse(
             success=True,
             advice=AdviceData.from_service_response(advice_response),
@@ -127,22 +127,22 @@ def generate_advice(
         raise
     except ValueError as error:
         # ##>: Catches corrupted JSON from AdviceData.from_json() when loading cached advice.
-        logger.exception("Corrupted advice data for %d-%02d", request.year, request.month)
+        logger.exception("Corrupted advice data for {}-{:02d}", request.year, request.month)
         raise HTTPException(
             status_code=500,
             detail="Stored advice data is corrupted. Please regenerate advice with regenerate=true.",
         ) from error
     except InsufficientDataError as error:
-        logger.info("Insufficient data for advice generation: %s", error)
+        logger.info("Insufficient data for advice generation: {}", error)
         raise HTTPException(status_code=400, detail=_http_detail_for_advice_error(error)) from error
     except (AdviceQueryError, MonthDataError) as error:
         logger.exception("Database error in generate_advice")
         raise HTTPException(status_code=503, detail="Database temporarily unavailable.") from error
     except AdviceGenerationError as error:
-        logger.exception("Advice generation error for %d-%02d", request.year, request.month)
+        logger.exception("Advice generation error for {}-{:02d}", request.year, request.month)
         raise HTTPException(status_code=503, detail=_http_detail_for_advice_error(error)) from error
     except Exception as error:
-        logger.exception("Unexpected error in generate_advice: error_type=%s", type(error).__name__)
+        logger.exception("Unexpected error in generate_advice: error_type={}", type(error).__name__)
         raise HTTPException(status_code=500, detail="An unexpected error occurred.") from error
 
 
@@ -204,14 +204,14 @@ def get_advice(
         raise
     except ValueError as error:
         # ##>: Catches corrupted JSON from AdviceData.from_json() when loading stored advice.
-        logger.exception("Corrupted advice data for %d-%02d", year, month)
+        logger.exception("Corrupted advice data for {}-{:02d}", year, month)
         raise HTTPException(
             status_code=500,
             detail="Stored advice data is corrupted. Please regenerate advice.",
         ) from error
     except (AdviceQueryError, MonthDataError) as error:
-        logger.exception("Database error in get_advice for %d-%02d", year, month)
+        logger.exception("Database error in get_advice for {}-{:02d}", year, month)
         raise HTTPException(status_code=503, detail="Database temporarily unavailable.") from error
     except Exception as error:
-        logger.exception("Unexpected error in get_advice for %d-%02d", year, month)
+        logger.exception("Unexpected error in get_advice for {}-{:02d}", year, month)
         raise HTTPException(status_code=500, detail="An unexpected error occurred.") from error

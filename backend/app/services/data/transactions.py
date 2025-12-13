@@ -131,7 +131,7 @@ def update_transaction_category(
         updated_month = calculate_and_update_month(month_repo, transaction_repo, transaction.month_id)
 
         logger.info(
-            "Updated transaction %d: type=%s, subcategory=%s, month_id=%d",
+            "Updated transaction {}: type={}, subcategory={}, month_id={}",
             transaction_id,
             money_map_type.value,
             validated_subcategory,

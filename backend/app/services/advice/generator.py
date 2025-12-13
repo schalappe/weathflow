@@ -110,16 +110,16 @@ class AdviceGenerator:
         AdviceParseError
             If response cannot be parsed.
         """
-        logger.info("Starting advice generation for %d-%02d", current_month.year, current_month.month)
+        logger.info("Starting advice generation for {}-{:02d}", current_month.year, current_month.month)
 
         self._validate_data(current_month, history)
-        logger.debug("Data validation passed with %d history months", len(history))
+        logger.debug("Data validation passed with {} history months", len(history))
 
         prompt = self._build_user_prompt(current_month, history)
-        logger.debug("User prompt built (%d characters)", len(prompt))
+        logger.debug("User prompt built ({} characters)", len(prompt))
 
         response_text = self._call_claude_api(prompt)
-        logger.debug("Claude API response received (%d characters)", len(response_text))
+        logger.debug("Claude API response received ({} characters)", len(response_text))
 
         advice = self._parse_response(response_text)
         logger.info("Advice generation completed successfully")
@@ -228,18 +228,18 @@ class AdviceGenerator:
                 messages=[{"role": "user", "content": user_prompt}],
             )
         except anthropic.AuthenticationError as e:
-            logger.error("Anthropic authentication failed: %s", e)
+            logger.error("Anthropic authentication failed: {}", e)
             raise AdviceGenerationError(
                 "Invalid Anthropic API key. Please check your ANTHROPIC_API_KEY environment variable."
             ) from e
         except anthropic.APIConnectionError as e:
-            logger.error("Claude API connection failed after %d retries: %s", self.MAX_RETRIES, e)
+            logger.error("Claude API connection failed after {} retries: {}", self.MAX_RETRIES, e)
             raise AdviceAPIError(retry_count=self.MAX_RETRIES) from e
         except anthropic.RateLimitError as e:
-            logger.error("Claude API rate limit exceeded after %d retries: %s", self.MAX_RETRIES, e)
+            logger.error("Claude API rate limit exceeded after {} retries: {}", self.MAX_RETRIES, e)
             raise AdviceAPIError(retry_count=self.MAX_RETRIES) from e
         except anthropic.APIStatusError as e:
-            logger.error("Anthropic API error (status %s): %s", e.status_code, e.message)
+            logger.error("Anthropic API error (status {}): {}", e.status_code, e.message)
             raise AdviceAPIError(retry_count=self.MAX_RETRIES) from e
 
         # ##>: Extract text content from response.
@@ -249,7 +249,7 @@ class AdviceGenerator:
 
         content_block = response.content[0]
         if not hasattr(content_block, "text"):
-            logger.error("Claude API returned unexpected content type: %s", type(content_block).__name__)
+            logger.error("Claude API returned unexpected content type: {}", type(content_block).__name__)
             raise AdviceParseError(f"Unexpected response content type: {type(content_block).__name__}")
 
         return content_block.text
@@ -283,11 +283,11 @@ class AdviceGenerator:
         try:
             data = json.loads(cleaned)
         except json.JSONDecodeError as e:
-            logger.error("JSON parse error: %s. Response text: %s", e, response_text[:1000])
+            logger.error("JSON parse error: {}. Response text: {}", e, response_text[:1000])
             raise AdviceParseError(response_text) from e
 
         if not isinstance(data, dict):
-            logger.error("Claude API returned non-object JSON type: %s", type(data).__name__)
+            logger.error("Claude API returned non-object JSON type: {}", type(data).__name__)
             raise AdviceParseError(response_text)
 
         try:
@@ -307,5 +307,5 @@ class AdviceGenerator:
                 encouragement=data["encouragement"],
             )
         except (KeyError, TypeError, ValueError) as e:
-            logger.error("Failed to parse advice response: %s", e)
+            logger.error("Failed to parse advice response: {}", e)
             raise AdviceParseError(response_text) from e

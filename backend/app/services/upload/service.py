@@ -330,7 +330,7 @@ class UploadService:
             if result is None:
                 # ##!: Missing result indicates a bug in ID mapping or API response.
                 logger.error(
-                    "Missing categorization result for transaction %d (date=%s, description='%s'). "
+                    "Missing categorization result for transaction {} (date={}, description='{}'). "
                     "This indicates a bug in ID mapping or API response.",
                     i + 1,
                     t.date,

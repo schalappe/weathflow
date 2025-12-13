@@ -34,12 +34,12 @@ def get_advice_by_month_id(advice_repo: AdviceRepository, month_id: int) -> Advi
     try:
         result = advice_repo.get_by_month_id(month_id)
         if result:
-            logger.info("Found advice for month_id=%d", month_id)
+            logger.info("Found advice for month_id={}", month_id)
         else:
-            logger.info("No advice found for month_id=%d", month_id)
+            logger.info("No advice found for month_id={}", month_id)
         return result
     except SQLAlchemyError as error:
-        logger.exception("Database error retrieving advice for month_id=%d", month_id)
+        logger.exception("Database error retrieving advice for month_id={}", month_id)
         raise AdviceQueryError(month_id, str(error)) from error
 
 
@@ -70,11 +70,11 @@ def create_or_update_advice(advice_repo: AdviceRepository, month_id: int, advice
         result = advice_repo.upsert(month_id, advice_text)
         advice_repo.commit()
         advice_repo.refresh(result)
-        logger.info("Saved advice for month_id=%d", month_id)
+        logger.info("Saved advice for month_id={}", month_id)
         return result
     except SQLAlchemyError as error:
         advice_repo.rollback()
-        logger.exception("Database error saving advice for month_id=%d", month_id)
+        logger.exception("Database error saving advice for month_id={}", month_id)
         raise AdviceQueryError(month_id, str(error)) from error
 
 

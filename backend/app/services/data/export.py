@@ -135,7 +135,7 @@ def _get_month_export_data(
     month_record = month_repo.get_by_year_month(year, month)
 
     if month_record is None:
-        logger.info("Export requested for non-existent month: %d-%02d", year, month)
+        logger.info("Export requested for non-existent month: {}-{:02d}", year, month)
         raise MonthNotFoundError(month_id=-1)  # -1 indicates lookup by year/month
 
     transactions = transaction_repo.get_all_for_month(month_record.id)
@@ -200,12 +200,12 @@ def export_month_to_json(
     try:
         json_content = json.dumps(export_data, ensure_ascii=False, indent=2)
     except TypeError as error:
-        logger.error("JSON serialization failed for %d-%02d: %s", year, month, str(error))
+        logger.error("JSON serialization failed for {}-{:02d}: {}", year, month, str(error))
         raise ExportSerializationError(year, month, str(error)) from error
 
     filename = f"moneymap-{year}-{month:02d}.json"
 
-    logger.info("Generated JSON export for %d-%02d with %d transactions", year, month, len(transactions))
+    logger.info("Generated JSON export for {}-{:02d} with {} transactions", year, month, len(transactions))
 
     return ExportResult(
         content=json_content.encode("utf-8"),
@@ -269,7 +269,7 @@ def export_month_to_csv(
 
     filename = f"moneymap-{year}-{month:02d}.csv"
 
-    logger.info("Generated CSV export for %d-%02d with %d transactions", year, month, len(transactions))
+    logger.info("Generated CSV export for {}-{:02d} with {} transactions", year, month, len(transactions))
 
     return ExportResult(
         content=output.getvalue().encode("utf-8"),
