@@ -76,7 +76,9 @@ class TestAdviceRepository(DatabaseTestCase):
         result = repo.upsert(self.month.id, '{"summary": "Updated advice"}')
 
         # ##>: Compare timezone-naive datetimes (strip timezone from result for SQLite compatibility).
-        result_timestamp = result.generated_at.replace(tzinfo=None) if result.generated_at.tzinfo else result.generated_at
+        result_timestamp = (
+            result.generated_at.replace(tzinfo=None) if result.generated_at.tzinfo else result.generated_at
+        )
         original_naive = original_timestamp.replace(tzinfo=None) if original_timestamp.tzinfo else original_timestamp
 
         assert result_timestamp > original_naive
