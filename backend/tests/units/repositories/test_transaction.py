@@ -126,8 +126,8 @@ class TestTransactionRepository(DatabaseTestCase):
         assert len(transactions) == 3
         assert total == 10
 
-    def test_get_filtered_orders_by_date_desc(self) -> None:
-        """get_filtered orders transactions by date descending."""
+    def test_get_filtered_orders_by_date_asc(self) -> None:
+        """get_filtered orders transactions by date ascending."""
         self.session.add(Transaction(month_id=self.month.id, date=date(2025, 1, 1), description="First", amount=100.0))
         self.session.add(
             Transaction(month_id=self.month.id, date=date(2025, 1, 15), description="Second", amount=200.0)
@@ -137,8 +137,8 @@ class TestTransactionRepository(DatabaseTestCase):
         repo = TransactionRepository(self.session)
         transactions, _ = repo.get_filtered(self.month.id)
 
-        assert transactions[0].description == "Second"  # Most recent first
-        assert transactions[1].description == "First"
+        assert transactions[0].description == "First"  # Oldest first
+        assert transactions[1].description == "Second"
 
     def test_get_all_for_month_returns_all_transactions(self) -> None:
         """get_all_for_month returns all transactions without pagination."""

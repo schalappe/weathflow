@@ -102,7 +102,7 @@ class TransactionRepository:
             query = query.filter(Transaction.date <= end_date)
 
         total_count = query.count()
-        # [>]: Order by date ascending (start of month to end of month).
+        # [>]: Order by date ascending (oldest first - start of month to end of month).
         transactions = query.order_by(Transaction.date.asc()).offset((page - 1) * page_size).limit(page_size).all()
 
         return transactions, total_count
@@ -124,7 +124,7 @@ class TransactionRepository:
             All transactions for the month, ordered by date ascending.
         """
         query = self._db.query(Transaction).filter(Transaction.month_id == month_id)
-        # [>]: Order by date ascending (start of month to end of month).
+        # [>]: Order by date ascending (oldest first - start of month to end of month).
         return query.order_by(Transaction.date.asc()).all()
 
     def aggregate_totals(self, month_id: int) -> tuple[float, float, float]:
