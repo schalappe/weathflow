@@ -1,0 +1,42 @@
+# Backend .dockerignore
+# Excludes files not needed in Docker build.
+
+# Virtual environment.
+.venv/
+venv/
+env/
+
+# Python cache.
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Test files.
+tests/
+htmlcov/
+.coverage
+
+# IDE and editor.
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment files (passed via Docker instead).
+.env
+.env.local
+.env.*.local
+
+# Git.
+.git/
+.gitignore
+
+# Documentation.
+*.md
+docs/
+
+# Logs.
+*.log

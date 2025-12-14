@@ -5,7 +5,8 @@
        lint lint-backend lint-frontend \
        format format-backend format-frontend \
        typecheck typecheck-backend typecheck-frontend \
-       test test-backend test-frontend help
+       test test-backend test-frontend help \
+       docker-up docker-down docker-build docker-logs docker-clean
 
 # Default target.
 .DEFAULT_GOAL := help
@@ -145,6 +146,39 @@ build: ## Build frontend for production.
 	@echo "$(CYAN)🏗️  Building frontend for production...$(RESET)"
 	cd frontend && bun run build
 	@echo "$(GREEN)✓ Build complete$(RESET)"
+
+# ============================================
+# DOCKER
+# ============================================
+
+docker-up: ## Start app with Docker Compose (production mode).
+	@echo "$(CYAN)🐳 Starting Docker containers...$(RESET)"
+	@if [ ! -f .env ]; then \
+		echo "$(RED)Error: .env file not found. Copy .env.example to .env and add your ANTHROPIC_API_KEY$(RESET)"; \
+		exit 1; \
+	fi
+	docker compose up -d
+	@echo "$(GREEN)✓ App running at:$(RESET)"
+	@echo "$(BLUE)→ Frontend: http://localhost:4000$(RESET)"
+	@echo "$(BLUE)→ Backend:  http://localhost:8000$(RESET)"
+
+docker-down: ## Stop Docker Compose containers.
+	@echo "$(CYAN)🐳 Stopping Docker containers...$(RESET)"
+	docker compose down
+	@echo "$(GREEN)✓ Containers stopped$(RESET)"
+
+docker-build: ## Rebuild Docker images (use after code changes).
+	@echo "$(CYAN)🐳 Rebuilding Docker images...$(RESET)"
+	docker compose build --no-cache
+	@echo "$(GREEN)✓ Images rebuilt$(RESET)"
+
+docker-logs: ## View Docker container logs.
+	docker compose logs -f
+
+docker-clean: ## Remove Docker containers, images, and volumes.
+	@echo "$(YELLOW)⚠️  Removing Docker resources...$(RESET)"
+	docker compose down --rmi local --volumes
+	@echo "$(GREEN)✓ Docker resources cleaned$(RESET)"
 
 # ============================================
 # DATABASE

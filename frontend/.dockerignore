@@ -1,0 +1,47 @@
+# Frontend .dockerignore
+# Excludes files not needed in Docker build.
+
+# Dependencies (installed fresh in container).
+node_modules/
+
+# Build output (rebuilt in container).
+.next/
+out/
+
+# Environment files (passed via Docker instead).
+.env
+.env.local
+.env.*.local
+
+# IDE and editor.
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git.
+.git/
+.gitignore
+
+# Test files.
+coverage/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__/
+vitest.config.*
+
+# Documentation.
+*.md
+
+# Logs.
+*.log
+npm-debug.log*
+
+# TypeScript cache.
+*.tsbuildinfo
+
+# Misc.
+.DS_Store
+Thumbs.db
