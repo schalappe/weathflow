@@ -268,3 +268,26 @@ export interface GenerateAdviceResponse {
   generated_at: string;
   was_cached: boolean;
 }
+
+// [>]: Cash flow API response types for Sankey diagram visualization.
+
+export interface CategoryBreakdown {
+  subcategory: string;
+  amount: number;
+}
+
+export interface CashFlowData {
+  income_total: number;
+  core_total: number;
+  choice_total: number;
+  compound_total: number;
+  deficit: number;
+  core_breakdown: CategoryBreakdown[];
+  choice_breakdown: CategoryBreakdown[];
+  compound_breakdown: CategoryBreakdown[];
+}
+
+export interface CashFlowResponse {
+  data: CashFlowData;
+  period_months: number;
+}

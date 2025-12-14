@@ -8,6 +8,7 @@ import { createMonthHistory } from "@/__tests__/utils/test-factories";
 // [>]: Mock the API client module.
 vi.mock("@/lib/api-client", () => ({
   getMonthsHistory: vi.fn(),
+  getCashFlow: vi.fn(),
   getAdvice: vi.fn().mockResolvedValue({
     success: true,
     advice: null,
@@ -27,10 +28,27 @@ beforeAll(() => {
 });
 
 const mockGetMonthsHistory = vi.mocked(apiClient.getMonthsHistory);
+const mockGetCashFlow = vi.mocked(apiClient.getCashFlow);
+
+// [>]: Default mock cashflow response for tests.
+const mockCashFlowResponse = {
+  data: {
+    income_total: 0,
+    core_total: 0,
+    choice_total: 0,
+    compound_total: 0,
+    deficit: 0,
+    core_breakdown: [],
+    choice_breakdown: [],
+    compound_breakdown: [],
+  },
+  period_months: 12,
+};
 
 describe("HistoryClient - State Management", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetCashFlow.mockResolvedValue(mockCashFlowResponse);
   });
 
   it("starts in loading state with default period of 12", async () => {
@@ -128,6 +146,7 @@ describe("HistoryClient - State Management", () => {
 describe("HistoryClient - Data Fetching", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetCashFlow.mockResolvedValue(mockCashFlowResponse);
   });
 
   it("fetches data on initial mount with period=12", async () => {
@@ -189,6 +208,7 @@ describe("HistoryClient - Data Fetching", () => {
 describe("HistoryClient - UI Rendering", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetCashFlow.mockResolvedValue(mockCashFlowResponse);
   });
 
   it("shows loading skeleton during initial load", async () => {

@@ -10,10 +10,11 @@ import { AlertCircle, Upload, RefreshCw, TrendingUp } from "lucide-react";
 import { PeriodSelector } from "./period-selector";
 import { ScoreChart } from "./score-chart";
 import { SpendingBreakdownChart } from "./breakdown-chart";
-import { getMonthsHistory } from "@/lib/api-client";
+import { SankeyChart } from "./sankey-chart";
+import { getMonthsHistory, getCashFlow } from "@/lib/api-client";
 import { getErrorMessage } from "@/lib/utils";
 import { t } from "@/lib/translations";
-import type { MonthHistory } from "@/types";
+import type { CashFlowData, MonthHistory } from "@/types";
 
 type HistoryPageState = "loading" | "loaded" | "empty" | "error";
 
@@ -21,6 +22,7 @@ interface HistoryState {
   pageState: HistoryPageState;
   period: number;
   months: MonthHistory[];
+  cashFlowData: CashFlowData | null;
   error: string | null;
 }
 
@@ -28,12 +30,14 @@ type HistoryAction =
   | { type: "LOAD_START" }
   | { type: "LOAD_SUCCESS"; payload: MonthHistory[] }
   | { type: "LOAD_ERROR"; payload: string }
-  | { type: "SET_PERIOD"; payload: number };
+  | { type: "SET_PERIOD"; payload: number }
+  | { type: "CASHFLOW_LOADED"; payload: CashFlowData };
 
 const initialState: HistoryState = {
   pageState: "loading",
   period: 12,
   months: [],
+  cashFlowData: null,
   error: null,
 };
 
@@ -75,6 +79,13 @@ function historyReducer(
         ...state,
         period: action.payload,
         pageState: "loading",
+        cashFlowData: null,
+      };
+
+    case "CASHFLOW_LOADED":
+      return {
+        ...state,
+        cashFlowData: action.payload,
       };
 
     default:
@@ -109,9 +120,15 @@ export function HistoryClient() {
 
     async function loadHistory() {
       try {
-        const response = await getMonthsHistory(state.period);
+        // [>]: Fetch history and cashflow data in parallel.
+        const [historyResponse, cashflowResponse] = await Promise.all([
+          getMonthsHistory(state.period),
+          getCashFlow(state.period),
+        ]);
+
         if (isMounted) {
-          dispatch({ type: "LOAD_SUCCESS", payload: response.months });
+          dispatch({ type: "LOAD_SUCCESS", payload: historyResponse.months });
+          dispatch({ type: "CASHFLOW_LOADED", payload: cashflowResponse.data });
         }
       } catch (error) {
         console.error("[HistoryClient] Failed to load history data:", error);
@@ -223,6 +240,9 @@ export function HistoryClient() {
             <ScoreChart months={state.months} period={state.period} />
             <SpendingBreakdownChart months={state.months} />
           </div>
+
+          {/* Sankey Cash Flow Chart - Full Width */}
+          <SankeyChart data={state.cashFlowData} />
         </div>
       )}
     </div>

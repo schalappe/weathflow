@@ -1,8 +1,9 @@
 """Repository for Transaction data access operations."""
 
 from datetime import date
+from typing import Any
 
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.db.enums import MoneyMapType
@@ -242,6 +243,57 @@ class TransactionRepository:
     def flush(self) -> None:
         """Flush pending changes to database without committing."""
         self._db.flush()
+
+    def aggregate_by_subcategory(self, month_ids: list[int]) -> list[Any]:
+        """
+        Aggregate transaction amounts by money_map_type and money_map_subcategory.
+
+        Groups transactions across multiple months, filtering out EXCLUDED type.
+        Returns absolute values for expenses (negative amounts become positive).
+
+        Parameters
+        ----------
+        month_ids : list[int]
+            List of month IDs to aggregate across.
+
+        Returns
+        -------
+        list[Any]
+            List of (money_map_type, money_map_subcategory, total_amount) tuples.
+            Amounts are always positive (absolute value for expenses).
+        """
+        if not month_ids:
+            return []
+
+        # [>]: Filter to relevant categories (exclude EXCLUDED type).
+        valid_types = [
+            MoneyMapType.INCOME.value,
+            MoneyMapType.CORE.value,
+            MoneyMapType.CHOICE.value,
+            MoneyMapType.COMPOUND.value,
+        ]
+
+        # [>]: Use CASE to handle sign per-row: INCOME keeps sign, others take absolute value.
+        # Then SUM aggregates the processed values.
+        amount_per_row = case(
+            (Transaction.money_map_type == MoneyMapType.INCOME.value, Transaction.amount),
+            else_=func.abs(Transaction.amount),
+        )
+
+        # ##&: SQLAlchemy query returns untyped results; mypy can't infer tuple structure.
+        return (
+            self._db.query(
+                Transaction.money_map_type,
+                Transaction.money_map_subcategory,
+                func.sum(amount_per_row).label("total"),
+            )
+            .filter(
+                Transaction.month_id.in_(month_ids),
+                Transaction.money_map_type.in_(valid_types),
+            )
+            .group_by(Transaction.money_map_type, Transaction.money_map_subcategory)
+            .all()
+        )
 
     @staticmethod
     def _escape_like_pattern(search: str) -> str:
