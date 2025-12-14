@@ -19,7 +19,7 @@ import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { CATEGORY_COLORS, formatCurrency, cn } from "@/lib/utils";
 import { t } from "@/lib/translations";
 import { GitBranch } from "lucide-react";
-import type { CashFlowData } from "@/types";
+import type { CashFlowData, CategoryBreakdown } from "@/types";
 
 interface SankeyChartProps {
   data: CashFlowData | null;
@@ -30,6 +30,7 @@ interface SankeyNode {
   name: string;
   displayName: string;
   color: string;
+  layer: number;
 }
 
 interface SankeyLink {
@@ -43,8 +44,16 @@ interface SankeyDataOutput {
   links: SankeyLink[];
 }
 
+// [>]: Sort breakdown items by amount descending for consistent visual ordering.
+function sortBreakdownByAmount(
+  breakdown: CategoryBreakdown[],
+): CategoryBreakdown[] {
+  return [...breakdown].sort((a, b) => b.amount - a.amount);
+}
+
 // [>]: Transform API data to Recharts Sankey format.
 // Flow: Income → Categories (Core/Choice/Compound) → Subcategories.
+// Subcategories are sorted by amount (descending) within each category.
 // When deficit > 0, show Deficit node instead of Compound.
 function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
   if (data.income_total === 0) {
@@ -55,21 +64,23 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
   const links: SankeyLink[] = [];
   const nodeMap = new Map<string, number>();
 
-  // [>]: Add Income node (index 0).
+  // [>]: Layer 0 - Income node (source).
   nodes.push({
     name: "income",
     displayName: t.categories.INCOME,
     color: CATEGORY_COLORS.INCOME,
+    layer: 0,
   });
   nodeMap.set("income", 0);
 
-  // [>]: Add category nodes.
+  // [>]: Layer 1 - Category nodes (Core, Choice, Compound/Deficit).
   if (data.core_total > 0) {
     const idx = nodes.length;
     nodes.push({
       name: "core",
       displayName: t.categories.CORE,
       color: CATEGORY_COLORS.CORE,
+      layer: 1,
     });
     nodeMap.set("core", idx);
     links.push({ source: 0, target: idx, value: data.core_total });
@@ -81,6 +92,7 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       name: "choice",
       displayName: t.categories.CHOICE,
       color: CATEGORY_COLORS.CHOICE,
+      layer: 1,
     });
     nodeMap.set("choice", idx);
     links.push({ source: 0, target: idx, value: data.choice_total });
@@ -93,6 +105,7 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       name: "compound",
       displayName: t.categories.COMPOUND,
       color: CATEGORY_COLORS.COMPOUND,
+      layer: 1,
     });
     nodeMap.set("compound", idx);
     links.push({ source: 0, target: idx, value: data.compound_total });
@@ -105,13 +118,16 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       name: "deficit",
       displayName: t.sankeyChart.deficit,
       color: "#c45a3b",
+      layer: 1,
     });
     nodeMap.set("deficit", idx);
     links.push({ source: 0, target: idx, value: data.deficit });
   }
 
-  // [>]: Add subcategory nodes for Core.
-  for (const breakdown of data.core_breakdown) {
+  // [>]: Layer 2 - Subcategory nodes sorted by amount (descending).
+  // Add Core subcategories first (sorted by amount).
+  const sortedCoreBreakdown = sortBreakdownByAmount(data.core_breakdown);
+  for (const breakdown of sortedCoreBreakdown) {
     const subcatName = `core_${breakdown.subcategory}`;
     const idx = nodes.length;
     const displayName =
@@ -121,6 +137,7 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       name: subcatName,
       displayName,
       color: CATEGORY_COLORS.CORE,
+      layer: 2,
     });
     nodeMap.set(subcatName, idx);
     const coreIdx = nodeMap.get("core");
@@ -129,8 +146,9 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
     }
   }
 
-  // [>]: Add subcategory nodes for Choice.
-  for (const breakdown of data.choice_breakdown) {
+  // [>]: Add Choice subcategories (sorted by amount).
+  const sortedChoiceBreakdown = sortBreakdownByAmount(data.choice_breakdown);
+  for (const breakdown of sortedChoiceBreakdown) {
     const subcatName = `choice_${breakdown.subcategory}`;
     const idx = nodes.length;
     const displayName =
@@ -140,6 +158,7 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       name: subcatName,
       displayName,
       color: CATEGORY_COLORS.CHOICE,
+      layer: 2,
     });
     nodeMap.set(subcatName, idx);
     const choiceIdx = nodeMap.get("choice");
@@ -148,9 +167,12 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
     }
   }
 
-  // [>]: Add subcategory nodes for Compound (only if no deficit).
+  // [>]: Add Compound subcategories (only if no deficit, sorted by amount).
   if (data.deficit === 0) {
-    for (const breakdown of data.compound_breakdown) {
+    const sortedCompoundBreakdown = sortBreakdownByAmount(
+      data.compound_breakdown,
+    );
+    for (const breakdown of sortedCompoundBreakdown) {
       const subcatName = `compound_${breakdown.subcategory}`;
       const idx = nodes.length;
       const displayName =
@@ -161,6 +183,7 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
         name: subcatName,
         displayName,
         color: CATEGORY_COLORS.COMPOUND,
+        layer: 2,
       });
       nodeMap.set(subcatName, idx);
       const compoundIdx = nodeMap.get("compound");
@@ -182,7 +205,22 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
   return { nodes, links };
 }
 
+// [>]: Calculate dynamic chart height based on number of subcategory nodes.
+// Ensures enough vertical space for labels without overlap.
+function calculateChartHeight(data: CashFlowData): number {
+  const subcategoryCount =
+    data.core_breakdown.length +
+    data.choice_breakdown.length +
+    (data.deficit === 0 ? data.compound_breakdown.length : 0);
+
+  // [>]: Base height of 300px, add 28px per subcategory beyond 8.
+  const baseHeight = 300;
+  const extraHeight = Math.max(0, subcategoryCount - 8) * 28;
+  return Math.min(baseHeight + extraHeight, 600);
+}
+
 // [>]: Custom node renderer for Sankey diagram with category colors.
+// Labels positioned based on layer: inside for categories, outside for subcategories.
 function CustomNode(props: {
   x: number;
   y: number;
@@ -198,6 +236,41 @@ function CustomNode(props: {
     return <g />;
   }
 
+  const isSubcategory = payload.layer === 2;
+  const isIncome = payload.layer === 0;
+
+  // [>]: Subcategory labels positioned outside on the right.
+  // Category labels centered inside the node.
+  if (isSubcategory) {
+    return (
+      <Layer key={`CustomNode${props.index}`}>
+        <Rectangle
+          x={x}
+          y={y}
+          width={width}
+          height={height}
+          fill={payload.color}
+          fillOpacity={0.85}
+          radius={2}
+        />
+        <text
+          textAnchor="start"
+          x={x + width + 8}
+          y={y + height / 2}
+          dy={4}
+          fontSize={11}
+          fill="currentColor"
+          className="fill-foreground/80"
+          fontWeight={400}
+        >
+          {payload.displayName}
+        </text>
+      </Layer>
+    );
+  }
+
+  // [>]: Income label on the left side, category labels outside on right.
+  // Category labels positioned outside to ensure visibility in both light/dark modes.
   return (
     <Layer key={`CustomNode${props.index}`}>
       <Rectangle
@@ -207,15 +280,17 @@ function CustomNode(props: {
         height={height}
         fill={payload.color}
         fillOpacity={0.9}
+        radius={2}
       />
       <text
-        textAnchor="middle"
-        x={x + width / 2}
+        textAnchor={isIncome ? "end" : "start"}
+        x={isIncome ? x - 8 : x + width + 8}
         y={y + height / 2}
         dy={4}
-        fontSize={11}
-        fill="#fff"
-        fontWeight={500}
+        fontSize={12}
+        fill="currentColor"
+        className="fill-foreground/90"
+        fontWeight={600}
       >
         {payload.displayName}
       </text>
@@ -326,6 +401,7 @@ const chartErrorFallback = (
 export function SankeyChart({ data, className }: SankeyChartProps) {
   const sankeyData = data ? transformToSankeyData(data) : null;
   const isEmpty = !sankeyData;
+  const chartHeight = data ? calculateChartHeight(data) : 300;
 
   return (
     <Card className={cn("border-0 shadow-lg", className)}>
@@ -350,14 +426,14 @@ export function SankeyChart({ data, className }: SankeyChartProps) {
               {t.sankeyChart.empty}
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={chartHeight}>
               <Sankey
                 data={sankeyData}
-                nodeWidth={20}
-                nodePadding={30}
+                nodeWidth={16}
+                nodePadding={24}
                 linkCurvature={0.5}
-                iterations={64}
-                margin={{ left: 20, right: 120, top: 20, bottom: 20 }}
+                iterations={128}
+                margin={{ left: 70, right: 150, top: 10, bottom: 10 }}
                 node={CustomNode}
                 link={CustomLink}
               >
