@@ -118,14 +118,18 @@ class MonthRepository:
         Parameters
         ----------
         limit : int
-            Maximum number of months to return.
+            Maximum number of months to return. Use 0 to return all months.
 
         Returns
         -------
         list[Month]
             List of Month records ordered by year asc, month asc.
         """
-        result = self._db.query(Month).order_by(Month.year.desc(), Month.month.desc()).limit(limit).all()
+        query = self._db.query(Month).order_by(Month.year.desc(), Month.month.desc())
+        # ##>: limit=0 means "all data", so skip the limit clause.
+        if limit > 0:
+            query = query.limit(limit)
+        result = query.all()
         # ##>: Reverse to get chronological order (oldest first).
         result.reverse()
         return result

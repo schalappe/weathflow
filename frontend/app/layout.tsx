@@ -3,7 +3,13 @@ import Link from "next/link";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { LayoutDashboard, Upload, TrendingUp, Wallet } from "lucide-react";
+import {
+  LayoutDashboard,
+  Upload,
+  TrendingUp,
+  Lightbulb,
+  Wallet,
+} from "lucide-react";
 import { t } from "@/lib/translations";
 import "./globals.css";
 
@@ -46,6 +52,9 @@ function NavBar() {
             </NavLink>
             <NavLink href="/history" icon={<TrendingUp className="h-4 w-4" />}>
               {t.nav.history}
+            </NavLink>
+            <NavLink href="/advice" icon={<Lightbulb className="h-4 w-4" />}>
+              {t.nav.advice}
             </NavLink>
           </div>
         </nav>
