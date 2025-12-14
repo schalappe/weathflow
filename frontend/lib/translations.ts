@@ -293,6 +293,15 @@ export const t = {
     error: "Impossible d'afficher le graphique",
   },
 
+  // Sankey Chart
+  sankeyChart: {
+    title: "Flux de trésorerie",
+    subtitle: "Répartition des revenus par catégorie",
+    empty: "Aucune donnée disponible",
+    error: "Impossible d'afficher le diagramme",
+    deficit: "Déficit",
+  },
+
   // Advice Panel
   advice: {
     title: "Conseils personnalisés",

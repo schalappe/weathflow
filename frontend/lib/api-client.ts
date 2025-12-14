@@ -1,4 +1,5 @@
 import type {
+  CashFlowResponse,
   CategorizeResponse,
   GenerateAdviceResponse,
   GetAdviceResponse,
@@ -254,6 +255,36 @@ export async function getMonthsHistory(
   }
 
   return safeParseJson<HistoryResponse>(response);
+}
+
+export async function getCashFlow(
+  months: number = 12,
+): Promise<CashFlowResponse> {
+  const url = new URL(`${API_BASE}/api/months/cashflow`);
+  url.searchParams.set("months", months.toString());
+
+  let response: Response;
+  try {
+    response = await fetch(url.toString());
+  } catch (networkError) {
+    console.error("Network error fetching cashflow data:", networkError);
+    throw new Error(
+      "Unable to connect to server. Please check your network connection.",
+    );
+  }
+
+  if (!response.ok) {
+    const message = await extractErrorMessage(
+      response,
+      "Failed to load cashflow data",
+    );
+    console.error(
+      `Cashflow fetch failed with status ${response.status}: ${message}`,
+    );
+    throw new Error(message);
+  }
+
+  return safeParseJson<CashFlowResponse>(response);
 }
 
 export async function getAdvice(

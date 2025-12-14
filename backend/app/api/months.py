@@ -12,6 +12,7 @@ from loguru import logger
 from pydantic import ValidationError
 
 from app.api.deps import MonthRepo, TransactionRepo, create_router
+from app.responses.cashflow import CashFlowResponse
 from app.responses.history import HistoryResponse, MonthHistory
 from app.responses.months import (
     MonthDetailResponse,
@@ -20,6 +21,7 @@ from app.responses.months import (
     PaginationInfo,
     TransactionResponse,
 )
+from app.services.data import cashflow as cashflow_service
 from app.services.data import export as export_service
 from app.services.data import months as months_service
 from app.services.exceptions import InvalidCategoryTypeError, MonthDataError, MonthNotFoundError
@@ -136,6 +138,44 @@ def get_history(
         raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
     except Exception as error:
         logger.exception("Unexpected error in get_history: error_type={}", type(error).__name__)
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
+
+
+@router.get("/cashflow", response_model=CashFlowResponse)
+def get_cashflow(
+    month_repo: MonthRepo,
+    transaction_repo: TransactionRepo,
+    months: int = Query(12, ge=0, le=24, description="Number of months to aggregate (0 for all, 1-24 for limited)"),
+) -> CashFlowResponse:
+    """
+    Get aggregated cash flow data for Sankey diagram visualization.
+
+    Aggregates income and spending by category/subcategory across the selected period.
+    Calculates deficit when spending exceeds income.
+
+    Parameters
+    ----------
+    months : int
+        Number of months to aggregate (default: 12, max: 24, or 0 for all).
+
+    Returns
+    -------
+    CashFlowResponse
+        Cash flow data with category totals, subcategory breakdowns, and deficit.
+
+    Raises
+    ------
+    HTTPException 503
+        If database is temporarily unavailable.
+    """
+    try:
+        cashflow_data = cashflow_service.get_cashflow_data(month_repo, transaction_repo, months)
+        return CashFlowResponse(data=cashflow_data, period_months=months)
+    except MonthDataError as error:
+        logger.exception("Database error in get_cashflow")
+        raise HTTPException(status_code=503, detail=_http_detail_for_db_error(error)) from error
+    except Exception as error:
+        logger.exception("Unexpected error in get_cashflow: error_type={}", type(error).__name__)
         raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from error
 
 
