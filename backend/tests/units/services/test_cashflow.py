@@ -24,7 +24,7 @@ class TestBuildCashflowData(TestCase):
 
     def test_calculates_category_totals(self) -> None:
         """_build_cashflow_data correctly sums totals by category."""
-        aggregated = [
+        aggregated: list[tuple[str, str | None, float]] = [
             (MoneyMapType.INCOME.value, "Job", 5000.0),
             (MoneyMapType.CORE.value, "Housing", 1200.0),
             (MoneyMapType.CORE.value, "Groceries", 300.0),
@@ -42,7 +42,7 @@ class TestBuildCashflowData(TestCase):
 
     def test_builds_breakdowns(self) -> None:
         """_build_cashflow_data correctly builds subcategory breakdowns."""
-        aggregated = [
+        aggregated: list[tuple[str, str | None, float]] = [
             (MoneyMapType.INCOME.value, "Job", 5000.0),
             (MoneyMapType.CORE.value, "Housing", 1200.0),
             (MoneyMapType.CORE.value, "Groceries", 300.0),
@@ -62,7 +62,7 @@ class TestBuildCashflowData(TestCase):
 
     def test_calculates_deficit_when_spending_exceeds_income(self) -> None:
         """_build_cashflow_data calculates deficit when Core + Choice > Income."""
-        aggregated = [
+        aggregated: list[tuple[str, str | None, float]] = [
             (MoneyMapType.INCOME.value, "Job", 3000.0),
             (MoneyMapType.CORE.value, "Housing", 2500.0),
             (MoneyMapType.CHOICE.value, "Dining out", 1000.0),
@@ -79,7 +79,7 @@ class TestBuildCashflowData(TestCase):
 
     def test_clears_compound_when_deficit_exists(self) -> None:
         """_build_cashflow_data clears compound breakdown when deficit exists."""
-        aggregated = [
+        aggregated: list[tuple[str, str | None, float]] = [
             (MoneyMapType.INCOME.value, "Job", 2000.0),
             (MoneyMapType.CORE.value, "Housing", 2500.0),
             (MoneyMapType.COMPOUND.value, "Investments", 500.0),
