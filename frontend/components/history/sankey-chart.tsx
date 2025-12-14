@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   Sankey,
   Tooltip,
@@ -189,12 +190,12 @@ function CustomNode(props: {
   height: number;
   index: number;
   payload: SankeyNode;
-}) {
+}): React.ReactElement<SVGElement> {
   const { x, y, width, height, payload } = props;
 
-  // [!]: Guard against undefined payload from Recharts.
+  // [!]: Return empty SVG group when payload undefined (satisfies Recharts type contract).
   if (!payload) {
-    return null;
+    return <g />;
   }
 
   return (
@@ -233,7 +234,7 @@ function CustomLink(props: {
   linkWidth: number;
   index: number;
   payload: { source: SankeyNode; target: SankeyNode };
-}) {
+}): React.ReactElement<SVGElement> {
   const {
     sourceX,
     targetX,
@@ -245,9 +246,9 @@ function CustomLink(props: {
     payload,
   } = props;
 
-  // [!]: Guard against incomplete payload from Recharts.
+  // [!]: Return empty SVG group when payload incomplete (satisfies Recharts type contract).
   if (!payload?.source?.color) {
-    return null;
+    return <g />;
   }
 
   const halfWidth = linkWidth / 2;
