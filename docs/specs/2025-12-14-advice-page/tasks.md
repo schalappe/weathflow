@@ -16,10 +16,10 @@ Primary Stack: Next.js (Frontend only)
 
 **Dependencies:** None
 
-- [ ] 1.0 Complete translations layer
-  - [ ] 1.1 Add navigation translation key
+- [x] 1.0 Complete translations layer
+  - [x] 1.1 Add navigation translation key
     - Add `t.nav.advice: "Conseils"` to translations.ts
-  - [ ] 1.2 Add advice page translation keys
+  - [x] 1.2 Add advice page translation keys
     - Add `t.advicePage.title: "Conseils personnalisés"`
     - Add `t.advicePage.subtitle: "Recommandations IA basées sur vos habitudes de dépenses"`
     - Add `t.advicePage.empty.title: "Aucun mois disponible"`
@@ -40,32 +40,32 @@ Primary Stack: Next.js (Frontend only)
 
 **Dependencies:** Task Group 1
 
-- [ ] 2.0 Complete advice page client component
-  - [ ] 2.1 Write 4 focused tests for AdvicePageClient
+- [x] 2.0 Complete advice page client component
+  - [x] 2.1 Write 4 focused tests for AdvicePageClient
     - Test loading state renders skeleton
     - Test empty state shows import CTA when no months
     - Test error state shows error message with retry button
     - Test loaded state renders MonthSelector and AdvicePanel
-  - [ ] 2.2 Create `frontend/components/advice/advice-page-client.tsx`
+  - [x] 2.2 Create `frontend/components/advice/advice-page-client.tsx`
     - Import existing `MonthSelector` from `@/components/dashboard/month-selector`
     - Import existing `AdvicePanel` from `@/components/history/advice-panel`
     - Implement useReducer with state: pageState, monthsList, selectedYear, selectedMonth, error
     - Implement actions: LOAD_START, MONTHS_LOADED, LOAD_ERROR, SELECT_MONTH
     - Reuse pattern from: `frontend/components/history/history-client.tsx`
-  - [ ] 2.3 Implement page states
+  - [x] 2.3 Implement page states
     - Loading: Skeleton with header placeholder and content placeholder
     - Empty: Card with Lightbulb icon, message, and "Importer des transactions" button linking to /import
     - Error: Alert with error message and retry button
     - Loaded: Header with title/subtitle + MonthSelector + AdvicePanel
-  - [ ] 2.4 Implement data fetching effect
+  - [x] 2.4 Implement data fetching effect
     - Fetch months list via `getMonthsList()` on mount
     - Auto-select most recent month (first in array) on success
     - Handle empty array (dispatch LOAD_ERROR with empty message)
-  - [ ] 2.5 Implement month change handler
+  - [x] 2.5 Implement month change handler
     - Dispatch SELECT_MONTH action with year and month
     - AdvicePanel handles its own re-fetching via props change
     - Add `key` prop to AdvicePanel for clean remount: `key={\`${selectedYear}-${selectedMonth}\`}`
-  - [ ] 2.6 Ensure tests pass
+  - [x] 2.6 Ensure tests pass
     - Run: `cd frontend && bun test advice-page-client`
 
 **Acceptance Criteria:**
@@ -81,13 +81,13 @@ Primary Stack: Next.js (Frontend only)
 
 **Dependencies:** Task Group 2
 
-- [ ] 3.0 Complete advice page route
-  - [ ] 3.1 Create `frontend/app/advice/page.tsx`
+- [x] 3.0 Complete advice page route
+  - [x] 3.1 Create `frontend/app/advice/page.tsx`
     - Server component wrapper
     - Import ErrorBoundary from `@/components/ui/error-boundary`
     - Import AdvicePageClient from `@/components/advice/advice-page-client`
     - Reuse pattern from: `frontend/app/history/page.tsx`
-  - [ ] 3.2 Verify page loads at `/advice`
+  - [x] 3.2 Verify page loads at `/advice`
     - Start dev server: `cd frontend && bun dev`
     - Navigate to http://localhost:3000/advice
     - Confirm no console errors
@@ -106,11 +106,11 @@ Primary Stack: Next.js (Frontend only)
 
 **Dependencies:** Task Group 3
 
-- [ ] 4.0 Complete navigation integration
-  - [ ] 4.1 Update `frontend/app/layout.tsx`
+- [x] 4.0 Complete navigation integration
+  - [x] 4.1 Update `frontend/app/layout.tsx`
     - Import `Lightbulb` icon from lucide-react
     - Add NavLink after History link: `<NavLink href="/advice" icon={<Lightbulb className="h-4 w-4" />}>{t.nav.advice}</NavLink>`
-  - [ ] 4.2 Verify navigation works
+  - [x] 4.2 Verify navigation works
     - Click "Conseils" link from any page
     - Confirm navigation to /advice
     - Confirm active state styling when on /advice
@@ -130,14 +130,14 @@ Primary Stack: Next.js (Frontend only)
 
 **Dependencies:** Task Group 4
 
-- [ ] 5.0 Complete history page cleanup
-  - [ ] 5.1 Update `frontend/components/history/history-client.tsx`
+- [x] 5.0 Complete history page cleanup
+  - [x] 5.1 Update `frontend/components/history/history-client.tsx`
     - Remove import: `import { AdvicePanel } from "./advice-panel";`
     - Remove AdvicePanel usage (lines 229-234 approximately)
-  - [ ] 5.2 Update history tests if needed
+  - [x] 5.2 Update history tests if needed
     - Check `frontend/__tests__/history/` for AdvicePanel references
     - Remove any tests that test AdvicePanel integration in history page
-  - [ ] 5.3 Verify history page still works
+  - [x] 5.3 Verify history page still works
     - Navigate to /history
     - Confirm charts still render
     - Confirm no console errors
@@ -158,15 +158,15 @@ Primary Stack: Next.js (Frontend only)
 
 **Dependencies:** Task Groups 1-5
 
-- [ ] 6.0 Review and fill critical gaps
-  - [ ] 6.1 Review tests from Task Group 2 (4 tests)
-  - [ ] 6.2 Identify critical gaps for advice page only
+- [x] 6.0 Review and fill critical gaps
+  - [x] 6.1 Review tests from Task Group 2 (4 tests)
+  - [x] 6.2 Identify critical gaps for advice page only
     - Focus on: month selection, state transitions, error handling
-  - [ ] 6.3 Write max 4 additional tests if gaps found
+  - [x] 6.3 Write max 4 additional tests if gaps found
     - Test month selector integration
     - Test retry functionality
     - Test navigation from empty state to import page
-  - [ ] 6.4 Run all advice-related tests
+  - [x] 6.4 Run all advice-related tests
     - Run: `cd frontend && bun test advice`
     - Verify all tests pass
 

@@ -7,6 +7,7 @@ export const t = {
     dashboard: "Tableau de bord",
     import: "Importer",
     history: "Historique",
+    advice: "Conseils",
   },
   brand: {
     name: "Money Map",
@@ -302,6 +303,11 @@ export const t = {
         "Générez des conseils personnalisés basés sur vos 3 derniers mois de transactions.",
       button: "Générer des conseils",
     },
+    notAvailable: {
+      title: "Génération non disponible",
+      description:
+        "Les conseils ne peuvent être générés que pour le mois actuel et le mois précédent.",
+    },
     generating: "Génération...",
     sections: {
       analysis: "Analyse des tendances",
@@ -316,6 +322,20 @@ export const t = {
     importData: "Importer des données",
     loadError: "Impossible de charger les conseils",
     generateError: "Impossible de générer les conseils",
+  },
+
+  // Advice Page
+  advicePage: {
+    title: "Conseils personnalisés",
+    subtitle: "Recommandations IA basées sur vos habitudes de dépenses",
+    empty: {
+      title: "Aucun mois disponible",
+      description:
+        "Importez vos transactions pour recevoir des conseils personnalisés.",
+      button: "Importer des transactions",
+    },
+    retry: "Réessayer",
+    loadMonthsError: "Impossible de charger les mois",
   },
 
   // Common
