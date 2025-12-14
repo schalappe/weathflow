@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { AdvicePageClient } from "@/components/advice/advice-page-client";
 import * as apiClient from "@/lib/api-client";
 import type { MonthSummary } from "@/types";
@@ -12,8 +12,9 @@ vi.mock("@/lib/api-client", () => ({
   generateAdvice: vi.fn(),
 }));
 
-const mockGetMonthsList = vi.mocked(apiClient.getMonthsList);
-const mockGetAdvice = vi.mocked(apiClient.getAdvice);
+// [>]: Cast mocked functions directly to avoid vi.mocked() compatibility issues.
+const mockGetMonthsList = apiClient.getMonthsList as Mock;
+const mockGetAdvice = apiClient.getAdvice as Mock;
 
 // [>]: Factory for creating test month data.
 function createMonthSummary(year: number, month: number): MonthSummary {

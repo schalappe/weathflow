@@ -111,7 +111,8 @@ function isTrendNegative(trend: string): boolean {
 
 // [>]: Check if advice generation is allowed for a given month.
 // Only current month (n) and previous month (n-1) are allowed.
-function isGenerationAllowed(year: number, month: number): boolean {
+// [>]: Exported for unit testing.
+export function isGenerationAllowed(year: number, month: number): boolean {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
@@ -221,6 +222,7 @@ export function AdvicePanelContent({
           onGenerate={handleGenerate}
           isLoading={state.isRegenerating}
           canGenerate={canGenerate}
+          error={state.error}
         />
       )}
 
@@ -272,11 +274,27 @@ interface EmptyStateProps {
   onGenerate: () => void;
   isLoading: boolean;
   canGenerate: boolean;
+  error: string | null;
 }
 
-function EmptyState({ onGenerate, isLoading, canGenerate }: EmptyStateProps) {
+function EmptyState({
+  onGenerate,
+  isLoading,
+  canGenerate,
+  error,
+}: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center gap-5 py-8 text-center">
+      {/* [>]: Show error banner when generation fails from empty state. */}
+      {error && (
+        <Alert
+          variant="destructive"
+          className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950 max-w-md"
+        >
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
       <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/10 to-purple-500/20">
         <Sparkles className="h-7 w-7 text-violet-600 dark:text-violet-400" />
       </div>
