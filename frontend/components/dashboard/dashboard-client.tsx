@@ -11,25 +11,23 @@ import { ScoreCard } from "./score-card";
 import { MetricCard } from "./metric-card";
 import { SpendingPieChart } from "./spending-pie-chart";
 import { MonthSelector } from "./month-selector";
-import { TransactionTable } from "./transaction-table";
+import { GroupedTransactionList } from "./grouped-transaction-list";
 import { TransactionEditModal } from "./transaction-edit-modal";
 import { ExportButtons } from "./export-buttons";
 import {
   getMonthsList,
-  getMonthDetail,
+  getMonthDetailAllTransactions,
   updateTransaction,
 } from "@/lib/api-client";
 import {
   formatMonthDisplay,
   meetsThreshold,
   getErrorMessage,
-  TRANSACTIONS_PER_PAGE,
 } from "@/lib/utils";
 import { t } from "@/lib/translations";
 import type {
   DashboardState,
   DashboardAction,
-  TransactionFilters,
   TransactionResponse,
   UpdateTransactionPayload,
 } from "@/types";
@@ -217,12 +215,10 @@ export function DashboardClient() {
       if (!state.selectedMonth) return;
 
       try {
-        const response = await getMonthDetail(
+        // [>]: Fetch all transactions for grouped view (no pagination).
+        const response = await getMonthDetailAllTransactions(
           state.selectedMonth.year,
           state.selectedMonth.month,
-          state.currentPage,
-          TRANSACTIONS_PER_PAGE,
-          state.filters,
         );
         if (isMounted) {
           dispatch({ type: "MONTH_DETAIL_LOADED", payload: response });
@@ -244,18 +240,11 @@ export function DashboardClient() {
     return () => {
       isMounted = false;
     };
-  }, [state.selectedMonth, state.currentPage, state.pageState, state.filters]);
+    // [>]: Removed currentPage and filters from deps since grouped view fetches all transactions.
+  }, [state.selectedMonth, state.pageState]);
 
   const handleMonthChange = useCallback((year: number, month: number) => {
     dispatch({ type: "SELECT_MONTH", payload: { year, month } });
-  }, []);
-
-  const handlePageChange = useCallback((page: number) => {
-    dispatch({ type: "SET_PAGE", payload: page });
-  }, []);
-
-  const handleFiltersChange = useCallback((filters: TransactionFilters) => {
-    dispatch({ type: "SET_FILTERS", payload: filters });
   }, []);
 
   const handleRetry = useCallback(() => {
@@ -456,17 +445,12 @@ export function DashboardClient() {
               </div>
             </div>
 
-            {/* Row 3: Transactions Table (full width) */}
+            {/* Row 3: Grouped Transactions (full width) */}
             <div className="animate-fade-in-up opacity-0 stagger-6">
-              <TransactionTable
+              <GroupedTransactionList
                 transactions={state.monthDetail.transactions}
-                pagination={state.monthDetail.pagination}
-                onPageChange={handlePageChange}
                 onTransactionClick={handleTransactionClick}
                 isLoading={isLoading}
-                filters={state.filters}
-                onFiltersChange={handleFiltersChange}
-                selectedMonth={state.selectedMonth}
               />
             </div>
           </div>

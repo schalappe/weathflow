@@ -128,6 +128,13 @@ export const t = {
     noMatch: "Aucune transaction ne correspond à vos filtres",
     clearFilters: "Effacer les filtres",
     manuallyCorrected: "Corrigée manuellement",
+    tabs: {
+      inputs: "Entrées",
+      outputs: "Sorties",
+    },
+    other: "Autre",
+    transactionCount: "transaction",
+    transactionsCount: "transactions",
   },
 
   // Transaction Filters

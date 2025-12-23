@@ -195,6 +195,55 @@ export async function getMonthDetail(
   return safeParseJson<MonthDetailResponse>(response);
 }
 
+// [>]: Backend limits page_size to 100, so we use this for bulk fetching.
+const MAX_PAGE_SIZE = 100;
+
+/**
+ * Fetches all transactions for a month by paginating through all pages.
+ * Used by GroupedTransactionList which needs all transactions for grouping.
+ */
+export async function getMonthDetailAllTransactions(
+  year: number,
+  month: number,
+): Promise<MonthDetailResponse> {
+  // [>]: First fetch to get total count and first batch.
+  const firstPage = await getMonthDetail(year, month, 1, MAX_PAGE_SIZE);
+
+  // [>]: If all transactions fit in first page, return directly.
+  if (firstPage.pagination.total_pages <= 1) {
+    return firstPage;
+  }
+
+  // [>]: Fetch remaining pages in parallel.
+  const remainingPages = Array.from(
+    { length: firstPage.pagination.total_pages - 1 },
+    (_, i) => i + 2,
+  );
+
+  const additionalResponses = await Promise.all(
+    remainingPages.map((page) =>
+      getMonthDetail(year, month, page, MAX_PAGE_SIZE),
+    ),
+  );
+
+  // [>]: Combine all transactions.
+  const allTransactions = [
+    ...firstPage.transactions,
+    ...additionalResponses.flatMap((r) => r.transactions),
+  ];
+
+  return {
+    month: firstPage.month,
+    transactions: allTransactions,
+    pagination: {
+      page: 1,
+      page_size: allTransactions.length,
+      total_items: allTransactions.length,
+      total_pages: 1,
+    },
+  };
+}
+
 export async function updateTransaction(
   transactionId: number,
   payload: UpdateTransactionPayload,

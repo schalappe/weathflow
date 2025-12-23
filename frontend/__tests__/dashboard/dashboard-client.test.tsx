@@ -2,13 +2,11 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DashboardClient } from "@/components/dashboard/dashboard-client";
 import * as apiClient from "@/lib/api-client";
-import { DEFAULT_FILTERS } from "@/types";
-import { TRANSACTIONS_PER_PAGE } from "@/lib/utils";
 
 // [>]: Mock the API client module.
 vi.mock("@/lib/api-client", () => ({
   getMonthsList: vi.fn(),
-  getMonthDetail: vi.fn(),
+  getMonthDetailAllTransactions: vi.fn(),
 }));
 
 // [>]: Mock Next.js Link component.
@@ -105,7 +103,9 @@ describe("DashboardClient", () => {
 
   it("initial load fetches months list", async () => {
     vi.mocked(apiClient.getMonthsList).mockResolvedValue(mockMonthsList);
-    vi.mocked(apiClient.getMonthDetail).mockResolvedValue(mockMonthDetail);
+    vi.mocked(apiClient.getMonthDetailAllTransactions).mockResolvedValue(
+      mockMonthDetail,
+    );
 
     render(<DashboardClient />);
 
@@ -121,18 +121,18 @@ describe("DashboardClient", () => {
 
   it("auto-selects most recent month on load", async () => {
     vi.mocked(apiClient.getMonthsList).mockResolvedValue(mockMonthsList);
-    vi.mocked(apiClient.getMonthDetail).mockResolvedValue(mockMonthDetail);
+    vi.mocked(apiClient.getMonthDetailAllTransactions).mockResolvedValue(
+      mockMonthDetail,
+    );
 
     render(<DashboardClient />);
 
     // [>]: Wait for data to load.
     await waitFor(() => {
-      expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
+      // [>]: New API fetches all transactions without pagination parameters.
+      expect(apiClient.getMonthDetailAllTransactions).toHaveBeenCalledWith(
         2025,
         10,
-        1,
-        TRANSACTIONS_PER_PAGE,
-        DEFAULT_FILTERS,
       );
     });
 
@@ -148,7 +148,9 @@ describe("DashboardClient", () => {
     // [>]: Testing month selection via MonthSelector is difficult with Radix Select in jsdom.
     // [>]: Instead, verify that after initial load, the first month is auto-selected and fetched.
     vi.mocked(apiClient.getMonthsList).mockResolvedValue(mockMonthsList);
-    vi.mocked(apiClient.getMonthDetail).mockResolvedValue(mockMonthDetail);
+    vi.mocked(apiClient.getMonthDetailAllTransactions).mockResolvedValue(
+      mockMonthDetail,
+    );
 
     render(<DashboardClient />);
 
@@ -164,13 +166,10 @@ describe("DashboardClient", () => {
     });
     expect(selector).toBeInTheDocument();
 
-    // [>]: Verify getMonthDetail was called with the most recent month.
-    expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
+    // [>]: Verify getMonthDetailAllTransactions was called with the most recent month.
+    expect(apiClient.getMonthDetailAllTransactions).toHaveBeenCalledWith(
       2025,
       10,
-      1,
-      TRANSACTIONS_PER_PAGE,
-      DEFAULT_FILTERS,
     );
 
     // [>]: Verify "octobre 2025" appears (in both selector and score card).
@@ -179,9 +178,11 @@ describe("DashboardClient", () => {
     );
   });
 
-  it("pagination change fetches new page", async () => {
+  it("displays grouped transaction list", async () => {
     vi.mocked(apiClient.getMonthsList).mockResolvedValue(mockMonthsList);
-    vi.mocked(apiClient.getMonthDetail).mockResolvedValue(mockMonthDetail);
+    vi.mocked(apiClient.getMonthDetailAllTransactions).mockResolvedValue(
+      mockMonthDetail,
+    );
 
     render(<DashboardClient />);
 
@@ -190,24 +191,9 @@ describe("DashboardClient", () => {
       expect(screen.getByText("Transactions")).toBeInTheDocument();
     });
 
-    // [>]: Click next page (icon button with ChevronRight).
-    const buttons = screen.getAllByRole("button");
-    const nextButton = buttons.find((btn) =>
-      btn.querySelector("svg.lucide-chevron-right"),
-    );
-    expect(nextButton).toBeDefined();
-    fireEvent.click(nextButton!);
-
-    // [>]: Should fetch page 2.
-    await waitFor(() => {
-      expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
-        2025,
-        10,
-        2,
-        TRANSACTIONS_PER_PAGE,
-        DEFAULT_FILTERS,
-      );
-    });
+    // [>]: New grouped view shows tabs instead of pagination.
+    expect(screen.getByRole("tab", { name: /Entrées/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Sorties/i })).toBeInTheDocument();
   });
 
   it("error state displays with retry button", async () => {
@@ -229,7 +215,9 @@ describe("DashboardClient", () => {
 
     // [>]: Reset mock and click retry.
     vi.mocked(apiClient.getMonthsList).mockResolvedValue(mockMonthsList);
-    vi.mocked(apiClient.getMonthDetail).mockResolvedValue(mockMonthDetail);
+    vi.mocked(apiClient.getMonthDetailAllTransactions).mockResolvedValue(
+      mockMonthDetail,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /réessayer/i }));
 
@@ -239,180 +227,6 @@ describe("DashboardClient", () => {
     });
   });
 
-  describe("filter state management", () => {
-    it("resets page to 1 when filters change", async () => {
-      // [>]: Create mock that returns page 2 initially.
-      const page2Detail = {
-        ...mockMonthDetail,
-        pagination: { ...mockMonthDetail.pagination, page: 2 },
-      };
-      vi.mocked(apiClient.getMonthsList).mockResolvedValue(mockMonthsList);
-      vi.mocked(apiClient.getMonthDetail)
-        .mockResolvedValueOnce(mockMonthDetail)
-        .mockResolvedValueOnce(page2Detail)
-        .mockResolvedValue(mockMonthDetail);
-
-      render(<DashboardClient />);
-
-      // [>]: Wait for initial load.
-      await waitFor(() => {
-        expect(screen.getByText("Transactions")).toBeInTheDocument();
-      });
-
-      // [>]: Navigate to page 2 (icon button with ChevronRight).
-      const buttons = screen.getAllByRole("button");
-      const nextButton = buttons.find((btn) =>
-        btn.querySelector("svg.lucide-chevron-right"),
-      );
-      expect(nextButton).toBeDefined();
-      fireEvent.click(nextButton!);
-
-      await waitFor(() => {
-        expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
-          2025,
-          10,
-          2,
-          TRANSACTIONS_PER_PAGE,
-          DEFAULT_FILTERS,
-        );
-      });
-
-      // [>]: Open category filter and select CORE.
-      fireEvent.click(screen.getByText("Toutes les catégories"));
-      const coreCheckbox = await screen.findByRole("checkbox", {
-        name: /Essentiel/i,
-      });
-      fireEvent.click(coreCheckbox);
-
-      // [>]: Should reset to page 1 with new filter.
-      await waitFor(() => {
-        expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
-          2025,
-          10,
-          1,
-          TRANSACTIONS_PER_PAGE,
-          expect.objectContaining({ categoryTypes: ["CORE"] }),
-        );
-      });
-    });
-
-    it("resets filters when month changes", async () => {
-      // [>]: Setup mock for different months.
-      const sept2025Detail = {
-        month: mockMonthsList.months[1],
-        transactions: [],
-        pagination: {
-          page: 1,
-          page_size: 25,
-          total_items: 0,
-          total_pages: 1,
-        },
-      };
-
-      vi.mocked(apiClient.getMonthsList).mockResolvedValue(mockMonthsList);
-      vi.mocked(apiClient.getMonthDetail)
-        .mockResolvedValueOnce(mockMonthDetail)
-        .mockResolvedValue(sept2025Detail);
-
-      render(<DashboardClient />);
-
-      // [>]: Wait for initial load.
-      await waitFor(() => {
-        expect(screen.getByText("Transactions")).toBeInTheDocument();
-      });
-
-      // [>]: Apply a filter first.
-      fireEvent.click(screen.getByText("Toutes les catégories"));
-      const coreCheckbox = await screen.findByRole("checkbox", {
-        name: /Essentiel/i,
-      });
-      fireEvent.click(coreCheckbox);
-
-      await waitFor(() => {
-        expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
-          2025,
-          10,
-          1,
-          TRANSACTIONS_PER_PAGE,
-          expect.objectContaining({ categoryTypes: ["CORE"] }),
-        );
-      });
-
-      // [>]: Change month via selector.
-      const selector = screen.getByRole("combobox", {
-        name: /sélectionner le mois/i,
-      });
-      fireEvent.click(selector);
-
-      // [>]: Select September 2025.
-      const septOption = await screen.findByRole("option", {
-        name: /septembre 2025/i,
-      });
-      fireEvent.click(septOption);
-
-      // [>]: Verify new month is fetched with DEFAULT_FILTERS (reset).
-      await waitFor(() => {
-        expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
-          2025,
-          9,
-          1,
-          TRANSACTIONS_PER_PAGE,
-          DEFAULT_FILTERS,
-        );
-      });
-    });
-
-    it("passes updated filters to API when filter changes", async () => {
-      vi.mocked(apiClient.getMonthsList).mockResolvedValue(mockMonthsList);
-      vi.mocked(apiClient.getMonthDetail).mockResolvedValue(mockMonthDetail);
-
-      render(<DashboardClient />);
-
-      // [>]: Wait for initial load.
-      await waitFor(() => {
-        expect(screen.getByText("Transactions")).toBeInTheDocument();
-      });
-
-      // [>]: Clear previous calls to focus on filter change.
-      vi.mocked(apiClient.getMonthDetail).mockClear();
-
-      // [>]: Select multiple categories.
-      fireEvent.click(screen.getByText("Toutes les catégories"));
-      fireEvent.click(
-        await screen.findByRole("checkbox", { name: /Essentiel/i }),
-      );
-
-      await waitFor(() => {
-        expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
-          2025,
-          10,
-          1,
-          TRANSACTIONS_PER_PAGE,
-          expect.objectContaining({
-            categoryTypes: ["CORE"],
-            dateFrom: null,
-            dateTo: null,
-            searchQuery: "",
-          }),
-        );
-      });
-
-      // [>]: Add another category.
-      fireEvent.click(
-        await screen.findByRole("checkbox", { name: /Plaisir/i }),
-      );
-
-      await waitFor(() => {
-        expect(apiClient.getMonthDetail).toHaveBeenCalledWith(
-          2025,
-          10,
-          1,
-          TRANSACTIONS_PER_PAGE,
-          expect.objectContaining({
-            categoryTypes: expect.arrayContaining(["CORE", "CHOICE"]),
-          }),
-        );
-      });
-    });
-  });
+  // [>]: Filter tests removed - GroupedTransactionList uses client-side grouping
+  // instead of server-side filtering. Filtering can be re-added in a future iteration.
 });
