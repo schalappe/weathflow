@@ -28,7 +28,6 @@ import { t } from "@/lib/translations";
 import type {
   DashboardState,
   DashboardAction,
-  TransactionFilters,
   TransactionResponse,
   UpdateTransactionPayload,
 } from "@/types";
@@ -246,14 +245,6 @@ export function DashboardClient() {
 
   const handleMonthChange = useCallback((year: number, month: number) => {
     dispatch({ type: "SELECT_MONTH", payload: { year, month } });
-  }, []);
-
-  const handlePageChange = useCallback((page: number) => {
-    dispatch({ type: "SET_PAGE", payload: page });
-  }, []);
-
-  const handleFiltersChange = useCallback((filters: TransactionFilters) => {
-    dispatch({ type: "SET_FILTERS", payload: filters });
   }, []);
 
   const handleRetry = useCallback(() => {

@@ -53,7 +53,7 @@ import {
   translateSubcategory,
   type SubcategoryGroup as SubcategoryGroupType,
 } from "@/lib/transaction-grouping";
-import type { TransactionResponse, MoneyMapType } from "@/types";
+import type { TransactionResponse } from "@/types";
 
 // [>]: Map icon names to actual Lucide components.
 const ICON_COMPONENTS: Record<
