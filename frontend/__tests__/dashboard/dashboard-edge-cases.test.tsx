@@ -10,7 +10,7 @@ import { DEFAULT_FILTERS } from "@/types";
 // [>]: Mock the API client module.
 vi.mock("@/lib/api-client", () => ({
   getMonthsList: vi.fn(),
-  getMonthDetail: vi.fn(),
+  getMonthDetailAllTransactions: vi.fn(),
 }));
 
 // [>]: Mock Next.js Link component.
@@ -175,7 +175,9 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
       };
 
       vi.mocked(apiClient.getMonthsList).mockResolvedValue(mockMonthsList);
-      vi.mocked(apiClient.getMonthDetail).mockResolvedValue(mockMonthDetail);
+      vi.mocked(apiClient.getMonthDetailAllTransactions).mockResolvedValue(
+        mockMonthDetail,
+      );
 
       render(<DashboardClient />);
 
@@ -192,9 +194,11 @@ describe("Additional Dashboard Tests - Gap Analysis", () => {
       expect(screen.getAllByText("Plaisir").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Épargne").length).toBeGreaterThan(0);
 
-      // [>]: Verify transaction table.
+      // [>]: Verify transactions section with grouped view.
       expect(screen.getByText("Transactions")).toBeInTheDocument();
-      expect(screen.getByText("Test Transaction")).toBeInTheDocument();
+      // [>]: New grouped view shows tabs instead of flat table.
+      expect(screen.getByRole("tab", { name: /Entrées/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Sorties/i })).toBeInTheDocument();
 
       // [>]: Verify pie chart.
       expect(screen.getByText("Répartition des dépenses")).toBeInTheDocument();
