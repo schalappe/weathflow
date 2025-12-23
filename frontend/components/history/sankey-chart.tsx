@@ -31,6 +31,7 @@ interface SankeyNode {
   displayName: string;
   color: string;
   layer: number;
+  value: number;
 }
 
 interface SankeyLink {
@@ -70,6 +71,7 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
     displayName: t.categories.INCOME,
     color: CATEGORY_COLORS.INCOME,
     layer: 0,
+    value: data.income_total,
   });
   nodeMap.set("income", 0);
 
@@ -81,6 +83,7 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       displayName: t.categories.CORE,
       color: CATEGORY_COLORS.CORE,
       layer: 1,
+      value: data.core_total,
     });
     nodeMap.set("core", idx);
     links.push({ source: 0, target: idx, value: data.core_total });
@@ -93,6 +96,7 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       displayName: t.categories.CHOICE,
       color: CATEGORY_COLORS.CHOICE,
       layer: 1,
+      value: data.choice_total,
     });
     nodeMap.set("choice", idx);
     links.push({ source: 0, target: idx, value: data.choice_total });
@@ -106,6 +110,7 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       displayName: t.categories.COMPOUND,
       color: CATEGORY_COLORS.COMPOUND,
       layer: 1,
+      value: data.compound_total,
     });
     nodeMap.set("compound", idx);
     links.push({ source: 0, target: idx, value: data.compound_total });
@@ -119,6 +124,7 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       displayName: t.sankeyChart.deficit,
       color: "#c45a3b",
       layer: 1,
+      value: data.deficit,
     });
     nodeMap.set("deficit", idx);
     links.push({ source: 0, target: idx, value: data.deficit });
@@ -138,6 +144,7 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       displayName,
       color: CATEGORY_COLORS.CORE,
       layer: 2,
+      value: breakdown.amount,
     });
     nodeMap.set(subcatName, idx);
     const coreIdx = nodeMap.get("core");
@@ -159,6 +166,7 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       displayName,
       color: CATEGORY_COLORS.CHOICE,
       layer: 2,
+      value: breakdown.amount,
     });
     nodeMap.set(subcatName, idx);
     const choiceIdx = nodeMap.get("choice");
@@ -184,6 +192,7 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
         displayName,
         color: CATEGORY_COLORS.COMPOUND,
         layer: 2,
+        value: breakdown.amount,
       });
       nodeMap.set(subcatName, idx);
       const compoundIdx = nodeMap.get("compound");
@@ -221,6 +230,7 @@ function calculateChartHeight(data: CashFlowData): number {
 
 // [>]: Custom node renderer for Sankey diagram with category colors.
 // Labels positioned based on layer: inside for categories, outside for subcategories.
+// Each label shows category name with monetary amount for better understanding.
 function CustomNode(props: {
   x: number;
   y: number;
@@ -238,9 +248,10 @@ function CustomNode(props: {
 
   const isSubcategory = payload.layer === 2;
   const isIncome = payload.layer === 0;
+  const formattedAmount = formatCurrency(payload.value);
 
   // [>]: Subcategory labels positioned outside on the right.
-  // Category labels centered inside the node.
+  // Shows name and amount for better understanding.
   if (isSubcategory) {
     return (
       <Layer key={`CustomNode${props.index}`}>
@@ -263,7 +274,11 @@ function CustomNode(props: {
           className="fill-foreground/80"
           fontWeight={400}
         >
-          {payload.displayName}
+          <tspan>{payload.displayName}</tspan>
+          <tspan className="fill-foreground/50" fontWeight={400}>
+            {" "}
+            · {formattedAmount}
+          </tspan>
         </text>
       </Layer>
     );
@@ -271,6 +286,7 @@ function CustomNode(props: {
 
   // [>]: Income label on the left side, category labels outside on right.
   // Category labels positioned outside to ensure visibility in both light/dark modes.
+  // Shows category name and total amount for better understanding.
   return (
     <Layer key={`CustomNode${props.index}`}>
       <Rectangle
@@ -292,7 +308,11 @@ function CustomNode(props: {
         className="fill-foreground/90"
         fontWeight={600}
       >
-        {payload.displayName}
+        <tspan>{payload.displayName}</tspan>
+        <tspan className="fill-foreground/60" fontWeight={500}>
+          {" "}
+          · {formattedAmount}
+        </tspan>
       </text>
     </Layer>
   );
@@ -433,7 +453,7 @@ export function SankeyChart({ data, className }: SankeyChartProps) {
                 nodePadding={24}
                 linkCurvature={0.5}
                 iterations={128}
-                margin={{ left: 70, right: 150, top: 10, bottom: 10 }}
+                margin={{ left: 100, right: 200, top: 10, bottom: 10 }}
                 node={CustomNode}
                 link={CustomLink}
               >
