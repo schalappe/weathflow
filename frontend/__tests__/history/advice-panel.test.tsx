@@ -103,7 +103,7 @@ describe("AdvicePanel - State Management", () => {
     expect(screen.getByText(mockAdvice.analysis)).toBeInTheDocument();
     expect(screen.getByText("Points de vigilance")).toBeInTheDocument();
     expect(screen.getByText("Recommandations")).toBeInTheDocument();
-    expect(screen.getByText("Continuez comme ça !")).toBeInTheDocument();
+    expect(screen.getByText("Encouragements")).toBeInTheDocument();
     expect(screen.getByText(mockAdvice.encouragement)).toBeInTheDocument();
   });
 
