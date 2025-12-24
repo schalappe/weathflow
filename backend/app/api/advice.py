@@ -99,7 +99,7 @@ def generate_advice(
         if not eligibility.is_eligible:
             raise HTTPException(
                 status_code=403,
-                detail=eligibility.reason or 'This month is not eligible for advice generation.',
+                detail=eligibility.reason or "This month is not eligible for advice generation.",
             )
 
         if not request.regenerate:
@@ -115,7 +115,9 @@ def generate_advice(
 
         # ##>: Fetch history with transactions eager-loaded to avoid N+1 queries.
         # ##>: Use dynamic history limit based on eligibility (12 for first advice, 3 otherwise).
-        history_months = months_service.get_months_history_with_transactions(month_repo, limit=eligibility.history_limit)
+        history_months = months_service.get_months_history_with_transactions(
+            month_repo, limit=eligibility.history_limit
+        )
 
         # ##>: Filter out current month from history and collect IDs for batch advice fetch.
         filtered_history = [m for m in history_months if not (m.year == request.year and m.month == request.month)]

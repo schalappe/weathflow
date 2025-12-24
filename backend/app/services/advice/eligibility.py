@@ -76,7 +76,7 @@ def check_eligibility(
             is_eligible=False,
             history_limit=REGULAR_HISTORY_LIMIT,
             is_first_advice=True,
-            reason='Aucun mois disponible dans la base de données.',
+            reason="Aucun mois disponible dans la base de données.",
         )
 
     # ##>: Check if target is within the eligible window.
@@ -87,8 +87,8 @@ def check_eligibility(
             is_eligible=False,
             history_limit=REGULAR_HISTORY_LIMIT,
             is_first_advice=False,
-            reason=f'Les conseils ne peuvent être générés que pour les 2 mois les plus récents. '
-            f'Votre dernière transaction date de {most_recent.year}-{most_recent.month:02d}.',
+            reason=f"Les conseils ne peuvent être générés que pour les 2 mois les plus récents. "
+            f"Votre dernière transaction date de {most_recent.year}-{most_recent.month:02d}.",
         )
 
     # ##>: Determine if this is first advice scenario.

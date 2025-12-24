@@ -58,8 +58,8 @@ class TestCheckEligibility(DatabaseTestCase):
 
         assert result.is_eligible is False
         assert result.reason is not None
-        assert '2025-10' in result.reason
-        assert 'Les conseils ne peuvent être générés' in result.reason
+        assert "2025-10" in result.reason
+        assert "Les conseils ne peuvent être générés" in result.reason
 
     def test_first_advice_returns_12_month_limit(self) -> None:
         """Returns 12 month history limit when no advice exists."""

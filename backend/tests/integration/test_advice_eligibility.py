@@ -23,7 +23,7 @@ def _create_month(db: Session, year: int, month: int, score: int = 2) -> Month:
         choice_percentage=30.0,
         compound_percentage=20.0,
         score=score,
-        score_label='Okay',
+        score_label="Okay",
     )
     db.add(month_record)
     db.commit()
@@ -34,18 +34,18 @@ def _create_month(db: Session, year: int, month: int, score: int = 2) -> Month:
 def _create_mock_advice_response() -> AdviceResponse:
     """Create a mock AdviceResponse from AdviceGenerator."""
     return AdviceResponse(
-        analysis='Votre gestion financière montre des progrès.',
+        analysis="Votre gestion financière montre des progrès.",
         problem_areas=[
-            ProblemArea(category='Subscriptions', amount=85.0, trend='+20%'),
+            ProblemArea(category="Subscriptions", amount=85.0, trend="+20%"),
         ],
         recommendations=[
-            'Réduire les abonnements non utilisés.',
+            "Réduire les abonnements non utilisés.",
         ],
-        encouragement='Continuez sur cette lancée!',
+        encouragement="Continuez sur cette lancée!",
     )
 
 
-MOCK_API_KEY_ENV = {'ANTHROPIC_API_KEY': 'test-key-for-integration-tests'}
+MOCK_API_KEY_ENV = {"ANTHROPIC_API_KEY": "test-key-for-integration-tests"}
 
 
 class TestGetAdviceEligibility:
@@ -57,13 +57,13 @@ class TestGetAdviceEligibility:
         _create_month(db_session, 2025, 9)
         _create_month(db_session, 2025, 10)
 
-        response = client.get('/api/advice/2025/10')
+        response = client.get("/api/advice/2025/10")
 
         assert response.status_code == 200
         data = response.json()
-        assert 'eligibility' in data
-        assert data['eligibility']['can_generate'] is True
-        assert data['eligibility']['is_first_advice'] is True  # ##>: No advice exists yet.
+        assert "eligibility" in data
+        assert data["eligibility"]["can_generate"] is True
+        assert data["eligibility"]["is_first_advice"] is True  # ##>: No advice exists yet.
 
     def test_get_advice_returns_not_eligible_for_old_month(self, client: TestClient, db_session: Session) -> None:
         """GET /api/advice returns can_generate=False for months outside window."""
@@ -71,13 +71,13 @@ class TestGetAdviceEligibility:
         _create_month(db_session, 2025, 9)
         _create_month(db_session, 2025, 10)  # ##>: Most recent.
 
-        response = client.get('/api/advice/2025/8')
+        response = client.get("/api/advice/2025/8")
 
         assert response.status_code == 200
         data = response.json()
-        assert data['eligibility']['can_generate'] is False
-        assert data['eligibility']['reason'] is not None
-        assert '2025-10' in data['eligibility']['reason']
+        assert data["eligibility"]["can_generate"] is False
+        assert data["eligibility"]["reason"] is not None
+        assert "2025-10" in data["eligibility"]["reason"]
 
 
 class TestGenerateAdviceEligibility:
@@ -88,24 +88,24 @@ class TestGenerateAdviceEligibility:
         _create_month(db_session, 2025, 8)  # ##>: Old month.
         _create_month(db_session, 2025, 10)  # ##>: Most recent.
 
-        response = client.post('/api/advice/generate', json={'year': 2025, 'month': 8})
+        response = client.post("/api/advice/generate", json={"year": 2025, "month": 8})
 
         assert response.status_code == 403
-        assert '2025-10' in response.json()['detail']
+        assert "2025-10" in response.json()["detail"]
 
     def test_eligibility_reason_included_in_403_response(self, client: TestClient, db_session: Session) -> None:
         """403 response includes clear reason message."""
         _create_month(db_session, 2025, 7)  # ##>: Old month.
         _create_month(db_session, 2025, 10)  # ##>: Most recent.
 
-        response = client.post('/api/advice/generate', json={'year': 2025, 'month': 7})
+        response = client.post("/api/advice/generate", json={"year": 2025, "month": 7})
 
         assert response.status_code == 403
-        detail = response.json()['detail']
-        assert 'Les conseils ne peuvent être générés que pour les 2 mois les plus récents' in detail
+        detail = response.json()["detail"]
+        assert "Les conseils ne peuvent être générés que pour les 2 mois les plus récents" in detail
 
-    @patch.dict('os.environ', MOCK_API_KEY_ENV)
-    @patch('app.api.deps.AdviceGenerator')
+    @patch.dict("os.environ", MOCK_API_KEY_ENV)
+    @patch("app.api.deps.AdviceGenerator")
     def test_generate_advice_uses_dynamic_history_limit(
         self,
         mock_generator_class: MagicMock,
@@ -121,14 +121,14 @@ class TestGenerateAdviceEligibility:
         mock_generator.generate_advice.return_value = _create_mock_advice_response()
         mock_generator_class.return_value = mock_generator
 
-        response = client.post('/api/advice/generate', json={'year': 2025, 'month': 10})
+        response = client.post("/api/advice/generate", json={"year": 2025, "month": 10})
 
         assert response.status_code == 200
         # ##>: First advice uses 12-month limit, should have called generate_advice.
         mock_generator.generate_advice.assert_called_once()
 
-    @patch.dict('os.environ', MOCK_API_KEY_ENV)
-    @patch('app.api.deps.AdviceGenerator')
+    @patch.dict("os.environ", MOCK_API_KEY_ENV)
+    @patch("app.api.deps.AdviceGenerator")
     def test_generate_first_advice_uses_12_month_limit(
         self,
         mock_generator_class: MagicMock,
@@ -145,15 +145,15 @@ class TestGenerateAdviceEligibility:
         mock_generator.generate_advice.return_value = _create_mock_advice_response()
         mock_generator_class.return_value = mock_generator
 
-        response = client.post('/api/advice/generate', json={'year': 2025, 'month': 1})
+        response = client.post("/api/advice/generate", json={"year": 2025, "month": 1})
 
         assert response.status_code == 200
         # ##>: Verify first advice scenario detected.
         data = response.json()
-        assert data['success'] is True
+        assert data["success"] is True
 
-    @patch.dict('os.environ', MOCK_API_KEY_ENV)
-    @patch('app.api.deps.AdviceGenerator')
+    @patch.dict("os.environ", MOCK_API_KEY_ENV)
+    @patch("app.api.deps.AdviceGenerator")
     def test_regenerating_first_advice_uses_12_month_limit(
         self,
         mock_generator_class: MagicMock,
@@ -161,7 +161,6 @@ class TestGenerateAdviceEligibility:
         db_session: Session,
     ) -> None:
         """Regenerating the only advice still uses 12-month limit."""
-        month_sep = _create_month(db_session, 2025, 9)
         month_oct = _create_month(db_session, 2025, 10)
 
         # ##>: Add advice only for October (the target month).
@@ -176,7 +175,7 @@ class TestGenerateAdviceEligibility:
         mock_generator.generate_advice.return_value = _create_mock_advice_response()
         mock_generator_class.return_value = mock_generator
 
-        response = client.post('/api/advice/generate', json={'year': 2025, 'month': 10, 'regenerate': True})
+        response = client.post("/api/advice/generate", json={"year": 2025, "month": 10, "regenerate": True})
 
         assert response.status_code == 200
-        assert response.json()['was_cached'] is False
+        assert response.json()["was_cached"] is False
