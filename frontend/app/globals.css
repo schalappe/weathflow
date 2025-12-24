@@ -112,12 +112,12 @@
   --chart-4: #e8b931;
   --chart-5: #b0aea5;
 
-  /* Money Map category text colors (darker for light mode contrast) */
-  --income-text: #5a8ab8;
-  --core-text: #c46647;
-  --choice-text: #c9a02a;
-  --compound-text: #6a7d50;
-  --excluded-text: #8a8880;
+  /* Money Map category text colors (WCAG AA compliant: 4.5:1 contrast vs #ffffff) */
+  --income-text: #3d7099;
+  --core-text: #b04a2a;
+  --choice-text: #8a6d1c;
+  --compound-text: #5c6d44;
+  --excluded-text: #6b6a63;
 
   /* Sidebar */
   --sidebar: #faf9f5;
