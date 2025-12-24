@@ -79,6 +79,10 @@ def check_eligibility(
             reason="Aucun mois disponible dans la base de données.",
         )
 
+    # ##>: Determine first-advice status early for accurate reporting in all cases.
+    advice_count = advice_repo.count()
+    is_first_advice = advice_count == 0
+
     # ##>: Check if target is within the eligible window.
     is_within_window = _is_within_eligible_window(target_year, target_month, most_recent.year, most_recent.month)
 
@@ -86,19 +90,20 @@ def check_eligibility(
         return EligibilityResult(
             is_eligible=False,
             history_limit=REGULAR_HISTORY_LIMIT,
-            is_first_advice=False,
+            is_first_advice=is_first_advice,
             reason=f"Les conseils ne peuvent être générés que pour les 2 mois les plus récents. "
             f"Votre dernière transaction date de {most_recent.year}-{most_recent.month:02d}.",
         )
 
-    # ##>: Determine if this is first advice scenario.
-    is_first = _is_first_advice_scenario(advice_repo, target_month_id)
-    history_limit = EXTENDED_HISTORY_LIMIT if is_first else REGULAR_HISTORY_LIMIT
+    # ##>: Extend history for first advice or regenerating the only advice.
+    is_regenerating_only = advice_count == 1 and advice_repo.get_by_month_id(target_month_id) is not None
+    use_extended_history = is_first_advice or is_regenerating_only
+    history_limit = EXTENDED_HISTORY_LIMIT if use_extended_history else REGULAR_HISTORY_LIMIT
 
     return EligibilityResult(
         is_eligible=True,
         history_limit=history_limit,
-        is_first_advice=is_first,
+        is_first_advice=is_first_advice,
         reason=None,
     )
 
@@ -131,38 +136,3 @@ def _is_within_eligible_window(target_year: int, target_month: int, ref_year: in
 
     # ##>: Target must be within [ref - (window-1), ref] (N most recent months).
     return ref_absolute - (ELIGIBLE_MONTH_WINDOW - 1) <= target_absolute <= ref_absolute
-
-
-def _is_first_advice_scenario(advice_repo: AdviceRepository, target_month_id: int) -> bool:
-    """
-    Determine if this is a first-advice scenario.
-
-    First advice means:
-    - No advice records exist in the database, OR
-    - Only one advice exists and it's for the target month (regenerating first advice)
-
-    Parameters
-    ----------
-    advice_repo : AdviceRepository
-        Repository for advice data access.
-    target_month_id : int
-        Database ID of the target month.
-
-    Returns
-    -------
-    bool
-        True if this should use extended history context.
-    """
-    advice_count = advice_repo.count()
-
-    # ##>: No advice exists at all.
-    if advice_count == 0:
-        return True
-
-    # ##>: If only one advice exists, check if it's for the target month.
-    if advice_count == 1:
-        existing_advice = advice_repo.get_by_month_id(target_month_id)
-        if existing_advice is not None:
-            return True
-
-    return False
