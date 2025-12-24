@@ -119,8 +119,8 @@ def generate_advice(
             month_repo, limit=eligibility.history_limit
         )
 
-        # ##>: Filter out current month from history and collect IDs for batch advice fetch.
-        filtered_history = [m for m in history_months if not (m.year == request.year and m.month == request.month)]
+        # ##>: Filter to only include strictly older months (exclude current and future months).
+        filtered_history = [m for m in history_months if (m.year, m.month) < (request.year, request.month)]
         all_month_ids = [m.id for m in filtered_history] + [month_record.id]
 
         # ##>: Batch fetch all advice records in single query to eliminate N+1.
@@ -137,13 +137,16 @@ def generate_advice(
             )
             history_data.append(advice_service.month_to_month_data(m, past_recommendations))
 
-        # ##>: Current month also gets its past advice (if regenerating).
-        current_past_advice = advice_by_month_id.get(month_record.id)
-        current_recommendations = (
-            advice_service.extract_recommendations_from_advice(current_past_advice.advice_text)
-            if current_past_advice
-            else None
-        )
+        # ##>: Only include current month's past advice if NOT regenerating.
+        # ##>: When regenerating, exclude old advice to avoid biasing the AI toward similar recommendations.
+        current_recommendations = None
+        if not request.regenerate:
+            current_past_advice = advice_by_month_id.get(month_record.id)
+            current_recommendations = (
+                advice_service.extract_recommendations_from_advice(current_past_advice.advice_text)
+                if current_past_advice
+                else None
+            )
         current_data = advice_service.month_to_month_data(month_record, current_recommendations)
 
         advice_response = generator.generate_advice(current_data, history_data)

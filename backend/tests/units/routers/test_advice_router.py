@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from app.db.models.advice import Advice
 from app.db.models.month import Month
 from app.main import app
+from app.services.advice.eligibility import EligibilityResult
 from app.services.advice.models import AdviceResponse, ProblemArea
 from app.services.exceptions import AdviceQueryError, InsufficientDataError
 
@@ -166,6 +167,161 @@ class TestPostGenerateAdvice(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertFalse(data["was_cached"])
+
+    @patch("app.api.advice.check_eligibility")
+    @patch("app.api.advice.advice_service")
+    @patch("app.api.advice.months_service")
+    @patch("app.api.deps.AdviceGenerator")
+    @patch("app.api.deps.get_settings")
+    def test_regenerate_excludes_current_month_advice_from_prompt(
+        self,
+        mock_settings: MagicMock,
+        mock_generator_class: MagicMock,
+        mock_months_service: MagicMock,
+        mock_advice_service: MagicMock,
+        mock_check_eligibility: MagicMock,
+    ) -> None:
+        """POST regenerate=True should NOT include current month's old advice in prompt.
+
+        When regenerating advice, the AI should not see the previous recommendations
+        for the current month, as this biases the new advice generation.
+        Only strictly older months should have their past advice included.
+        """
+        mock_settings.return_value.anthropic_api_key.get_secret_value.return_value = "test-key"
+        mock_settings.return_value.anthropic_base_url = None
+
+        # ##>: Mock eligibility check to return eligible.
+        mock_check_eligibility.return_value = EligibilityResult(
+            is_eligible=True,
+            history_limit=3,
+            is_first_advice=False,
+            reason=None,
+        )
+
+        # ##>: Current month (October 2025) has existing advice.
+        current_month = _create_mock_month(month_id=1, year=2025, month=10)
+        current_month_advice = _create_mock_advice(month_id=1)
+
+        # ##>: Older month (September 2025) also has advice.
+        older_month = _create_mock_month(month_id=2, year=2025, month=9)
+        older_month_advice = _create_mock_advice(month_id=2)
+
+        mock_months_service.get_month_with_transactions.return_value = current_month
+        mock_months_service.get_months_history_with_transactions.return_value = [current_month, older_month]
+
+        # ##>: Both months have existing advice in the database.
+        mock_advice_service.get_advice_by_month_ids.return_value = {
+            1: current_month_advice,
+            2: older_month_advice,
+        }
+        mock_advice_service.extract_recommendations_from_advice.return_value = ["Old recommendation"]
+
+        mock_generator = MagicMock()
+        mock_generator.generate_advice.return_value = _create_advice_response()
+        mock_generator_class.return_value = mock_generator
+
+        mock_stored_advice = _create_mock_advice()
+        mock_advice_service.create_or_update_advice.return_value = mock_stored_advice
+        mock_advice_service.month_to_month_data.return_value = MagicMock()
+        mock_advice_service.advice_response_to_json.return_value = "{}"
+
+        response = client.post("/api/advice/generate", json={"year": 2025, "month": 10, "regenerate": True})
+
+        self.assertEqual(response.status_code, 200)
+
+        # ##>: Verify month_to_month_data was called twice: once for older month, once for current.
+        self.assertEqual(mock_advice_service.month_to_month_data.call_count, 2)
+
+        # ##>: Find the call for the current month (October 2025).
+        current_month_call = None
+        for call in mock_advice_service.month_to_month_data.call_args_list:
+            month_arg = call[0][0]
+            if month_arg.month == 10 and month_arg.year == 2025:
+                current_month_call = call
+                break
+
+        self.assertIsNotNone(current_month_call, "Expected call for current month (October 2025)")
+        assert current_month_call is not None  # Type guard for mypy.
+
+        # ##>: Current month should have past_advice=None when regenerating.
+        # The second argument is the past_advice parameter.
+        past_advice_arg = current_month_call[0][1] if len(current_month_call[0]) > 1 else None
+        self.assertIsNone(
+            past_advice_arg, "When regenerating, current month's old advice should NOT be included in prompt"
+        )
+
+    @patch("app.api.advice.check_eligibility")
+    @patch("app.api.advice.advice_service")
+    @patch("app.api.advice.months_service")
+    @patch("app.api.deps.AdviceGenerator")
+    @patch("app.api.deps.get_settings")
+    def test_excludes_future_months_from_history(
+        self,
+        mock_settings: MagicMock,
+        mock_generator_class: MagicMock,
+        mock_months_service: MagicMock,
+        mock_advice_service: MagicMock,
+        mock_check_eligibility: MagicMock,
+    ) -> None:
+        """POST should only include strictly older months in history, not future months.
+
+        When generating advice for September, October's advice should NOT be included
+        even if October has already been generated. Only August and earlier should be
+        included in the history.
+        """
+        mock_settings.return_value.anthropic_api_key.get_secret_value.return_value = "test-key"
+        mock_settings.return_value.anthropic_base_url = None
+
+        mock_check_eligibility.return_value = EligibilityResult(
+            is_eligible=True,
+            history_limit=3,
+            is_first_advice=False,
+            reason=None,
+        )
+
+        # ##>: Target month is September 2025.
+        september = _create_mock_month(month_id=1, year=2025, month=9)
+
+        # ##>: October 2025 is a FUTURE month (should be excluded from history).
+        october = _create_mock_month(month_id=2, year=2025, month=10)
+        october_advice = _create_mock_advice(month_id=2)
+
+        # ##>: August 2025 is an OLDER month (should be included in history).
+        august = _create_mock_month(month_id=3, year=2025, month=8)
+        august_advice = _create_mock_advice(month_id=3)
+
+        mock_months_service.get_month_with_transactions.return_value = september
+        # ##>: History returns all months including the future one (October).
+        mock_months_service.get_months_history_with_transactions.return_value = [october, september, august]
+
+        # ##>: No cached advice for September, so it will generate new advice.
+        mock_advice_service.get_advice_by_month_id.return_value = None
+        mock_advice_service.get_advice_by_month_ids.return_value = {
+            2: october_advice,
+            3: august_advice,
+        }
+        mock_advice_service.extract_recommendations_from_advice.return_value = ["Past recommendation"]
+
+        mock_generator = MagicMock()
+        mock_generator.generate_advice.return_value = _create_advice_response()
+        mock_generator_class.return_value = mock_generator
+
+        mock_stored_advice = _create_mock_advice()
+        mock_advice_service.create_or_update_advice.return_value = mock_stored_advice
+        mock_advice_service.month_to_month_data.return_value = MagicMock()
+        mock_advice_service.advice_response_to_json.return_value = "{}"
+
+        response = client.post("/api/advice/generate", json={"year": 2025, "month": 9})
+
+        self.assertEqual(response.status_code, 200)
+
+        # ##>: Verify month_to_month_data was called only for September (current) and August (older).
+        # It should NOT be called for October (future month).
+        call_months = [call[0][0].month for call in mock_advice_service.month_to_month_data.call_args_list]
+
+        self.assertIn(9, call_months, "September (current month) should be included")
+        self.assertIn(8, call_months, "August (older month) should be included in history")
+        self.assertNotIn(10, call_months, "October (future month) should NOT be included in history")
 
     @patch("app.api.advice.months_service")
     def test_returns_404_when_month_not_found(self, mock_months_service: MagicMock) -> None:
