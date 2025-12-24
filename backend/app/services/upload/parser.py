@@ -11,7 +11,7 @@ from typing import ClassVar
 from app.services.exceptions import InvalidFormatError, MissingColumnsError, RowParseError
 from app.services.upload.models import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
 
-# [>]: Bankin subcategories to exclude during import. These transactions are internal
+# ##>: Bankin subcategories to exclude during import. These transactions are internal
 # transfers that should not be stored, categorized, or counted in budgets.
 EXCLUDED_SUBCATEGORIES: frozenset[str] = frozenset({"Virements internes"})
 
@@ -78,7 +78,7 @@ class BankinCSVParser:
 
         transactions: list[ParsedTransaction] = []
         for line_number, row in enumerate(reader, start=2):
-            # [>]: Skip excluded subcategories before parsing to avoid processing internal transfers.
+            # ##>: Skip excluded subcategories before parsing to avoid processing internal transfers.
             subcategory = row.get("Sous-Catégorie", "").strip()
             if subcategory in EXCLUDED_SUBCATEGORIES:
                 continue

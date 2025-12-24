@@ -190,6 +190,7 @@ export function DashboardClient() {
           dispatch({ type: "MONTHS_LOADED", payload: response.months });
         }
       } catch (error) {
+        console.error("[DashboardClient] Failed to load months:", error);
         if (isMounted) {
           dispatch({
             type: "LOAD_ERROR",

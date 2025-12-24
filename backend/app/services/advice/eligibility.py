@@ -129,8 +129,8 @@ def _is_within_eligible_window(target_year: int, target_month: int, ref_year: in
     target_absolute = target_year * 12 + target_month
     ref_absolute = ref_year * 12 + ref_month
 
-    # ##>: Target must be within [ref - 1, ref] (2 most recent months).
-    return ref_absolute - 1 <= target_absolute <= ref_absolute
+    # ##>: Target must be within [ref - (window-1), ref] (N most recent months).
+    return ref_absolute - (ELIGIBLE_MONTH_WINDOW - 1) <= target_absolute <= ref_absolute
 
 
 def _is_first_advice_scenario(advice_repo: AdviceRepository, target_month_id: int) -> bool:
