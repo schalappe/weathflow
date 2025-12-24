@@ -144,9 +144,7 @@ describe("DashboardClient", () => {
     });
   });
 
-  it("month change triggers data fetch", async () => {
-    // [>]: Testing month selection via MonthSelector is difficult with Radix Select in jsdom.
-    // [>]: Instead, verify that after initial load, the first month is auto-selected and fetched.
+  it("month change triggers data fetch via chevron navigation", async () => {
     vi.mocked(apiClient.getMonthsList).mockResolvedValue(mockMonthsList);
     vi.mocked(apiClient.getMonthDetailAllTransactions).mockResolvedValue(
       mockMonthDetail,
@@ -160,11 +158,9 @@ describe("DashboardClient", () => {
       expect(screen.getByText("/3")).toBeInTheDocument();
     });
 
-    // [>]: Verify the month selector is rendered with correct options.
-    const selector = screen.getByRole("combobox", {
-      name: /sélectionner le mois/i,
-    });
-    expect(selector).toBeInTheDocument();
+    // [>]: Verify the month navigator is rendered with chevron buttons.
+    expect(screen.getByLabelText("Mois précédent")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mois suivant")).toBeInTheDocument();
 
     // [>]: Verify getMonthDetailAllTransactions was called with the most recent month.
     expect(apiClient.getMonthDetailAllTransactions).toHaveBeenCalledWith(
@@ -172,10 +168,30 @@ describe("DashboardClient", () => {
       10,
     );
 
-    // [>]: Verify "octobre 2025" appears (in both selector and score card).
+    // [>]: Verify "octobre 2025" appears (in both navigator and score card).
     expect(screen.getAllByText("octobre 2025").length).toBeGreaterThanOrEqual(
       1,
     );
+
+    // [>]: Mock response for September.
+    const septemberDetail = {
+      ...mockMonthDetail,
+      month: mockMonthsList.months[1],
+    };
+    vi.mocked(apiClient.getMonthDetailAllTransactions).mockResolvedValue(
+      septemberDetail,
+    );
+
+    // [>]: Click previous month button to navigate to September.
+    fireEvent.click(screen.getByLabelText("Mois précédent"));
+
+    // [>]: Should fetch September data.
+    await waitFor(() => {
+      expect(apiClient.getMonthDetailAllTransactions).toHaveBeenCalledWith(
+        2025,
+        9,
+      );
+    });
   });
 
   it("displays grouped transaction list", async () => {

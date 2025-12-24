@@ -50,9 +50,15 @@
 
   /* Money Map semantic colors - Updated for Neutra theme */
   --color-income: #6a9bcc;
+  --color-income-text: var(--income-text);
   --color-core: #d97757;
+  --color-core-text: var(--core-text);
   --color-choice: #e8b931;
+  --color-choice-text: var(--choice-text);
   --color-compound: #788c5d;
+  --color-compound-text: var(--compound-text);
+  --color-excluded: #b0aea5;
+  --color-excluded-text: var(--excluded-text);
   --color-score-great: #788c5d;
   --color-score-okay: #e8b931;
   --color-score-need-improvement: #d97757;
@@ -85,7 +91,7 @@
 
   /* Muted - Subtle backgrounds */
   --muted: #e8e6dc;
-  --muted-foreground: #b0aea5;
+  --muted-foreground: #6b6a65;
 
   /* Accent - Blue secondary accent */
   --accent: #6a9bcc;
@@ -105,6 +111,13 @@
   --chart-3: #788c5d;
   --chart-4: #e8b931;
   --chart-5: #b0aea5;
+
+  /* Money Map category text colors (WCAG AA compliant: 4.5:1 contrast vs #ffffff) */
+  --income-text: #3d7099;
+  --core-text: #b04a2a;
+  --choice-text: #8a6d1c;
+  --compound-text: #5c6d44;
+  --excluded-text: #6b6a63;
 
   /* Sidebar */
   --sidebar: #faf9f5;
@@ -157,6 +170,13 @@
   --chart-3: #8a9e6a;
   --chart-4: #f0c43d;
   --chart-5: #b0aea5;
+
+  /* Money Map category text colors (brighter for dark mode contrast) */
+  --income-text: #7aa8d4;
+  --core-text: #e08363;
+  --choice-text: #f0c43d;
+  --compound-text: #8a9e6a;
+  --excluded-text: #b0aea5;
 
   /* Sidebar - Darker than background */
   --sidebar: #121211;

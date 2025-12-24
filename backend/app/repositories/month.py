@@ -63,6 +63,17 @@ class MonthRepository:
         """
         return self._db.query(Month).filter(Month.year == year, Month.month == month).first()
 
+    def get_most_recent(self) -> Month | None:
+        """
+        Get the most recent month by year and month.
+
+        Returns
+        -------
+        Month | None
+            The newest month record, or None if no months exist.
+        """
+        return self._db.query(Month).order_by(Month.year.desc(), Month.month.desc()).first()
+
     def get_by_year_month_with_transactions(self, year: int, month: int) -> Month | None:
         """
         Get month by year and month number with transactions eager-loaded.

@@ -6,11 +6,13 @@ from loguru import logger
 from app.api.deps import AdviceGen, AdviceRepo, MonthRepo, create_router
 from app.responses.advice import (
     AdviceData,
+    EligibilityInfo,
     GenerateAdviceRequest,
     GenerateAdviceResponse,
     GetAdviceResponse,
 )
 from app.services.advice import service as advice_service
+from app.services.advice.eligibility import check_eligibility
 from app.services.data import months as months_service
 from app.services.exceptions import (
     AdviceAPIError,
@@ -72,6 +74,8 @@ def generate_advice(
 
     Raises
     ------
+    HTTPException 403
+        If month is not eligible for advice generation.
     HTTPException 404
         If month not found.
     HTTPException 400
@@ -90,6 +94,14 @@ def generate_advice(
                 detail=f"No data found for {request.year}-{request.month:02d}. Upload transactions first.",
             )
 
+        # ##>: Check eligibility before proceeding.
+        eligibility = check_eligibility(request.year, request.month, month_record.id, month_repo, advice_repo)
+        if not eligibility.is_eligible:
+            raise HTTPException(
+                status_code=403,
+                detail=eligibility.reason or "This month is not eligible for advice generation.",
+            )
+
         if not request.regenerate:
             existing_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
             if existing_advice:
@@ -102,7 +114,10 @@ def generate_advice(
                 )
 
         # ##>: Fetch history with transactions eager-loaded to avoid N+1 queries.
-        history_months = months_service.get_months_history_with_transactions(month_repo, limit=3)
+        # ##>: Use dynamic history limit based on eligibility (12 for first advice, 3 otherwise).
+        history_months = months_service.get_months_history_with_transactions(
+            month_repo, limit=eligibility.history_limit
+        )
 
         # ##>: Filter out current month from history and collect IDs for batch advice fetch.
         filtered_history = [m for m in history_months if not (m.year == request.year and m.month == request.month)]
@@ -204,6 +219,14 @@ def get_advice(
                 detail=f"No data found for {year}-{month:02d}. Upload transactions first.",
             )
 
+        # ##>: Check eligibility for this month.
+        eligibility = check_eligibility(year, month, month_record.id, month_repo, advice_repo)
+        eligibility_info = EligibilityInfo(
+            can_generate=eligibility.is_eligible,
+            is_first_advice=eligibility.is_first_advice,
+            reason=eligibility.reason,
+        )
+
         advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
 
         if advice is None:
@@ -212,6 +235,7 @@ def get_advice(
                 advice=None,
                 generated_at=None,
                 exists=False,
+                eligibility=eligibility_info,
             )
 
         return GetAdviceResponse(
@@ -219,6 +243,7 @@ def get_advice(
             advice=AdviceData.from_json(advice.advice_text),
             generated_at=advice.generated_at,
             exists=True,
+            eligibility=eligibility_info,
         )
 
     except HTTPException:

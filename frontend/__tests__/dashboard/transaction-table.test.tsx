@@ -109,10 +109,10 @@ describe("TransactionTable", () => {
       />,
     );
 
-    // [>]: Positive amount should have + prefix and Neutra green color.
+    // [>]: Positive amount should have + prefix and compound text color.
     const positiveAmount = screen.getByText(/\+3[\s\u00A0]000[\s\u00A0]€/);
     expect(positiveAmount).toBeInTheDocument();
-    expect(positiveAmount).toHaveClass("text-[#788c5d]");
+    expect(positiveAmount).toHaveClass("text-compound-text");
 
     // [>]: Negative amount should have foreground color (no special styling).
     const negativeAmount = screen.getByText(/-86[\s\u00A0]€/);

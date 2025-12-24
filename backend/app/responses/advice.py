@@ -115,6 +115,14 @@ class GenerateAdviceResponse(BaseModel):
     was_cached: bool
 
 
+class EligibilityInfo(BaseModel):
+    """Eligibility information for advice generation."""
+
+    can_generate: bool
+    is_first_advice: bool
+    reason: str | None = None
+
+
 class GetAdviceResponse(BaseModel):
     """Response for GET /api/advice/{year}/{month}."""
 
@@ -122,3 +130,4 @@ class GetAdviceResponse(BaseModel):
     advice: AdviceData | None
     generated_at: datetime | None
     exists: bool
+    eligibility: EligibilityInfo

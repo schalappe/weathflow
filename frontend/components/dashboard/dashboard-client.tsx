@@ -10,7 +10,7 @@ import { AlertCircle, Upload, RefreshCw } from "lucide-react";
 import { ScoreCard } from "./score-card";
 import { MetricCard } from "./metric-card";
 import { SpendingPieChart } from "./spending-pie-chart";
-import { MonthSelector } from "./month-selector";
+import { MonthNavigator } from "./month-navigator";
 import { GroupedTransactionList } from "./grouped-transaction-list";
 import { TransactionEditModal } from "./transaction-edit-modal";
 import { ExportButtons } from "./export-buttons";
@@ -150,7 +150,7 @@ function dashboardReducer(
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6 animate-pulse">
+    <div className="space-y-6">
       {/* Header skeleton */}
       <div className="flex items-center justify-between">
         <Skeleton className="h-7 w-32" />
@@ -190,6 +190,7 @@ export function DashboardClient() {
           dispatch({ type: "MONTHS_LOADED", payload: response.months });
         }
       } catch (error) {
+        console.error("[DashboardClient] Failed to load months:", error);
         if (isMounted) {
           dispatch({
             type: "LOAD_ERROR",
@@ -365,7 +366,7 @@ export function DashboardClient() {
                   month={state.selectedMonth.month}
                   disabled={isLoading}
                 />
-                <MonthSelector
+                <MonthNavigator
                   months={state.monthsList}
                   selectedYear={state.selectedMonth.year}
                   selectedMonth={state.selectedMonth.month}

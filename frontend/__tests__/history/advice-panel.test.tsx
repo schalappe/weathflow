@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AdvicePanel } from "@/components/history/advice-panel";
 import * as apiClient from "@/lib/api-client";
 import { createMockAdviceData } from "@/__tests__/utils/test-factories";
+import type { EligibilityInfo } from "@/types";
 
 // [>]: Mock the API client module.
 vi.mock("@/lib/api-client", () => ({
@@ -13,6 +14,13 @@ vi.mock("@/lib/api-client", () => ({
 
 const mockGetAdvice = vi.mocked(apiClient.getAdvice);
 const mockGenerateAdvice = vi.mocked(apiClient.generateAdvice);
+
+// [>]: Default eligibility info for tests (can_generate=true).
+const mockEligibility: EligibilityInfo = {
+  can_generate: true,
+  is_first_advice: false,
+  reason: null,
+};
 
 describe("AdvicePanel - State Management", () => {
   beforeEach(() => {
@@ -31,6 +39,7 @@ describe("AdvicePanel - State Management", () => {
                 advice: null,
                 generated_at: null,
                 exists: false,
+                eligibility: mockEligibility,
               }),
             100,
           ),
@@ -50,6 +59,7 @@ describe("AdvicePanel - State Management", () => {
       advice: null,
       generated_at: null,
       exists: false,
+      eligibility: mockEligibility,
     });
 
     render(<AdvicePanel year={2025} month={12} />);
@@ -77,6 +87,7 @@ describe("AdvicePanel - State Management", () => {
       advice: mockAdvice,
       generated_at: new Date().toISOString(),
       exists: true,
+      eligibility: mockEligibility,
     });
 
     render(<AdvicePanel year={2025} month={12} />);
@@ -120,6 +131,7 @@ describe("AdvicePanel - State Management", () => {
       advice: mockAdvice,
       generated_at: new Date().toISOString(),
       exists: true,
+      eligibility: mockEligibility,
     });
 
     render(<AdvicePanel year={2025} month={12} />);
@@ -146,6 +158,7 @@ describe("AdvicePanel - State Management", () => {
       advice: mockAdvice,
       generated_at: new Date().toISOString(),
       exists: true,
+      eligibility: mockEligibility,
     });
 
     // [>]: Generate advice takes time to trigger spinner visibility.
@@ -195,6 +208,7 @@ describe("AdvicePanel - User Interactions", () => {
       advice: null,
       generated_at: null,
       exists: false,
+      eligibility: mockEligibility,
     });
 
     mockGenerateAdvice.mockResolvedValue({
@@ -236,6 +250,7 @@ describe("AdvicePanel - User Interactions", () => {
       advice: mockAdvice,
       generated_at: new Date().toISOString(),
       exists: true,
+      eligibility: mockEligibility,
     });
 
     mockGenerateAdvice.mockResolvedValue({
@@ -272,6 +287,7 @@ describe("AdvicePanel - User Interactions", () => {
         advice: null,
         generated_at: null,
         exists: false,
+        eligibility: mockEligibility,
       });
 
     render(<AdvicePanel year={2025} month={12} />);
@@ -293,6 +309,7 @@ describe("AdvicePanel - User Interactions", () => {
       advice: null,
       generated_at: null,
       exists: false,
+      eligibility: mockEligibility,
     });
 
     const { rerender } = render(<AdvicePanel year={2025} month={11} />);
@@ -318,6 +335,7 @@ describe("AdvicePanel - User Interactions", () => {
       advice: mockAdvice,
       generated_at: new Date().toISOString(),
       exists: true,
+      eligibility: mockEligibility,
     });
 
     mockGenerateAdvice.mockRejectedValue(new Error("AI service unavailable"));
@@ -352,6 +370,7 @@ describe("AdvicePanel - User Interactions", () => {
       advice: mockAdvice,
       generated_at: new Date().toISOString(),
       exists: true,
+      eligibility: mockEligibility,
     });
 
     render(<AdvicePanel year={2025} month={12} />);
@@ -374,6 +393,7 @@ describe("AdvicePanel - User Interactions", () => {
       advice: mockAdvice,
       generated_at: new Date().toISOString(),
       exists: true,
+      eligibility: mockEligibility,
     });
 
     render(<AdvicePanel year={2025} month={12} />);
@@ -396,6 +416,7 @@ describe("AdvicePanel - User Interactions", () => {
       advice: mockAdvice,
       generated_at: new Date().toISOString(),
       exists: true,
+      eligibility: mockEligibility,
     });
 
     render(<AdvicePanel year={2025} month={12} />);
@@ -418,6 +439,7 @@ describe("AdvicePanel - User Interactions", () => {
       advice: mockAdvice,
       generated_at: new Date().toISOString(),
       exists: true,
+      eligibility: mockEligibility,
     });
 
     // [>]: Slow response to observe disabled state.

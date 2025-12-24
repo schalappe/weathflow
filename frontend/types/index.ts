@@ -251,15 +251,29 @@ export interface AdviceData {
   encouragement: string;
 }
 
+// [>]: Eligibility info provided by backend to control UI behavior.
+export interface EligibilityInfo {
+  can_generate: boolean;
+  is_first_advice: boolean;
+  reason: string | null;
+}
+
 // [>]: Discriminated union for type-safe advice response handling.
 // When exists=true, advice and generated_at are guaranteed non-null.
 export type GetAdviceResponse =
-  | { success: boolean; exists: false; advice: null; generated_at: null }
+  | {
+      success: boolean;
+      exists: false;
+      advice: null;
+      generated_at: null;
+      eligibility: EligibilityInfo;
+    }
   | {
       success: boolean;
       exists: true;
       advice: AdviceData;
       generated_at: string;
+      eligibility: EligibilityInfo;
     };
 
 export interface GenerateAdviceResponse {

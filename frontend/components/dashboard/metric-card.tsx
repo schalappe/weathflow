@@ -40,31 +40,31 @@ const CATEGORY_CONFIG: Record<
   Income: {
     icon: <Banknote className="h-5 w-5" />,
     glowClass: "metric-glow-income",
-    accentBg: "bg-[#6a9bcc]/10",
-    accentText: "text-[#6a9bcc] dark:text-[#7aa8d4]",
+    accentBg: "bg-income/10",
+    accentText: "text-income-text",
     label: t.metrics.Income,
   },
   Core: {
     icon: <Home className="h-5 w-5" />,
     glowClass: "metric-glow-core",
-    accentBg: "bg-[#d97757]/10",
-    accentText: "text-[#d97757] dark:text-[#e08363]",
+    accentBg: "bg-core/10",
+    accentText: "text-core-text",
     target: "≤ 50%",
     label: t.metrics.Core,
   },
   Choice: {
     icon: <ShoppingBag className="h-5 w-5" />,
     glowClass: "metric-glow-choice",
-    accentBg: "bg-[#e8b931]/10",
-    accentText: "text-[#c9a02a] dark:text-[#f0c43d]",
+    accentBg: "bg-choice/10",
+    accentText: "text-choice-text",
     target: "≤ 30%",
     label: t.metrics.Choice,
   },
   Compound: {
     icon: <PiggyBank className="h-5 w-5" />,
     glowClass: "metric-glow-compound",
-    accentBg: "bg-[#788c5d]/10",
-    accentText: "text-[#788c5d] dark:text-[#8a9e6a]",
+    accentBg: "bg-compound/10",
+    accentText: "text-compound-text",
     target: "≥ 20%",
     label: t.metrics.Compound,
   },
@@ -125,8 +125,8 @@ export function MetricCard({
               className={cn(
                 "flex h-7 w-7 items-center justify-center rounded-full",
                 isSuccess
-                  ? "bg-[#788c5d]/10 text-[#788c5d] dark:text-[#8a9e6a]"
-                  : "bg-[#d97757]/10 text-[#d97757] dark:text-[#e08363]",
+                  ? "bg-compound/10 text-compound-text"
+                  : "bg-core/10 text-core-text",
               )}
             >
               {isSuccess ? (
@@ -155,8 +155,8 @@ export function MetricCard({
                 className={cn(
                   "flex items-center gap-1 text-xs font-medium",
                   compoundDirection === "positive"
-                    ? "text-[#788c5d] dark:text-[#8a9e6a]"
-                    : "text-[#d97757] dark:text-[#e08363]",
+                    ? "text-compound-text"
+                    : "text-core-text",
                 )}
               >
                 {compoundDirection === "positive" ? (
@@ -185,9 +185,7 @@ export function MetricCard({
                   <span
                     className={cn(
                       "font-medium",
-                      isSuccess
-                        ? "text-[#788c5d] dark:text-[#8a9e6a]"
-                        : "text-[#d97757] dark:text-[#e08363]",
+                      isSuccess ? "text-compound-text" : "text-core-text",
                     )}
                   >
                     {isSuccess ? t.metrics.onTrack : t.metrics.overTarget}
@@ -200,10 +198,10 @@ export function MetricCard({
                   className={cn(
                     "h-full rounded-full transition-all duration-500",
                     isSuccess === undefined
-                      ? "bg-[#6a9bcc]"
+                      ? "bg-income"
                       : isSuccess
-                        ? "bg-[#788c5d]"
-                        : "bg-[#d97757]",
+                        ? "bg-compound"
+                        : "bg-core",
                   )}
                   style={{ width: `${Math.min(percentage, 100)}%` }}
                 />

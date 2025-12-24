@@ -321,10 +321,8 @@ describe("GroupedTransactionList", () => {
       // [>]: Expand to see the transaction.
       await user.click(screen.getByRole("button", { expanded: false }));
 
-      // [>]: Pencil icon container should be visible (has the yellow bg class).
-      const pencilContainer = document.querySelector(
-        ".bg-\\[\\#e8b931\\]\\/10",
-      );
+      // [>]: Pencil icon container should be visible (has the choice bg class).
+      const pencilContainer = document.querySelector(".bg-choice\\/10");
       expect(pencilContainer).toBeInTheDocument();
     });
   });
