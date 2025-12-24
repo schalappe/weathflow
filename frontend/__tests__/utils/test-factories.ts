@@ -1,4 +1,10 @@
-import type { AdviceData, MonthHistory, Score } from "@/types";
+import type {
+  AdviceData,
+  MonthHistory,
+  ProblemArea,
+  Recommendation,
+  Score,
+} from "@/types";
 import { vi } from "vitest";
 
 // [>]: Mock localStorage for theme and storage-related tests.
@@ -68,6 +74,35 @@ export function createMonthHistory(
   };
 }
 
+// [>]: Factory for creating test ProblemArea with sensible defaults.
+export function createMockProblemArea(
+  overrides: Partial<ProblemArea> = {},
+): ProblemArea {
+  return {
+    category: "Abonnements",
+    amount: 85,
+    trend: "+20%",
+    root_cause: null,
+    impact: null,
+    ...overrides,
+  };
+}
+
+// [>]: Factory for creating test Recommendation with sensible defaults.
+export function createMockRecommendation(
+  overrides: Partial<Recommendation> = {},
+): Recommendation {
+  return {
+    priority: 1,
+    action: "Audite tes abonnements",
+    details: "Certains ne sont peut-etre plus utilises.",
+    expected_savings: "30€/mois",
+    difficulty: "Facile",
+    quick_win: true,
+    ...overrides,
+  };
+}
+
 // [>]: Factory for creating test AdviceData with sensible defaults.
 export function createMockAdviceData(
   overrides: Partial<AdviceData> = {},
@@ -75,15 +110,49 @@ export function createMockAdviceData(
   return {
     analysis:
       "Tes depenses 'Choice' ont augmente de 15% sur les 3 derniers mois, principalement dans les abonnements.",
+    spending_patterns: [],
     problem_areas: [
-      { category: "Abonnements", amount: 85, trend: "+20%" },
-      { category: "Restaurants", amount: 120, trend: "+10%" },
+      createMockProblemArea({
+        category: "Abonnements",
+        amount: 85,
+        trend: "+20%",
+      }),
+      createMockProblemArea({
+        category: "Restaurants",
+        amount: 120,
+        trend: "+10%",
+      }),
     ],
     recommendations: [
-      "Audite tes abonnements: certains ne sont peut-etre plus utilises.",
-      "Prepare tes repas le dimanche pour reduire les sorties au restaurant.",
-      "Tu es proche du score 'Great'! Continue ainsi.",
+      createMockRecommendation({
+        priority: 1,
+        action:
+          "Audite tes abonnements: certains ne sont peut-etre plus utilises.",
+        details: "Netflix, Spotify, Disney+ totalisant 35€/mois.",
+        expected_savings: "10€/mois",
+        difficulty: "Facile",
+        quick_win: true,
+      }),
+      createMockRecommendation({
+        priority: 2,
+        action:
+          "Prepare tes repas le dimanche pour reduire les sorties au restaurant.",
+        details: "6 commandes Uber Eats ce mois.",
+        expected_savings: "45€/mois",
+        difficulty: "Modéré",
+        quick_win: false,
+      }),
+      createMockRecommendation({
+        priority: 3,
+        action: "Tu es proche du score 'Great'! Continue ainsi.",
+        details: "Maintiens ton taux d'epargne actuel.",
+        expected_savings: "0€",
+        difficulty: "Facile",
+        quick_win: false,
+      }),
     ],
+    progress_review: null,
+    monthly_goal: null,
     encouragement:
       "Tu as fait des progres ce mois-ci! Continue sur cette lancee.",
     ...overrides,
