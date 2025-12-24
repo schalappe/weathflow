@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal
 
 from app.services.exceptions import InvalidFormatError, MissingColumnsError, RowParseError
-from app.services.upload.parser import BankinCSVParser
+from app.services.upload.parser import EXCLUDED_SUBCATEGORIES, BankinCSVParser
 
 
 class TestBankinCSVParserValidCSV(unittest.TestCase):
@@ -233,3 +233,75 @@ class TestBankinCSVParserEdgeCases(unittest.TestCase):
 
         self.assertEqual(result.total_transactions, 1)
         self.assertEqual(result.months["2025-01"].transactions[0].description, "Café")
+
+
+class TestBankinCSVParserSubcategoryExclusion(unittest.TestCase):
+    """Tests for subcategory exclusion during import."""
+
+    def setUp(self) -> None:
+        """Create parser instance for each test."""
+        self.parser = BankinCSVParser()
+
+    def test_virements_internes_excluded_from_parse_result(self) -> None:
+        """Should completely exclude transactions with 'Virements internes' subcategory."""
+        csv_content = (
+            "Date;Description;Compte;Montant;Catégorie;Sous-Catégorie;Note;Pointée\n"
+            '"15/10/2025";"Salary";"Checking";"3000,00";"Income";"Salary";"";"Oui"\n'
+            '"16/10/2025";"Internal Transfer";"Savings";"500,00";"Transfers";"Virements internes";"";"Non"\n'
+            '"17/10/2025";"Groceries";"Checking";"-150,50";"Food";"Groceries";"";"Non"\n'
+        )
+
+        result = self.parser.parse(csv_content)
+
+        self.assertEqual(result.total_transactions, 2)
+        descriptions = [t.description for t in result.months["2025-10"].transactions]
+        self.assertIn("Salary", descriptions)
+        self.assertIn("Groceries", descriptions)
+        self.assertNotIn("Internal Transfer", descriptions)
+
+    def test_virements_internes_not_counted_in_summary(self) -> None:
+        """Should not include excluded transactions in month summary calculations."""
+        csv_content = (
+            "Date;Description;Compte;Montant;Catégorie;Sous-Catégorie;Note;Pointée\n"
+            '"15/10/2025";"Salary";"Checking";"3000,00";"Income";"Salary";"";"Oui"\n'
+            '"16/10/2025";"Internal Transfer In";"Savings";"500,00";"Transfers";"Virements internes";"";"Non"\n'
+            '"17/10/2025";"Internal Transfer Out";"Checking";"-500,00";"Transfers";"Virements internes";"";"Non"\n'
+            '"18/10/2025";"Groceries";"Checking";"-150,50";"Food";"Groceries";"";"Non"\n'
+        )
+
+        result = self.parser.parse(csv_content)
+        summary = result.months["2025-10"].summary
+
+        self.assertEqual(summary.transaction_count, 2)
+        self.assertEqual(summary.total_income, Decimal("3000.00"))
+        self.assertEqual(summary.total_expenses, Decimal("150.50"))
+
+    def test_all_virements_internes_excluded_creates_empty_month(self) -> None:
+        """Should handle case where all transactions in a month are excluded."""
+        csv_content = (
+            "Date;Description;Compte;Montant;Catégorie;Sous-Catégorie;Note;Pointée\n"
+            '"15/10/2025";"Transfer 1";"Savings";"500,00";"Transfers";"Virements internes";"";"Non"\n'
+            '"16/10/2025";"Transfer 2";"Checking";"-500,00";"Transfers";"Virements internes";"";"Non"\n'
+        )
+
+        result = self.parser.parse(csv_content)
+
+        self.assertEqual(result.total_transactions, 0)
+        self.assertEqual(len(result.months), 0)
+
+    def test_excluded_subcategories_constant_contains_virements_internes(self) -> None:
+        """Should have 'Virements internes' in the excluded subcategories set."""
+        self.assertIn("Virements internes", EXCLUDED_SUBCATEGORIES)
+
+    def test_exclusion_preserves_other_transfer_subcategories(self) -> None:
+        """Should only exclude 'Virements internes', not other transfer types."""
+        csv_content = (
+            "Date;Description;Compte;Montant;Catégorie;Sous-Catégorie;Note;Pointée\n"
+            '"15/10/2025";"Wire Transfer";"Checking";"-200,00";"Transfers";"Virements";"";"Non"\n'
+            '"16/10/2025";"Internal Transfer";"Savings";"500,00";"Transfers";"Virements internes";"";"Non"\n'
+        )
+
+        result = self.parser.parse(csv_content)
+
+        self.assertEqual(result.total_transactions, 1)
+        self.assertEqual(result.months["2025-10"].transactions[0].description, "Wire Transfer")
