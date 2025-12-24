@@ -124,8 +124,16 @@ describe("AdvicePanel - State Management", () => {
   it("trend colors are correct: red for positive, green for negative", async () => {
     const mockAdvice = createMockAdviceData({
       problem_areas: [
-        createMockProblemArea({ category: "Abonnements", amount: 85, trend: "+20%" }),
-        createMockProblemArea({ category: "Restaurants", amount: 120, trend: "-15%" }),
+        createMockProblemArea({
+          category: "Abonnements",
+          amount: 85,
+          trend: "+20%",
+        }),
+        createMockProblemArea({
+          category: "Restaurants",
+          amount: 120,
+          trend: "-15%",
+        }),
       ],
     });
 
@@ -412,7 +420,11 @@ describe("AdvicePanel - User Interactions", () => {
   it("shows gray color for neutral trend (0%)", async () => {
     const mockAdvice = createMockAdviceData({
       problem_areas: [
-        createMockProblemArea({ category: "Neutral", amount: 100, trend: "0%" }),
+        createMockProblemArea({
+          category: "Neutral",
+          amount: 100,
+          trend: "0%",
+        }),
       ],
     });
 
