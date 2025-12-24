@@ -231,7 +231,9 @@ export function TransactionTable({
                       <span
                         className={cn(
                           "font-mono text-sm font-semibold tabular-nums",
-                          tx.amount >= 0 ? "text-compound-text" : "text-foreground",
+                          tx.amount >= 0
+                            ? "text-compound-text"
+                            : "text-foreground",
                         )}
                       >
                         {tx.amount >= 0 ? "+" : ""}

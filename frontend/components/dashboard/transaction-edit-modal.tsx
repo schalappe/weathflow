@@ -120,7 +120,9 @@ export function TransactionEditModal({
               </span>
               <span
                 className={
-                  transaction.amount >= 0 ? "text-compound-text" : "text-core-text"
+                  transaction.amount >= 0
+                    ? "text-compound-text"
+                    : "text-core-text"
                 }
               >
                 {transaction.amount >= 0 ? "+" : ""}
