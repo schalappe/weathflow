@@ -239,11 +239,13 @@ class AdviceGenerator:
             If response is empty.
         """
         try:
-            # ##>: max_tokens is required by Anthropic API. Set high to let model respond fully.
+            # ##>: Use effort parameter for Opus 4.5 optimal performance.
             response = self._client.messages.create(
                 model=self._model,
                 max_tokens=4096,
                 messages=[{"role": "user", "content": user_prompt}],
+                extra_headers={"anthropic-beta": "effort-2025-11-24"},
+                extra_body={"output_config": {"effort": "high"}},
             )
         except anthropic.AuthenticationError as e:
             logger.error("Anthropic authentication failed: {}", e)

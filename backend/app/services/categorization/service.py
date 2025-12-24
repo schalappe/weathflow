@@ -248,10 +248,13 @@ class TransactionCategorizer:
         user_prompt = self._build_user_prompt(batch)
 
         try:
+            # ##>: Use effort parameter for Opus 4.5 optimal performance.
             response = self._client.messages.create(
                 model=self._model,
                 max_tokens=self.MAX_TOKENS,
                 messages=[{"role": "user", "content": user_prompt}],
+                extra_headers={"anthropic-beta": "effort-2025-11-24"},
+                extra_body={"output_config": {"effort": "high"}},
             )
         except anthropic.AuthenticationError as e:
             # ##!: Clear message for API key issues.
