@@ -8,13 +8,14 @@ from pydantic import ValidationError
 from app.responses.advice import AdviceData, GenerateAdviceRequest
 from app.services.advice.models import AdviceResponse as ServiceAdviceResponse
 from app.services.advice.models import ProblemArea as ServiceProblemArea
+from app.services.advice.models import Recommendation as ServiceRecommendation
 
 
 class TestAdviceDataFromJson(unittest.TestCase):
     """Tests for AdviceData.from_json factory method."""
 
-    def test_parses_valid_json_string(self) -> None:
-        """From JSON parses valid JSON string with all fields."""
+    def test_parses_valid_json_string_legacy_format(self) -> None:
+        """From JSON parses valid JSON string with legacy string recommendations."""
         json_str = json.dumps(
             {
                 "analysis": "Votre gestion financière est excellente.",
@@ -40,7 +41,69 @@ class TestAdviceDataFromJson(unittest.TestCase):
         self.assertEqual(result.problem_areas[0].amount, 85.0)
         self.assertEqual(result.problem_areas[0].trend, "+20%")
         self.assertEqual(len(result.recommendations), 3)
+        self.assertEqual(result.recommendations[0].action, "Réduire les abonnements.")
         self.assertEqual(result.encouragement, "Continuez comme ça!")
+
+    def test_parses_valid_json_string_new_format(self) -> None:
+        """From JSON parses valid JSON string with new enriched format."""
+        json_str = json.dumps(
+            {
+                "analysis": "Votre gestion financière est excellente.",
+                "spending_patterns": [
+                    {
+                        "pattern_type": "Abonnements",
+                        "description": "Netflix, Spotify",
+                        "monthly_cost": 25.0,
+                        "occurrences": 2,
+                        "insight": "Deux abonnements streaming.",
+                    }
+                ],
+                "problem_areas": [
+                    {
+                        "category": "Subscriptions",
+                        "amount": 85.0,
+                        "trend": "+20%",
+                        "root_cause": "Accumulation d'abonnements.",
+                        "impact": "Dépasse budget CHOICE.",
+                    }
+                ],
+                "recommendations": [
+                    {
+                        "priority": 1,
+                        "action": "Réduire les abonnements.",
+                        "details": "Netflix + Spotify = 25€.",
+                        "expected_savings": "120€/an",
+                        "difficulty": "Facile",
+                        "quick_win": True,
+                    }
+                ],
+                "progress_review": {
+                    "previous_advice_followed": "Premier mois.",
+                    "wins": ["Score 3/3"],
+                    "areas_for_growth": ["CHOICE"],
+                },
+                "monthly_goal": {
+                    "objective": "Réduire CHOICE de 10%",
+                    "target_amount": 90.0,
+                    "strategy": "Cuisiner plus.",
+                },
+                "encouragement": "Continuez comme ça!",
+            }
+        )
+
+        result = AdviceData.from_json(json_str)
+
+        self.assertEqual(len(result.spending_patterns), 1)
+        self.assertEqual(result.spending_patterns[0].pattern_type, "Abonnements")
+        self.assertEqual(result.problem_areas[0].root_cause, "Accumulation d'abonnements.")
+        self.assertEqual(result.recommendations[0].priority, 1)
+        self.assertTrue(result.recommendations[0].quick_win)
+        self.assertIsNotNone(result.progress_review)
+        assert result.progress_review is not None
+        self.assertEqual(result.progress_review.wins, ["Score 3/3"])
+        self.assertIsNotNone(result.monthly_goal)
+        assert result.monthly_goal is not None
+        self.assertEqual(result.monthly_goal.target_amount, 90.0)
 
 
 class TestAdviceDataFromServiceResponse(unittest.TestCase):
@@ -53,7 +116,24 @@ class TestAdviceDataFromServiceResponse(unittest.TestCase):
             problem_areas=[
                 ServiceProblemArea(category="Test", amount=100.0, trend="+10%"),
             ],
-            recommendations=["Recommendation 1", "Recommendation 2"],
+            recommendations=[
+                ServiceRecommendation(
+                    priority=1,
+                    action="Recommendation 1",
+                    details="Details 1",
+                    expected_savings="50€",
+                    difficulty="Facile",
+                    quick_win=True,
+                ),
+                ServiceRecommendation(
+                    priority=2,
+                    action="Recommendation 2",
+                    details="Details 2",
+                    expected_savings="30€",
+                    difficulty="Modéré",
+                    quick_win=False,
+                ),
+            ],
             encouragement="Keep going!",
         )
 
@@ -64,7 +144,9 @@ class TestAdviceDataFromServiceResponse(unittest.TestCase):
         self.assertEqual(result.problem_areas[0].category, "Test")
         self.assertEqual(result.problem_areas[0].amount, 100.0)
         self.assertEqual(result.problem_areas[0].trend, "+10%")
-        self.assertEqual(result.recommendations, ["Recommendation 1", "Recommendation 2"])
+        self.assertEqual(len(result.recommendations), 2)
+        self.assertEqual(result.recommendations[0].action, "Recommendation 1")
+        self.assertEqual(result.recommendations[1].action, "Recommendation 2")
         self.assertEqual(result.encouragement, "Keep going!")
 
 

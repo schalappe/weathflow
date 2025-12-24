@@ -8,7 +8,14 @@ from sqlalchemy.orm import Session
 
 from app.db.models.advice import Advice
 from app.db.models.month import Month
-from app.services.advice.models import AdviceResponse, ProblemArea
+from app.services.advice.models import (
+    AdviceResponse,
+    MonthlyGoal,
+    ProblemArea,
+    ProgressReview,
+    Recommendation,
+    SpendingPattern,
+)
 from app.services.exceptions import AdviceAPIError
 
 
@@ -34,19 +41,91 @@ def _create_month(db: Session, year: int, month: int, score: int = 2) -> Month:
 
 
 def _create_mock_advice_response() -> AdviceResponse:
-    """Create a mock AdviceResponse from AdviceGenerator."""
+    """Create a mock AdviceResponse from AdviceGenerator with enriched format."""
     return AdviceResponse(
         analysis="Votre gestion financière montre des progrès.",
+        spending_patterns=[
+            SpendingPattern(
+                pattern_type="Abonnements récurrents",
+                description="Netflix, Spotify, Disney+",
+                monthly_cost=35.0,
+                occurrences=3,
+                insight="Trois abonnements streaming actifs.",
+            ),
+            SpendingPattern(
+                pattern_type="Livraisons repas",
+                description="Uber Eats, Deliveroo",
+                monthly_cost=89.0,
+                occurrences=6,
+                insight="Fréquence élevée de livraisons.",
+            ),
+            SpendingPattern(
+                pattern_type="Dépenses fixes",
+                description="Loyer, électricité, internet",
+                monthly_cost=1200.0,
+                occurrences=3,
+                insight="Dépenses fixes stables.",
+            ),
+        ],
         problem_areas=[
-            ProblemArea(category="Subscriptions", amount=85.0, trend="+20%"),
-            ProblemArea(category="Dining", amount=150.0, trend="+15%"),
-            ProblemArea(category="Entertainment", amount=120.0, trend="N/A"),
+            ProblemArea(
+                category="Subscriptions",
+                amount=85.0,
+                trend="+20%",
+                root_cause="Accumulation d'abonnements non utilisés.",
+                impact="Dépasse le budget CHOICE de 5%.",
+            ),
+            ProblemArea(
+                category="Dining",
+                amount=150.0,
+                trend="+15%",
+                root_cause="Augmentation des commandes de livraison.",
+                impact="Réduit la capacité d'épargne.",
+            ),
+            ProblemArea(
+                category="Entertainment",
+                amount=120.0,
+                trend="N/A",
+                root_cause="Premier mois d'analyse.",
+                impact="À surveiller pour les prochains mois.",
+            ),
         ],
         recommendations=[
-            "Réduire les abonnements non utilisés.",
-            "Limiter les repas au restaurant.",
-            "Maintenir votre taux d'épargne actuel.",
+            Recommendation(
+                priority=1,
+                action="Réduire les abonnements non utilisés.",
+                details="Netflix 15.99€ + Spotify 9.99€ + Disney+ 8.99€ = 35€/mois.",
+                expected_savings="120€/an en annulant un service",
+                difficulty="Facile",
+                quick_win=True,
+            ),
+            Recommendation(
+                priority=2,
+                action="Limiter les repas au restaurant.",
+                details="6 commandes Uber Eats totalisant 89€ ce mois.",
+                expected_savings="45€/mois, 540€/an",
+                difficulty="Modéré",
+                quick_win=False,
+            ),
+            Recommendation(
+                priority=3,
+                action="Maintenir votre taux d'épargne actuel.",
+                details="Vous atteignez 20% d'épargne, continuez ainsi.",
+                expected_savings="0€ (maintien)",
+                difficulty="Facile",
+                quick_win=False,
+            ),
         ],
+        progress_review=ProgressReview(
+            previous_advice_followed="Premier mois d'analyse - référence établie.",
+            wins=["Score Money Map de 2/3 atteint"],
+            areas_for_growth=["Réduire les dépenses CHOICE"],
+        ),
+        monthly_goal=MonthlyGoal(
+            objective="Réduire les dépenses CHOICE de 10%",
+            target_amount=90.0,
+            strategy="Cuisiner 2 repas de plus par semaine au lieu de commander.",
+        ),
         encouragement="Continuez sur cette lancée!",
     )
 

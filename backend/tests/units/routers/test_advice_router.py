@@ -11,7 +11,7 @@ from app.db.models.advice import Advice
 from app.db.models.month import Month
 from app.main import app
 from app.services.advice.eligibility import EligibilityResult
-from app.services.advice.models import AdviceResponse, ProblemArea
+from app.services.advice.models import AdviceResponse, ProblemArea, Recommendation
 from app.services.exceptions import AdviceQueryError, InsufficientDataError
 
 client = TestClient(app)
@@ -65,7 +65,32 @@ def _create_advice_response() -> AdviceResponse:
             ProblemArea(category="Transport", amount=100.0, trend="-5%"),
             ProblemArea(category="Shopping", amount=150.0, trend="N/A"),
         ],
-        recommendations=["Reduce food spending", "Use public transport", "Track shopping"],
+        recommendations=[
+            Recommendation(
+                priority=1,
+                action="Reduce food spending",
+                details="Limit eating out to twice per week.",
+                expected_savings="50€/mois",
+                difficulty="Modéré",
+                quick_win=False,
+            ),
+            Recommendation(
+                priority=2,
+                action="Use public transport",
+                details="Take metro instead of Uber.",
+                expected_savings="30€/mois",
+                difficulty="Facile",
+                quick_win=True,
+            ),
+            Recommendation(
+                priority=3,
+                action="Track shopping",
+                details="Use a shopping list to avoid impulse buys.",
+                expected_savings="40€/mois",
+                difficulty="Facile",
+                quick_win=True,
+            ),
+        ],
         encouragement="Great progress!",
     )
 

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models.advice import Advice
 from app.db.models.month import Month
-from app.services.advice.models import AdviceResponse, ProblemArea
+from app.services.advice.models import AdviceResponse, ProblemArea, Recommendation
 
 
 def _create_month(db: Session, year: int, month: int, score: int = 2) -> Month:
@@ -39,7 +39,14 @@ def _create_mock_advice_response() -> AdviceResponse:
             ProblemArea(category="Subscriptions", amount=85.0, trend="+20%"),
         ],
         recommendations=[
-            "Réduire les abonnements non utilisés.",
+            Recommendation(
+                priority=1,
+                action="Réduire les abonnements non utilisés.",
+                details="Netflix, Spotify, Disney+ totalisant 35€/mois.",
+                expected_savings="120€/an",
+                difficulty="Facile",
+                quick_win=True,
+            ),
         ],
         encouragement="Continuez sur cette lancée!",
     )

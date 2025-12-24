@@ -197,6 +197,8 @@ def extract_recommendations_from_advice(advice_text: str) -> list[str]:
     """
     Extract recommendations list from stored advice JSON.
 
+    Handles both new dictionary format and legacy string format.
+
     Parameters
     ----------
     advice_text : str
@@ -205,15 +207,26 @@ def extract_recommendations_from_advice(advice_text: str) -> list[str]:
     Returns
     -------
     list[str]
-        List of recommendation strings, or empty list if parsing fails.
+        List of recommendation action strings, or empty list if parsing fails.
     """
     try:
         data = json.loads(advice_text)
         recommendations = data.get("recommendations", [])
-        if isinstance(recommendations, list):
-            return [str(r) for r in recommendations]
-        logger.warning("Advice JSON has non-list recommendations field: type={}", type(recommendations).__name__)
-        return []
+        if not isinstance(recommendations, list):
+            logger.warning("Advice JSON has non-list recommendations field: type={}", type(recommendations).__name__)
+            return []
+
+        result = []
+        for rec in recommendations:
+            if isinstance(rec, dict):
+                # ##>: New format: extract action text from structured recommendation.
+                action = rec.get("action", "")
+                if action:
+                    result.append(action)
+            else:
+                # ##>: Legacy format: recommendation is already a string.
+                result.append(str(rec))
+        return result
     except json.JSONDecodeError as error:
         logger.warning("Failed to parse advice JSON for recommendations extraction: {}", error)
         return []

@@ -11,7 +11,7 @@ from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.repositories.advice import AdviceRepository
 from app.services.advice import service as advice_service
-from app.services.advice.models import AdviceResponse, ProblemArea
+from app.services.advice.models import AdviceResponse, ProblemArea, Recommendation
 from tests.conftest import DatabaseTestCase
 
 
@@ -46,9 +46,30 @@ def _create_advice_response() -> AdviceResponse:
             ProblemArea(category="Entertainment", amount=120.0, trend="N/A"),
         ],
         recommendations=[
-            "Réduire les abonnements non utilisés.",
-            "Limiter les repas au restaurant.",
-            "Maintenir votre taux d'épargne actuel.",
+            Recommendation(
+                priority=1,
+                action="Réduire les abonnements non utilisés.",
+                details="Netflix, Spotify, Disney+ totalisant 35€/mois.",
+                expected_savings="120€/an",
+                difficulty="Facile",
+                quick_win=True,
+            ),
+            Recommendation(
+                priority=2,
+                action="Limiter les repas au restaurant.",
+                details="6 commandes Uber Eats ce mois.",
+                expected_savings="45€/mois",
+                difficulty="Modéré",
+                quick_win=False,
+            ),
+            Recommendation(
+                priority=3,
+                action="Maintenir votre taux d'épargne actuel.",
+                details="Continuez à épargner 20%.",
+                expected_savings="0€",
+                difficulty="Facile",
+                quick_win=False,
+            ),
         ],
         encouragement="Continuez sur cette lancée!",
     )
@@ -308,6 +329,65 @@ class TestExtractRecommendationsFromAdvice(unittest.TestCase):
         result = advice_service.extract_recommendations_from_advice(advice_text)
 
         self.assertEqual(result, ["1", "2.5", "True", "text"])
+
+    def test_extracts_action_from_new_dict_format(self) -> None:
+        """Should extract action text from new dictionary format recommendations."""
+        advice_text = json.dumps(
+            {
+                "recommendations": [
+                    {
+                        "priority": 1,
+                        "action": "Réduire Uber Eats",
+                        "details": "6 commandes totalisant 89€",
+                        "expected_savings": "45€/mois",
+                        "difficulty": "Modéré",
+                        "quick_win": False,
+                    },
+                    {
+                        "priority": 2,
+                        "action": "Annuler Disney+",
+                        "details": "Abonnement non utilisé",
+                        "expected_savings": "9€/mois",
+                        "difficulty": "Facile",
+                        "quick_win": True,
+                    },
+                ]
+            }
+        )
+
+        result = advice_service.extract_recommendations_from_advice(advice_text)
+
+        self.assertEqual(result, ["Réduire Uber Eats", "Annuler Disney+"])
+
+    def test_handles_mixed_format_recommendations(self) -> None:
+        """Should handle mixed format with both strings and dicts (edge case)."""
+        advice_text = json.dumps(
+            {
+                "recommendations": [
+                    "Legacy string recommendation",
+                    {"priority": 1, "action": "New format recommendation", "details": "Test"},
+                ]
+            }
+        )
+
+        result = advice_service.extract_recommendations_from_advice(advice_text)
+
+        self.assertEqual(result, ["Legacy string recommendation", "New format recommendation"])
+
+    def test_skips_dict_without_action(self) -> None:
+        """Should skip dict recommendations that don't have an action field."""
+        advice_text = json.dumps(
+            {
+                "recommendations": [
+                    {"priority": 1, "details": "Missing action field"},
+                    {"priority": 2, "action": "Has action", "details": "Test"},
+                ]
+            }
+        )
+
+        result = advice_service.extract_recommendations_from_advice(advice_text)
+
+        self.assertEqual(result, ["Has action"])
 
 
 class TestMonthToMonthDataWithNewFields(DatabaseTestCase):

@@ -7,7 +7,15 @@ import anthropic
 from anthropic import Anthropic
 from loguru import logger
 
-from app.services.advice.models import AdviceResponse, MonthData, ProblemArea
+from app.services.advice.models import (
+    AdviceResponse,
+    MonthData,
+    MonthlyGoal,
+    ProblemArea,
+    ProgressReview,
+    Recommendation,
+    SpendingPattern,
+)
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
 from app.services.exceptions import (
     AdviceAPIError,
@@ -268,6 +276,8 @@ class AdviceGenerator:
         """
         Parse Claude's JSON response into AdviceResponse.
 
+        Handles both the new enriched format and legacy format for backward compatibility.
+
         Parameters
         ----------
         response_text : str
@@ -301,19 +311,85 @@ class AdviceGenerator:
             raise AdviceParseError(response_text)
 
         try:
+            # ##>: Parse spending patterns (new format).
+            spending_patterns = [
+                SpendingPattern(
+                    pattern_type=item["pattern_type"],
+                    description=item["description"],
+                    monthly_cost=item["monthly_cost"],
+                    occurrences=item["occurrences"],
+                    insight=item["insight"],
+                )
+                for item in data.get("spending_patterns", [])
+            ]
+
+            # ##>: Parse problem areas with optional new fields.
             problem_areas = [
                 ProblemArea(
                     category=item["category"],
                     amount=item["amount"],
                     trend=item["trend"],
+                    root_cause=item.get("root_cause"),
+                    impact=item.get("impact"),
                 )
                 for item in data["problem_areas"]
             ]
 
+            # ##>: Parse recommendations - handle both new dict format and legacy string format.
+            raw_recommendations = data.get("recommendations", [])
+            if raw_recommendations and isinstance(raw_recommendations[0], dict):
+                recommendations = [
+                    Recommendation(
+                        priority=item["priority"],
+                        action=item["action"],
+                        details=item["details"],
+                        expected_savings=item["expected_savings"],
+                        difficulty=item["difficulty"],
+                        quick_win=item.get("quick_win", False),
+                    )
+                    for item in raw_recommendations
+                ]
+            else:
+                # ##>: Legacy format: recommendations as list of strings.
+                recommendations = [
+                    Recommendation(
+                        priority=idx + 1,
+                        action=rec,
+                        details=rec,
+                        expected_savings="Non spécifié",
+                        difficulty="Modéré",
+                        quick_win=False,
+                    )
+                    for idx, rec in enumerate(raw_recommendations)
+                ]
+
+            # ##>: Parse progress review (new format).
+            progress_review = None
+            if "progress_review" in data:
+                pr = data["progress_review"]
+                progress_review = ProgressReview(
+                    previous_advice_followed=pr["previous_advice_followed"],
+                    wins=pr.get("wins", []),
+                    areas_for_growth=pr.get("areas_for_growth", []),
+                )
+
+            # ##>: Parse monthly goal (new format).
+            monthly_goal = None
+            if "monthly_goal" in data:
+                mg = data["monthly_goal"]
+                monthly_goal = MonthlyGoal(
+                    objective=mg["objective"],
+                    target_amount=mg["target_amount"],
+                    strategy=mg["strategy"],
+                )
+
             return AdviceResponse(
                 analysis=data["analysis"],
+                spending_patterns=spending_patterns,
                 problem_areas=problem_areas,
-                recommendations=data["recommendations"],
+                recommendations=recommendations,
+                progress_review=progress_review,
+                monthly_goal=monthly_goal,
                 encouragement=data["encouragement"],
             )
         except (KeyError, TypeError, ValueError) as e:

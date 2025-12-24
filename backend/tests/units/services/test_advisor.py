@@ -7,7 +7,7 @@ import anthropic
 from pydantic import ValidationError
 
 from app.services.advice.generator import AdviceGenerator, calculate_trend
-from app.services.advice.models import AdviceResponse, MonthData, ProblemArea
+from app.services.advice.models import AdviceResponse, MonthData, ProblemArea, Recommendation
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
 from app.services.exceptions import (
     AdviceAPIError,
@@ -65,10 +65,28 @@ class TestAdviceDTOs(unittest.TestCase):
     def test_advice_response_field_validation(self) -> None:
         """Should create AdviceResponse with all required fields."""
         problem_areas = [ProblemArea(category="Test", amount=100.0, trend="+10%")]
+        recommendations = [
+            Recommendation(
+                priority=1,
+                action="Rec 1",
+                details="Details 1",
+                expected_savings="50€",
+                difficulty="Facile",
+                quick_win=True,
+            ),
+            Recommendation(
+                priority=2,
+                action="Rec 2",
+                details="Details 2",
+                expected_savings="30€",
+                difficulty="Modéré",
+                quick_win=False,
+            ),
+        ]
         response = AdviceResponse(
             analysis="Test analysis",
             problem_areas=problem_areas,
-            recommendations=["Rec 1", "Rec 2"],
+            recommendations=recommendations,
             encouragement="Keep going!",
         )
 
