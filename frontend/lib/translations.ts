@@ -171,6 +171,13 @@ export const t = {
     placeholder: "Sélectionner le mois",
   },
 
+  // Month Navigator
+  monthNavigator: {
+    label: "Mois sélectionné",
+    previous: "Mois précédent",
+    next: "Mois suivant",
+  },
+
   // Export
   export: {
     exporting: "Export...",

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, Upload, RefreshCw, Lightbulb } from "lucide-react";
-import { MonthSelector } from "@/components/dashboard/month-selector";
+import { MonthNavigator } from "@/components/dashboard/month-navigator";
 import { AdvicePanelContent } from "@/components/history/advice-panel-content";
 import { getMonthsList } from "@/lib/api-client";
 import { getErrorMessage } from "@/lib/utils";
@@ -212,7 +212,7 @@ export function AdvicePageClient() {
                   {t.advicePage.subtitle}
                 </p>
               </div>
-              <MonthSelector
+              <MonthNavigator
                 months={state.monthsList}
                 selectedYear={state.selectedYear}
                 selectedMonth={state.selectedMonth}

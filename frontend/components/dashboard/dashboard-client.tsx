@@ -10,7 +10,7 @@ import { AlertCircle, Upload, RefreshCw } from "lucide-react";
 import { ScoreCard } from "./score-card";
 import { MetricCard } from "./metric-card";
 import { SpendingPieChart } from "./spending-pie-chart";
-import { MonthSelector } from "./month-selector";
+import { MonthNavigator } from "./month-navigator";
 import { GroupedTransactionList } from "./grouped-transaction-list";
 import { TransactionEditModal } from "./transaction-edit-modal";
 import { ExportButtons } from "./export-buttons";
@@ -365,7 +365,7 @@ export function DashboardClient() {
                   month={state.selectedMonth.month}
                   disabled={isLoading}
                 />
-                <MonthSelector
+                <MonthNavigator
                   months={state.monthsList}
                   selectedYear={state.selectedMonth.year}
                   selectedMonth={state.selectedMonth.month}

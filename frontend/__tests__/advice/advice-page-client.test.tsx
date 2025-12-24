@@ -97,7 +97,7 @@ describe("AdvicePageClient - Page State Management", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows loaded state with MonthSelector and AdvicePanel", async () => {
+  it("shows loaded state with MonthNavigator and AdvicePanel", async () => {
     const months = [createMonthSummary(2025, 12), createMonthSummary(2025, 11)];
     mockGetMonthsList.mockResolvedValue({ months, total: 2 });
 
@@ -115,10 +115,10 @@ describe("AdvicePageClient - Page State Management", () => {
       expect(screen.getByText("Conseils personnalisés")).toBeInTheDocument();
     });
 
-    // [>]: Should show month selector with loaded months.
-    expect(
-      screen.getByRole("combobox", { name: /Sélectionner le mois/i }),
-    ).toBeInTheDocument();
+    // [>]: Should show month navigator with chevron buttons.
+    expect(screen.getByLabelText("Mois précédent")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mois suivant")).toBeInTheDocument();
+    expect(screen.getByText("décembre 2025")).toBeInTheDocument();
 
     // [>]: Should show advice panel content area.
     expect(
@@ -193,7 +193,7 @@ describe("AdvicePageClient - User Interactions", () => {
     });
   });
 
-  it("updates AdvicePanel when month selection changes", async () => {
+  it("updates AdvicePanel when navigating to previous month", async () => {
     const user = userEvent.setup();
     const months = [createMonthSummary(2025, 12), createMonthSummary(2025, 11)];
     mockGetMonthsList.mockResolvedValue({ months, total: 2 });
@@ -214,21 +214,16 @@ describe("AdvicePageClient - User Interactions", () => {
     // [>]: First call should be for most recent month.
     expect(mockGetAdvice).toHaveBeenCalledWith(2025, 12);
 
-    // [>]: Open the month selector dropdown.
-    const selector = screen.getByRole("combobox", {
-      name: /Sélectionner le mois/i,
-    });
-    await user.click(selector);
-
-    // [>]: Select November 2025.
-    const novemberOption = screen.getByRole("option", {
-      name: /novembre 2025/i,
-    });
-    await user.click(novemberOption);
+    // [>]: Click previous month button (chevron left).
+    const prevButton = screen.getByLabelText("Mois précédent");
+    await user.click(prevButton);
 
     // [>]: Should fetch advice for November.
     await waitFor(() => {
       expect(mockGetAdvice).toHaveBeenCalledWith(2025, 11);
     });
+
+    // [>]: Display should show November.
+    expect(screen.getByText("novembre 2025")).toBeInTheDocument();
   });
 });
