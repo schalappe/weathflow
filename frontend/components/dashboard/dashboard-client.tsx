@@ -150,7 +150,7 @@ function dashboardReducer(
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6 animate-pulse">
+    <div className="space-y-6">
       {/* Header skeleton */}
       <div className="flex items-center justify-between">
         <Skeleton className="h-7 w-32" />
