@@ -26,7 +26,7 @@ import {
   getErrorMessage,
 } from "@/lib/utils";
 import { t } from "@/lib/translations";
-import type { AdviceData, ProblemArea } from "@/types";
+import type { AdviceData, EligibilityInfo, ProblemArea } from "@/types";
 
 type AdvicePanelState = "loading" | "loaded" | "empty" | "error";
 
@@ -36,15 +36,20 @@ interface AdviceState {
   generatedAt: string | null;
   isRegenerating: boolean;
   error: string | null;
+  eligibility: EligibilityInfo | null;
 }
 
 type AdviceAction =
   | { type: "FETCH_START" }
   | {
       type: "FETCH_SUCCESS";
-      payload: { advice: AdviceData; generatedAt: string };
+      payload: {
+        advice: AdviceData;
+        generatedAt: string;
+        eligibility: EligibilityInfo;
+      };
     }
-  | { type: "FETCH_EMPTY" }
+  | { type: "FETCH_EMPTY"; payload: { eligibility: EligibilityInfo } }
   | { type: "FETCH_ERROR"; payload: string }
   | { type: "REGENERATE_START" }
   | {
@@ -59,6 +64,7 @@ const initialState: AdviceState = {
   generatedAt: null,
   isRegenerating: false,
   error: null,
+  eligibility: null,
 };
 
 function adviceReducer(state: AdviceState, action: AdviceAction): AdviceState {
@@ -72,11 +78,17 @@ function adviceReducer(state: AdviceState, action: AdviceAction): AdviceState {
         panelState: "loaded",
         advice: action.payload.advice,
         generatedAt: action.payload.generatedAt,
+        eligibility: action.payload.eligibility,
         error: null,
       };
 
     case "FETCH_EMPTY":
-      return { ...state, panelState: "empty", error: null };
+      return {
+        ...state,
+        panelState: "empty",
+        eligibility: action.payload.eligibility,
+        error: null,
+      };
 
     case "FETCH_ERROR":
       return { ...state, panelState: "error", error: action.payload };
@@ -109,25 +121,6 @@ function isTrendNegative(trend: string): boolean {
   return trend.startsWith("-");
 }
 
-// [>]: Check if advice generation is allowed for a given month.
-// Only current month (n) and previous month (n-1) are allowed.
-// [>]: Exported for unit testing.
-export function isGenerationAllowed(year: number, month: number): boolean {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-
-  // [>]: Calculate previous month (handles January -> December of previous year).
-  const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-  const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-
-  // [>]: Allow current month or previous month only.
-  const isCurrentMonth = year === currentYear && month === currentMonth;
-  const isPreviousMonth = year === prevYear && month === prevMonth;
-
-  return isCurrentMonth || isPreviousMonth;
-}
-
 interface AdvicePanelContentProps {
   year: number;
   month: number;
@@ -140,7 +133,8 @@ export function AdvicePanelContent({
   className,
 }: AdvicePanelContentProps) {
   const [state, dispatch] = useReducer(adviceReducer, initialState);
-  const canGenerate = isGenerationAllowed(year, month);
+  // [>]: Eligibility now comes from backend response, not local calculation.
+  const canGenerate = state.eligibility?.can_generate ?? false;
 
   useEffect(() => {
     dispatch({ type: "FETCH_START" });
@@ -160,10 +154,14 @@ export function AdvicePanelContent({
             payload: {
               advice: response.advice,
               generatedAt: response.generated_at,
+              eligibility: response.eligibility,
             },
           });
         } else {
-          dispatch({ type: "FETCH_EMPTY" });
+          dispatch({
+            type: "FETCH_EMPTY",
+            payload: { eligibility: response.eligibility },
+          });
         }
       } catch (error) {
         console.error("[AdvicePanelContent] Failed to load advice:", error);
@@ -223,6 +221,7 @@ export function AdvicePanelContent({
           isLoading={state.isRegenerating}
           canGenerate={canGenerate}
           error={state.error}
+          eligibilityReason={state.eligibility?.reason ?? null}
         />
       )}
 
@@ -275,6 +274,7 @@ interface EmptyStateProps {
   isLoading: boolean;
   canGenerate: boolean;
   error: string | null;
+  eligibilityReason: string | null;
 }
 
 function EmptyState({
@@ -282,6 +282,7 @@ function EmptyState({
   isLoading,
   canGenerate,
   error,
+  eligibilityReason,
 }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center gap-5 py-8 text-center">
@@ -305,7 +306,7 @@ function EmptyState({
         <p className="text-sm text-muted-foreground max-w-xs mx-auto">
           {canGenerate
             ? t.advice.empty.description
-            : t.advice.notAvailable.description}
+            : eligibilityReason || t.advice.notAvailable.description}
         </p>
       </div>
       {canGenerate && (

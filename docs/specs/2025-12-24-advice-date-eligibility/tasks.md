@@ -13,15 +13,15 @@ Total Subtasks: 22
 
 **Dependencies:** None
 
-- [ ] 1.0 Complete repository extensions
-  - [ ] 1.1 Write 4 focused tests for repository methods
+- [x] 1.0 Complete repository extensions
+  - [x] 1.1 Write 4 focused tests for repository methods
     - `test_get_most_recent_returns_latest_month`
     - `test_get_most_recent_returns_none_when_empty`
     - `test_has_any_returns_true_when_advice_exists`
     - `test_count_returns_correct_count`
-  - [ ] 1.2 Add `get_most_recent()` to `MonthRepository`
-  - [ ] 1.3 Add `has_any()` and `count()` to `AdviceRepository`
-  - [ ] 1.4 Ensure tests pass (run ONLY tests from 1.1)
+  - [x] 1.2 Add `get_most_recent()` to `MonthRepository`
+  - [x] 1.3 Add `has_any()` and `count()` to `AdviceRepository`
+  - [x] 1.4 Ensure tests pass (run ONLY tests from 1.1)
 
 **Acceptance Criteria:**
 
@@ -45,18 +45,18 @@ Total Subtasks: 22
 
 **Dependencies:** Task Group 1
 
-- [ ] 2.0 Complete eligibility service
-  - [ ] 2.1 Write 6 focused tests for eligibility logic
+- [x] 2.0 Complete eligibility service
+  - [x] 2.1 Write 6 focused tests for eligibility logic
     - `test_eligible_when_target_is_most_recent_month`
     - `test_eligible_when_target_is_previous_month`
     - `test_not_eligible_when_target_too_old`
     - `test_first_advice_returns_12_month_limit`
     - `test_regenerating_only_advice_returns_12_month_limit`
     - `test_normal_advice_returns_3_month_limit`
-  - [ ] 2.2 Create `EligibilityResult` frozen dataclass
-  - [ ] 2.3 Implement `check_eligibility()` function
-  - [ ] 2.4 Implement `_is_within_eligible_window()` helper
-  - [ ] 2.5 Ensure tests pass (run ONLY tests from 2.1)
+  - [x] 2.2 Create `EligibilityResult` frozen dataclass
+  - [x] 2.3 Implement `check_eligibility()` function
+  - [x] 2.4 Implement `_is_within_eligible_window()` helper
+  - [x] 2.5 Ensure tests pass (run ONLY tests from 2.1)
 
 **Acceptance Criteria:**
 
@@ -79,19 +79,19 @@ Total Subtasks: 22
 
 **Dependencies:** Task Group 2
 
-- [ ] 3.0 Complete API layer integration
-  - [ ] 3.1 Write 5 focused tests for API eligibility
+- [x] 3.0 Complete API layer integration
+  - [x] 3.1 Write 5 focused tests for API eligibility
     - `test_get_advice_returns_eligibility_info`
     - `test_generate_advice_uses_dynamic_history_limit`
     - `test_generate_advice_returns_403_when_not_eligible`
     - `test_generate_first_advice_uses_12_month_limit`
     - `test_eligibility_reason_included_in_403_response`
-  - [ ] 3.2 Add `EligibilityInfo` model to response schemas
-  - [ ] 3.3 Update `GetAdviceResponse` with eligibility field
-  - [ ] 3.4 Integrate eligibility check in `get_advice()` endpoint
-  - [ ] 3.5 Integrate eligibility check in `generate_advice()` endpoint
-  - [ ] 3.6 Use dynamic `history_limit` instead of hardcoded `3`
-  - [ ] 3.7 Ensure tests pass (run ONLY tests from 3.1)
+  - [x] 3.2 Add `EligibilityInfo` model to response schemas
+  - [x] 3.3 Update `GetAdviceResponse` with eligibility field
+  - [x] 3.4 Integrate eligibility check in `get_advice()` endpoint
+  - [x] 3.5 Integrate eligibility check in `generate_advice()` endpoint
+  - [x] 3.6 Use dynamic `history_limit` instead of hardcoded `3`
+  - [x] 3.7 Ensure tests pass (run ONLY tests from 3.1)
 
 **Acceptance Criteria:**
 
@@ -105,7 +105,7 @@ Total Subtasks: 22
 
 - `backend/app/responses/advice.py`
 - `backend/app/api/advice.py`
-- `backend/tests/integrations/api/test_advice_eligibility.py` (create)
+- `backend/tests/integration/test_advice_eligibility.py` (create)
 
 ---
 
@@ -115,14 +115,14 @@ Total Subtasks: 22
 
 **Dependencies:** Task Group 3
 
-- [ ] 4.0 Complete frontend eligibility update
-  - [ ] 4.1 Add `EligibilityInfo` type to TypeScript types
-  - [ ] 4.2 Update `GetAdviceResponse` type with eligibility field
-  - [ ] 4.3 Remove `isGenerationAllowed()` function from component
-  - [ ] 4.4 Update reducer state to store eligibility from response
-  - [ ] 4.5 Update `FETCH_SUCCESS` action to include eligibility
-  - [ ] 4.6 Use `eligibility.can_generate` for UI decisions
-  - [ ] 4.7 Delete obsolete test file `is-generation-allowed.test.tsx`
+- [x] 4.0 Complete frontend eligibility update
+  - [x] 4.1 Add `EligibilityInfo` type to TypeScript types
+  - [x] 4.2 Update `GetAdviceResponse` type with eligibility field
+  - [x] 4.3 Remove `isGenerationAllowed()` function from component
+  - [x] 4.4 Update reducer state to store eligibility from response
+  - [x] 4.5 Update `FETCH_SUCCESS` action to include eligibility
+  - [x] 4.6 Use `eligibility.can_generate` for UI decisions
+  - [x] 4.7 Delete obsolete test file `is-generation-allowed.test.tsx`
 
 **Acceptance Criteria:**
 
@@ -145,12 +145,12 @@ Total Subtasks: 22
 
 **Dependencies:** Task Groups 1-4
 
-- [ ] 5.0 Review tests and fill critical gaps
-  - [ ] 5.1 Review all tests from groups 1-4 (~15 tests)
-  - [ ] 5.2 Identify critical gaps for eligibility feature only
-  - [ ] 5.3 Write max 5 additional tests for gaps found
-  - [ ] 5.4 Run all eligibility-related tests to verify
-  - [ ] 5.5 Verify TypeScript compilation passes
+- [x] 5.0 Review tests and fill critical gaps
+  - [x] 5.1 Review all tests from groups 1-4 (~15 tests)
+  - [x] 5.2 Identify critical gaps for eligibility feature only
+  - [x] 5.3 Write max 5 additional tests for gaps found
+  - [x] 5.4 Run all eligibility-related tests to verify
+  - [x] 5.5 Verify TypeScript compilation passes
 
 **Acceptance Criteria:**
 
@@ -163,7 +163,7 @@ Total Subtasks: 22
 - `backend/tests/units/repositories/test_month_eligibility.py`
 - `backend/tests/units/repositories/test_advice_eligibility.py`
 - `backend/tests/units/services/advice/test_eligibility.py`
-- `backend/tests/integrations/api/test_advice_eligibility.py`
+- `backend/tests/integration/test_advice_eligibility.py`
 
 ---
 

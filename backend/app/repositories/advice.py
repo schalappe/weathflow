@@ -1,5 +1,6 @@
 """Repository for Advice data access operations."""
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.models.advice import Advice
@@ -41,6 +42,29 @@ class AdviceRepository:
             Advice record or None if not found.
         """
         return self._db.query(Advice).filter(Advice.month_id == month_id).first()
+
+    def has_any(self) -> bool:
+        """
+        Check if any advice records exist in the database.
+
+        Returns
+        -------
+        bool
+            True if at least one advice record exists.
+        """
+        return self._db.query(Advice.id).first() is not None
+
+    def count(self) -> int:
+        """
+        Count total advice records in the database.
+
+        Returns
+        -------
+        int
+            Total number of advice records.
+        """
+        result = self._db.query(func.count(Advice.id)).scalar()
+        return result or 0
 
     def get_by_month_ids(self, month_ids: list[int]) -> dict[int, Advice]:
         """
