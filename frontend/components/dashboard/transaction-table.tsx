@@ -46,27 +46,27 @@ interface TransactionTableProps {
   selectedMonth: { year: number; month: number };
 }
 
-// [>]: Neutra theme category styles.
+// [>]: Neutra theme category styles using CSS variables.
 const CATEGORY_STYLES: Record<string, { bg: string; text: string }> = {
   INCOME: {
-    bg: "bg-[#6a9bcc]/10 hover:bg-[#6a9bcc]/20",
-    text: "text-[#5a8ab8] dark:text-[#7aa8d4]",
+    bg: "bg-income/10 hover:bg-income/20",
+    text: "text-income-text",
   },
   CORE: {
-    bg: "bg-[#d97757]/10 hover:bg-[#d97757]/20",
-    text: "text-[#c46647] dark:text-[#e08363]",
+    bg: "bg-core/10 hover:bg-core/20",
+    text: "text-core-text",
   },
   CHOICE: {
-    bg: "bg-[#e8b931]/10 hover:bg-[#e8b931]/20",
-    text: "text-[#c9a02a] dark:text-[#f0c43d]",
+    bg: "bg-choice/10 hover:bg-choice/20",
+    text: "text-choice-text",
   },
   COMPOUND: {
-    bg: "bg-[#788c5d]/10 hover:bg-[#788c5d]/20",
-    text: "text-[#6a7d50] dark:text-[#8a9e6a]",
+    bg: "bg-compound/10 hover:bg-compound/20",
+    text: "text-compound-text",
   },
   EXCLUDED: {
-    bg: "bg-[#b0aea5]/10 hover:bg-[#b0aea5]/20",
-    text: "text-[#8a8880] dark:text-[#b0aea5]",
+    bg: "bg-excluded/10 hover:bg-excluded/20",
+    text: "text-excluded-text",
   },
 };
 
@@ -215,8 +215,8 @@ export function TransactionTable({
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-[#e8b931]/10">
-                                  <Pencil className="h-3 w-3 text-[#c9a02a] dark:text-[#f0c43d]" />
+                                <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-choice/10">
+                                  <Pencil className="h-3 w-3 text-choice-text" />
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent>
@@ -231,9 +231,7 @@ export function TransactionTable({
                       <span
                         className={cn(
                           "font-mono text-sm font-semibold tabular-nums",
-                          tx.amount >= 0
-                            ? "text-[#788c5d] dark:text-[#8a9e6a]"
-                            : "text-foreground",
+                          tx.amount >= 0 ? "text-compound-text" : "text-foreground",
                         )}
                       >
                         {tx.amount >= 0 ? "+" : ""}

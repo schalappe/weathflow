@@ -122,8 +122,8 @@ function TransactionRow({ transaction, onClick }: TransactionRowProps) {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#e8b931]/10">
-                <Pencil className="h-3 w-3 text-[#c9a02a] dark:text-[#f0c43d]" />
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-choice/10">
+                <Pencil className="h-3 w-3 text-choice-text" />
               </div>
             </TooltipTrigger>
             <TooltipContent>
@@ -135,7 +135,7 @@ function TransactionRow({ transaction, onClick }: TransactionRowProps) {
       <span
         className={cn(
           "font-mono text-sm font-medium tabular-nums shrink-0",
-          isPositive ? "text-[#788c5d] dark:text-[#8a9e6a]" : "text-foreground",
+          isPositive ? "text-compound-text" : "text-foreground",
         )}
       >
         {isPositive ? "+" : ""}

@@ -428,7 +428,7 @@ export function SankeyChart({ data, className }: SankeyChartProps) {
       <CardHeader className="pb-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#6a9bcc]/10 to-[#788c5d]/20">
-            <GitBranch className="h-5 w-5 text-[#6a9bcc] dark:text-[#7eacdb]" />
+            <GitBranch className="h-5 w-5 text-income-text" />
           </div>
           <div>
             <CardTitle className="text-base">{t.sankeyChart.title}</CardTitle>

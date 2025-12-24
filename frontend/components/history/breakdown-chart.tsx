@@ -230,7 +230,7 @@ export function SpendingBreakdownChart({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#d97757]/10 to-[#6a9bcc]/20">
-              <BarChart3 className="h-5 w-5 text-[#d97757] dark:text-[#e08363]" />
+              <BarChart3 className="h-5 w-5 text-core-text" />
             </div>
             <div>
               <CardTitle className="text-base">
