@@ -68,6 +68,9 @@ class AdviceGenerator:
 
     MIN_MONTHS_REQUIRED: ClassVar[int] = 2
     MAX_RETRIES: ClassVar[int] = 3
+    MIN_THINKING_BUDGET: ClassVar[int] = 1000
+    MAX_THINKING_BUDGET: ClassVar[int] = 100000
+    DEFAULT_THINKING_BUDGET: ClassVar[int] = 10000
 
     def __init__(
         self,
@@ -101,7 +104,20 @@ class AdviceGenerator:
         self._thinking_enabled = (
             thinking_enabled if thinking_enabled is not None else settings.anthropic_thinking_enabled
         )
-        self._thinking_budget = thinking_budget if thinking_budget is not None else settings.anthropic_thinking_budget
+
+        # ##>: Validate and clamp thinking budget to valid range.
+        raw_budget = thinking_budget if thinking_budget is not None else settings.anthropic_thinking_budget
+        if not (self.MIN_THINKING_BUDGET <= raw_budget <= self.MAX_THINKING_BUDGET):
+            logger.warning(
+                "Invalid thinking budget {}. Must be between {} and {}. Using default {}.",
+                raw_budget,
+                self.MIN_THINKING_BUDGET,
+                self.MAX_THINKING_BUDGET,
+                self.DEFAULT_THINKING_BUDGET,
+            )
+            self._thinking_budget = self.DEFAULT_THINKING_BUDGET
+        else:
+            self._thinking_budget = raw_budget
 
     def generate_advice(self, current_month: MonthData, history: list[MonthData]) -> AdviceResponse:
         """
@@ -265,7 +281,7 @@ class AdviceGenerator:
                 }
                 logger.debug("Using extended thinking mode with budget: {}", self._thinking_budget)
             else:
-                # ##>: Use effort parameter for Opus 4.5 optimal performance.
+                # ##>: Request high-quality output via effort API (beta feature, model-agnostic).
                 create_params["extra_headers"] = {"anthropic-beta": "effort-2025-11-24"}
                 create_params["extra_body"] = {"output_config": {"effort": "high"}}
 

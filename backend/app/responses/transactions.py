@@ -27,7 +27,7 @@ class UpdateTransactionRequest(BaseModel):
         if self.money_map_subcategory is None:
             return self
 
-        allowed = ALLOWED_SUBCATEGORIES.get(self.money_map_type, [])
+        allowed: tuple[str, ...] = ALLOWED_SUBCATEGORIES.get(self.money_map_type, ())
         if self.money_map_subcategory not in allowed:
             msg = f"Invalid subcategory '{self.money_map_subcategory}' for type {self.money_map_type.value}"
             raise ValueError(msg)

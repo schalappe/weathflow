@@ -37,7 +37,7 @@ def validate_subcategory(money_map_type: MoneyMapType, subcategory: str | None) 
     if money_map_type == MoneyMapType.EXCLUDED:
         return None
 
-    allowed = ALLOWED_SUBCATEGORIES.get(money_map_type, [])
+    allowed: tuple[str, ...] = ALLOWED_SUBCATEGORIES.get(money_map_type, ())
 
     # ##>: Allow None subcategory for any type (optional field).
     if subcategory is None:

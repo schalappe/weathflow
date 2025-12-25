@@ -449,6 +449,96 @@ class TestAdviceGeneratorIntegration(unittest.TestCase):
         self.mock_client.messages.create.assert_not_called()
 
 
+class TestExtendedThinkingMode(unittest.TestCase):
+    """Tests for extended thinking mode (Task Group 10)."""
+
+    def setUp(self) -> None:
+        """Create generator with mocked client."""
+        self.generator = AdviceGenerator(api_key="test-key", thinking_enabled=True, thinking_budget=5000)
+        self.mock_client = MagicMock()
+        self.generator._client = self.mock_client
+
+    def test_thinking_enabled_passes_thinking_params(self) -> None:
+        """Should pass thinking config when thinking_enabled=True."""
+        mock_response = MagicMock()
+        mock_response.content = [
+            MagicMock(text='{"analysis": "Test", "problem_areas": [], "recommendations": [], "encouragement": "Good"}')
+        ]
+        self.mock_client.messages.create.return_value = mock_response
+
+        self.generator._call_claude_api("test prompt")
+
+        call_kwargs = self.mock_client.messages.create.call_args[1]
+        self.assertIn("thinking", call_kwargs)
+        self.assertEqual(call_kwargs["thinking"]["type"], "enabled")
+        self.assertEqual(call_kwargs["thinking"]["budget_tokens"], 5000)
+
+    def test_thinking_disabled_uses_effort_headers(self) -> None:
+        """Should use effort headers when thinking_enabled=False."""
+        generator = AdviceGenerator(api_key="test-key", thinking_enabled=False)
+        generator._client = self.mock_client
+
+        mock_response = MagicMock()
+        mock_response.content = [
+            MagicMock(text='{"analysis": "Test", "problem_areas": [], "recommendations": [], "encouragement": "Good"}')
+        ]
+        self.mock_client.messages.create.return_value = mock_response
+
+        generator._call_claude_api("test prompt")
+
+        call_kwargs = self.mock_client.messages.create.call_args[1]
+        self.assertIn("extra_headers", call_kwargs)
+        self.assertIn("anthropic-beta", call_kwargs["extra_headers"])
+        self.assertIn("extra_body", call_kwargs)
+        self.assertEqual(call_kwargs["extra_body"]["output_config"]["effort"], "high")
+
+    def test_response_with_thinking_block_extracts_text(self) -> None:
+        """Should extract text from response containing thinking block."""
+        mock_response = MagicMock()
+        mock_thinking = MagicMock()
+        mock_thinking.type = "thinking"
+        mock_thinking.thinking = "Long reasoning process..."
+        mock_text = MagicMock()
+        mock_text.type = "text"
+        mock_text.text = '{"analysis": "Result", "problem_areas": [], "recommendations": [], "encouragement": "Good"}'
+        mock_response.content = [mock_thinking, mock_text]
+        self.mock_client.messages.create.return_value = mock_response
+
+        result = self.generator._call_claude_api("test prompt")
+
+        self.assertIn("Result", result)
+
+    def test_response_with_only_thinking_block_raises_parse_error(self) -> None:
+        """Should raise AdviceParseError when response has only thinking blocks."""
+        mock_response = MagicMock()
+        mock_thinking = MagicMock()
+        mock_thinking.type = "thinking"
+        mock_thinking.thinking = "Long reasoning..."
+        mock_response.content = [mock_thinking]
+        self.mock_client.messages.create.return_value = mock_response
+
+        with self.assertRaises(AdviceParseError) as context:
+            self.generator._call_claude_api("test prompt")
+
+        self.assertIn("no text content", str(context.exception))
+
+    def test_thinking_budget_passed_to_api(self) -> None:
+        """Should pass custom thinking budget to API."""
+        generator = AdviceGenerator(api_key="test-key", thinking_enabled=True, thinking_budget=15000)
+        generator._client = self.mock_client
+
+        mock_response = MagicMock()
+        mock_response.content = [
+            MagicMock(text='{"analysis": "Test", "problem_areas": [], "recommendations": [], "encouragement": "Good"}')
+        ]
+        self.mock_client.messages.create.return_value = mock_response
+
+        generator._call_claude_api("test prompt")
+
+        call_kwargs = self.mock_client.messages.create.call_args[1]
+        self.assertEqual(call_kwargs["thinking"]["budget_tokens"], 15000)
+
+
 class TestExceptionHierarchy(unittest.TestCase):
     """Tests for exception hierarchy."""
 

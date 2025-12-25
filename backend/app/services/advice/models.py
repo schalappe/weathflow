@@ -94,17 +94,17 @@ class SpendingPattern(FrozenModel):
     description : str
         Detailed description of the pattern with merchants/services.
     monthly_cost : float
-        Total monthly cost of this pattern.
+        Total monthly cost of this pattern (must be non-negative).
     occurrences : int
-        Number of times this pattern occurs per month.
+        Number of times this pattern occurs per month (must be at least 1).
     insight : str
         Analysis of what this pattern reveals about financial habits.
     """
 
     pattern_type: str
     description: str
-    monthly_cost: float
-    occurrences: int
+    monthly_cost: float = Field(ge=0)
+    occurrences: int = Field(ge=1)
     insight: str
 
 
@@ -120,7 +120,7 @@ class ProblemArea(FrozenModel):
     category : str
         Name of the spending category.
     amount : float
-        Amount spent in this category.
+        Amount spent in this category (must be non-negative).
     trend : str
         Trend indicator (e.g., '+20%', '-5%', 'N/A').
     root_cause : str | None
@@ -130,7 +130,7 @@ class ProblemArea(FrozenModel):
     """
 
     category: str
-    amount: float
+    amount: float = Field(ge=0)
     trend: str
     root_cause: str | None = None
     impact: str | None = None
@@ -192,13 +192,13 @@ class MonthlyGoal(FrozenModel):
     objective : str
         Precise and measurable objective.
     target_amount : float
-        Target amount to save or reduce.
+        Target amount to save or reduce (must be positive).
     strategy : str
         Concrete strategy to achieve the objective.
     """
 
     objective: str
-    target_amount: float
+    target_amount: float = Field(gt=0)
     strategy: str
 
 
