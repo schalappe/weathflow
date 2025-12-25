@@ -300,7 +300,7 @@ function EmptyState({
   eligibilityReason,
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center gap-5 py-8 text-center">
+    <div className="flex flex-col items-center gap-6 py-10 text-center">
       {/* [>]: Show error banner when generation fails from empty state. */}
       {error && (
         <Alert
@@ -311,14 +311,14 @@ function EmptyState({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/10 to-purple-500/20">
-        <Sparkles className="h-7 w-7 text-violet-600 dark:text-violet-400" />
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/10 to-purple-500/20">
+        <Sparkles className="h-8 w-8 text-violet-600 dark:text-violet-400" />
       </div>
-      <div className="space-y-1.5">
-        <h3 className="font-semibold">
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold">
           {canGenerate ? t.advice.empty.title : t.advice.notAvailable.title}
         </h3>
-        <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+        <p className="text-muted-foreground max-w-sm mx-auto">
           {canGenerate
             ? t.advice.empty.description
             : eligibilityReason || t.advice.notAvailable.description}
@@ -405,18 +405,18 @@ function ProblemAreaItem({ area, index }: ProblemAreaItemProps) {
   const isDown = isTrendNegative(area.trend);
 
   return (
-    <li className="rounded-xl bg-muted/50 px-4 py-3 transition-colors hover:bg-muted space-y-2">
+    <li className="rounded-xl bg-muted/50 px-5 py-4 transition-colors hover:bg-muted space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">
+        <span className="font-medium">
           {index + 1}. {area.category}
         </span>
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold tabular-nums">
+          <span className="font-semibold tabular-nums">
             {formatCurrency(area.amount)}
           </span>
           <span
             className={cn(
-              "flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium",
+              "flex items-center gap-1 rounded-md px-2.5 py-1 text-sm font-medium",
               isUp && "bg-red-500/10 text-red-700 dark:text-red-400",
               isDown &&
                 "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
@@ -425,17 +425,17 @@ function ProblemAreaItem({ area, index }: ProblemAreaItemProps) {
                 "bg-gray-500/10 text-gray-600 dark:text-gray-400",
             )}
           >
-            {isUp && <TrendingUp className="h-3 w-3" />}
-            {isDown && <TrendingDown className="h-3 w-3" />}
+            {isUp && <TrendingUp className="h-3.5 w-3.5" />}
+            {isDown && <TrendingDown className="h-3.5 w-3.5" />}
             {area.trend}
           </span>
         </div>
       </div>
       {(area.root_cause || area.impact) && (
-        <div className="text-xs text-muted-foreground space-y-1 pl-4 border-l-2 border-muted-foreground/20">
-          {area.root_cause && <p>{area.root_cause}</p>}
+        <div className="text-sm text-muted-foreground space-y-2 pl-4 border-l-2 border-muted-foreground/30">
+          {area.root_cause && <p className="leading-relaxed">{area.root_cause}</p>}
           {area.impact && (
-            <p className="text-amber-600 dark:text-amber-400">{area.impact}</p>
+            <p className="text-amber-600 dark:text-amber-400 leading-relaxed">{area.impact}</p>
           )}
         </div>
       )}
@@ -450,23 +450,23 @@ interface SpendingPatternItemProps {
 
 function SpendingPatternItem({ pattern }: SpendingPatternItemProps) {
   return (
-    <li className="rounded-xl bg-muted/50 px-4 py-3 transition-colors hover:bg-muted space-y-2">
+    <li className="rounded-xl bg-muted/50 px-5 py-4 transition-colors hover:bg-muted space-y-3">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Repeat className="h-4 w-4 text-blue-500" />
-          <span className="text-sm font-medium">{pattern.pattern_type}</span>
+        <div className="flex items-center gap-2.5">
+          <Repeat className="h-4.5 w-4.5 text-blue-500" />
+          <span className="font-medium">{pattern.pattern_type}</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             {pattern.occurrences}x/mois
           </span>
-          <span className="text-sm font-semibold tabular-nums text-blue-600 dark:text-blue-400">
+          <span className="font-semibold tabular-nums text-blue-600 dark:text-blue-400">
             {formatCurrency(pattern.monthly_cost)}
           </span>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">{pattern.description}</p>
-      <p className="text-xs text-muted-foreground/80 italic">
+      <p className="text-sm text-muted-foreground leading-relaxed">{pattern.description}</p>
+      <p className="text-sm text-muted-foreground italic">
         {pattern.insight}
       </p>
     </li>
@@ -480,27 +480,26 @@ interface RecommendationItemProps {
 
 function RecommendationItem({ recommendation }: RecommendationItemProps) {
   return (
-    <li className="rounded-lg bg-muted/30 p-4 space-y-3">
+    <li className="rounded-xl bg-muted/30 p-5 space-y-3">
       <div className="flex items-start gap-3">
-        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
           {recommendation.priority}
         </span>
-        <div className="flex-1 space-y-2">
+        <div className="flex-1 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm">{recommendation.action}</span>
+            <span className="font-medium">{recommendation.action}</span>
             {recommendation.quick_win && (
               <Badge
                 variant="secondary"
                 className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 gap-1"
               >
-                <Zap className="h-3 w-3" />
+                <Zap className="h-3.5 w-3.5" />
                 {t.advice.quickWin}
               </Badge>
             )}
             <Badge
               variant="outline"
               className={cn(
-                "text-xs",
                 recommendation.difficulty === "Facile" &&
                   "border-green-500/50 text-green-600 dark:text-green-400",
                 recommendation.difficulty === "Modéré" &&
@@ -512,11 +511,11 @@ function RecommendationItem({ recommendation }: RecommendationItemProps) {
               {recommendation.difficulty}
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">
+          <p className="text-[15px] text-muted-foreground leading-relaxed">
             {recommendation.details}
           </p>
-          <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
-            <Wallet className="h-3 w-3" />
+          <div className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">
+            <Wallet className="h-4 w-4" />
             <span>
               {t.advice.expectedSavings}: {recommendation.expected_savings}
             </span>
@@ -534,24 +533,24 @@ interface ProgressReviewSectionProps {
 
 function ProgressReviewSection({ progressReview }: ProgressReviewSectionProps) {
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
+    <div className="space-y-4">
+      <p className="text-[15px] text-muted-foreground leading-relaxed">
         {progressReview.previous_advice_followed}
       </p>
 
       {progressReview.wins.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            <Trophy className="h-3.5 w-3.5" />
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+            <Trophy className="h-4 w-4" />
             {t.advice.wins}
           </div>
-          <ul className="space-y-1">
+          <ul className="space-y-2">
             {progressReview.wins.map((win, index) => (
               <li
                 key={index}
-                className="text-sm text-muted-foreground flex items-start gap-2"
+                className="text-[15px] text-muted-foreground flex items-start gap-2.5"
               >
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                <CheckCircle2 className="h-4.5 w-4.5 text-emerald-500 flex-shrink-0 mt-0.5" />
                 {win}
               </li>
             ))}
@@ -560,18 +559,18 @@ function ProgressReviewSection({ progressReview }: ProgressReviewSectionProps) {
       )}
 
       {progressReview.areas_for_growth.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-            <Target className="h-3.5 w-3.5" />
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400">
+            <Target className="h-4 w-4" />
             {t.advice.areasForGrowth}
           </div>
-          <ul className="space-y-1">
+          <ul className="space-y-2">
             {progressReview.areas_for_growth.map((area, index) => (
               <li
                 key={index}
-                className="text-sm text-muted-foreground flex items-start gap-2"
+                className="text-[15px] text-muted-foreground flex items-start gap-2.5"
               >
-                <Clock className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                <Clock className="h-4.5 w-4.5 text-amber-500 flex-shrink-0 mt-0.5" />
                 {area}
               </li>
             ))}
@@ -589,17 +588,17 @@ interface MonthlyGoalSectionProps {
 
 function MonthlyGoalSection({ monthlyGoal }: MonthlyGoalSectionProps) {
   return (
-    <div className="rounded-xl bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="font-medium">{monthlyGoal.objective}</span>
+    <div className="rounded-xl bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-5 space-y-3">
+      <div className="flex items-center justify-between gap-4">
+        <span className="font-medium leading-snug">{monthlyGoal.objective}</span>
         <Badge
           variant="secondary"
-          className="bg-violet-500/20 text-violet-700 dark:text-violet-300"
+          className="bg-violet-500/20 text-violet-700 dark:text-violet-300 flex-shrink-0"
         >
           {t.advice.targetAmount}: {formatCurrency(monthlyGoal.target_amount)}
         </Badge>
       </div>
-      <p className="text-sm text-muted-foreground">{monthlyGoal.strategy}</p>
+      <p className="text-[15px] text-muted-foreground leading-relaxed">{monthlyGoal.strategy}</p>
     </div>
   );
 }
@@ -635,12 +634,12 @@ function AdviceContent({
       )}
 
       {/* Analysis Section */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="h-4.5 w-4.5 text-violet-600 dark:text-violet-400" />
-          <h4 className="font-semibold">{t.advice.sections.analysis}</h4>
+      <section className="space-y-4">
+        <div className="flex items-center gap-2.5">
+          <BarChart3 className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+          <h4 className="text-lg font-semibold">{t.advice.sections.analysis}</h4>
         </div>
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <p className="text-[15px] text-muted-foreground leading-relaxed">
           {advice.analysis}
         </p>
       </section>
@@ -649,14 +648,14 @@ function AdviceContent({
       {advice.spending_patterns && advice.spending_patterns.length > 0 && (
         <>
           <Separator />
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Repeat className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
-              <h4 className="font-semibold">
+          <section className="space-y-4">
+            <div className="flex items-center gap-2.5">
+              <Repeat className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <h4 className="text-lg font-semibold">
                 {t.advice.sections.spendingPatterns}
               </h4>
             </div>
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {advice.spending_patterns.map((pattern, index) => (
                 <SpendingPatternItem key={index} pattern={pattern} />
               ))}
@@ -669,12 +668,12 @@ function AdviceContent({
       {advice.problem_areas.length > 0 && (
         <>
           <Separator />
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />
-              <h4 className="font-semibold">{t.advice.sections.problems}</h4>
+          <section className="space-y-4">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <h4 className="text-lg font-semibold">{t.advice.sections.problems}</h4>
             </div>
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {advice.problem_areas.map((area, index) => (
                 <ProblemAreaItem key={index} area={area} index={index} />
               ))}
@@ -687,14 +686,14 @@ function AdviceContent({
       {advice.recommendations.length > 0 && (
         <>
           <Separator />
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
-              <h4 className="font-semibold">
+          <section className="space-y-4">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              <h4 className="text-lg font-semibold">
                 {t.advice.sections.recommendations}
               </h4>
             </div>
-            <ol className="space-y-3">
+            <ol className="space-y-4">
               {advice.recommendations.map((rec, index) => (
                 <RecommendationItem key={index} recommendation={rec} />
               ))}
@@ -707,10 +706,10 @@ function AdviceContent({
       {advice.progress_review && (
         <>
           <Separator />
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Trophy className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />
-              <h4 className="font-semibold">
+          <section className="space-y-4">
+            <div className="flex items-center gap-2.5">
+              <Trophy className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <h4 className="text-lg font-semibold">
                 {t.advice.sections.progressReview}
               </h4>
             </div>
@@ -723,10 +722,10 @@ function AdviceContent({
       {advice.monthly_goal && (
         <>
           <Separator />
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Target className="h-4.5 w-4.5 text-violet-600 dark:text-violet-400" />
-              <h4 className="font-semibold">{t.advice.sections.monthlyGoal}</h4>
+          <section className="space-y-4">
+            <div className="flex items-center gap-2.5">
+              <Target className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+              <h4 className="text-lg font-semibold">{t.advice.sections.monthlyGoal}</h4>
             </div>
             <MonthlyGoalSection monthlyGoal={advice.monthly_goal} />
           </section>
@@ -735,39 +734,38 @@ function AdviceContent({
 
       {/* Encouragement Section */}
       <Separator />
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4.5 w-4.5 text-violet-600 dark:text-violet-400" />
-          <h4 className="font-semibold">{t.advice.sections.encouragement}</h4>
+      <section className="space-y-4">
+        <div className="flex items-center gap-2.5">
+          <Sparkles className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+          <h4 className="text-lg font-semibold">{t.advice.sections.encouragement}</h4>
         </div>
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <p className="text-[15px] text-muted-foreground leading-relaxed">
           {advice.encouragement}
         </p>
       </section>
 
       {/* Footer with timestamp and regenerate button */}
-      <div className="flex items-center justify-between border-t pt-4">
+      <div className="flex items-center justify-between border-t pt-5 mt-2">
         {generatedAt && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {t.advice.generated} {formatAdviceTimestamp(generatedAt)}
           </p>
         )}
         {canRegenerate && (
           <Button
             variant="outline"
-            size="sm"
             onClick={onRegenerate}
             disabled={isRegenerating}
             className="gap-2"
           >
             {isRegenerating ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 {t.advice.regenerating}
               </>
             ) : (
               <>
-                <RefreshCw className="h-3.5 w-3.5" />
+                <RefreshCw className="h-4 w-4" />
                 {t.advice.regenerate}
               </>
             )}
