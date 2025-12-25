@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
 import {
   Card,
   CardContent,
@@ -16,7 +16,7 @@ import {
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { CATEGORY_COLORS, sortMonthsChronologically, cn } from "@/lib/utils";
 import { t } from "@/lib/translations";
-import { BarChart3, Home, ShoppingBag, PiggyBank } from "lucide-react";
+import { TrendingDown, Home, ShoppingBag, PiggyBank } from "lucide-react";
 import type { MonthHistory } from "@/types";
 
 interface SpendingBreakdownChartProps {
@@ -229,8 +229,8 @@ export function SpendingBreakdownChart({
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#d97757]/10 to-[#6a9bcc]/20">
-              <BarChart3 className="h-5 w-5 text-core-text" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#d97757]/10 to-[#e8b931]/20">
+              <TrendingDown className="h-5 w-5 text-core-text" />
             </div>
             <div>
               <CardTitle className="text-base">
@@ -269,10 +269,11 @@ export function SpendingBreakdownChart({
               config={chartConfig}
               className="aspect-auto h-[250px] w-full"
             >
-              <BarChart
+              <AreaChart
                 accessibilityLayer
                 data={chartData}
                 margin={{ left: 12, right: 12, top: 12, bottom: 12 }}
+                stackOffset="expand"
               >
                 {/* [>]: Horizontal grid lines only for cleaner look. */}
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -281,43 +282,55 @@ export function SpendingBreakdownChart({
                   tickLine={false}
                   axisLine={false}
                   tickMargin={8}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
                 />
                 <YAxis
-                  domain={[0, 100]}
-                  ticks={[0, 25, 50, 75, 100]}
-                  tickFormatter={(v) => `${v}%`}
+                  domain={[0, 1]}
+                  ticks={[0, 0.25, 0.5, 0.75, 1]}
+                  tickFormatter={(v) => `${Math.round(v * 100)}%`}
                   width={40}
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
                 />
                 <ChartTooltip
-                  cursor={false}
+                  cursor={{
+                    stroke: "hsl(var(--muted-foreground))",
+                    strokeDasharray: "3 3",
+                  }}
                   content={<CustomTooltipContent />}
                 />
-                <Bar
+                <Area
                   dataKey="core"
                   name="Core"
                   stackId="spending"
+                  type="monotone"
                   fill="var(--color-core)"
-                  radius={[0, 0, 0, 0]}
+                  fillOpacity={0.7}
+                  stroke="var(--color-core)"
+                  strokeWidth={2}
                 />
-                <Bar
+                <Area
                   dataKey="choice"
                   name="Choice"
                   stackId="spending"
+                  type="monotone"
                   fill="var(--color-choice)"
-                  radius={[0, 0, 0, 0]}
+                  fillOpacity={0.7}
+                  stroke="var(--color-choice)"
+                  strokeWidth={2}
                 />
-                <Bar
+                <Area
                   dataKey="compound"
                   name="Compound"
                   stackId="spending"
+                  type="monotone"
                   fill="var(--color-compound)"
-                  radius={[4, 4, 0, 0]}
+                  fillOpacity={0.7}
+                  stroke="var(--color-compound)"
+                  strokeWidth={2}
                 />
-              </BarChart>
+              </AreaChart>
             </ChartContainer>
           )}
         </ErrorBoundary>

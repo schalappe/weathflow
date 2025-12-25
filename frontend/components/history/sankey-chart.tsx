@@ -32,6 +32,9 @@ interface SankeyNode {
   color: string;
   layer: number;
   value: number;
+  // [>]: Store original values since Recharts modifies `value` during layout.
+  originalAmount: number;
+  percentage: number | null;
 }
 
 interface SankeyLink {
@@ -56,6 +59,7 @@ function sortBreakdownByAmount(
 // Flow: Income → Categories (Core/Choice/Compound) → Subcategories.
 // Subcategories are sorted by amount (descending) within each category.
 // When deficit > 0, show Deficit node instead of Compound.
+// Pre-calculates percentages using total outflows so they sum to ~100%.
 function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
   if (data.income_total === 0) {
     return null;
@@ -65,13 +69,27 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
   const links: SankeyLink[] = [];
   const nodeMap = new Map<string, number>();
 
+  // [>]: Calculate total outflows (what's actually displayed in the Sankey).
+  // Using this instead of income_total ensures percentages sum to ~100%.
+  const compoundOrDeficit =
+    data.deficit > 0 ? data.deficit : data.compound_total;
+  const totalOutflows = data.core_total + data.choice_total + compoundOrDeficit;
+
+  // [>]: Helper to calculate percentage of total outflows.
+  const calcPercentage = (amount: number): number =>
+    totalOutflows > 0 ? Math.round((amount / totalOutflows) * 100) : 0;
+
   // [>]: Layer 0 - Income node (source).
+  // Use totalOutflows for layout value so the Sankey is visually balanced.
+  // Display the real income_total in originalAmount for the label.
   nodes.push({
     name: "income",
     displayName: t.categories.INCOME,
     color: CATEGORY_COLORS.INCOME,
     layer: 0,
-    value: data.income_total,
+    value: totalOutflows,
+    originalAmount: data.income_total,
+    percentage: null,
   });
   nodeMap.set("income", 0);
 
@@ -84,6 +102,8 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       color: CATEGORY_COLORS.CORE,
       layer: 1,
       value: data.core_total,
+      originalAmount: data.core_total,
+      percentage: calcPercentage(data.core_total),
     });
     nodeMap.set("core", idx);
     links.push({ source: 0, target: idx, value: data.core_total });
@@ -97,6 +117,8 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       color: CATEGORY_COLORS.CHOICE,
       layer: 1,
       value: data.choice_total,
+      originalAmount: data.choice_total,
+      percentage: calcPercentage(data.choice_total),
     });
     nodeMap.set("choice", idx);
     links.push({ source: 0, target: idx, value: data.choice_total });
@@ -111,6 +133,8 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       color: CATEGORY_COLORS.COMPOUND,
       layer: 1,
       value: data.compound_total,
+      originalAmount: data.compound_total,
+      percentage: calcPercentage(data.compound_total),
     });
     nodeMap.set("compound", idx);
     links.push({ source: 0, target: idx, value: data.compound_total });
@@ -125,6 +149,8 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       color: "#c45a3b",
       layer: 1,
       value: data.deficit,
+      originalAmount: data.deficit,
+      percentage: calcPercentage(data.deficit),
     });
     nodeMap.set("deficit", idx);
     links.push({ source: 0, target: idx, value: data.deficit });
@@ -145,6 +171,8 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       color: CATEGORY_COLORS.CORE,
       layer: 2,
       value: breakdown.amount,
+      originalAmount: breakdown.amount,
+      percentage: null,
     });
     nodeMap.set(subcatName, idx);
     const coreIdx = nodeMap.get("core");
@@ -167,6 +195,8 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
       color: CATEGORY_COLORS.CHOICE,
       layer: 2,
       value: breakdown.amount,
+      originalAmount: breakdown.amount,
+      percentage: null,
     });
     nodeMap.set(subcatName, idx);
     const choiceIdx = nodeMap.get("choice");
@@ -193,6 +223,8 @@ function transformToSankeyData(data: CashFlowData): SankeyDataOutput | null {
         color: CATEGORY_COLORS.COMPOUND,
         layer: 2,
         value: breakdown.amount,
+        originalAmount: breakdown.amount,
+        percentage: null,
       });
       nodeMap.set(subcatName, idx);
       const compoundIdx = nodeMap.get("compound");
@@ -222,15 +254,16 @@ function calculateChartHeight(data: CashFlowData): number {
     data.choice_breakdown.length +
     (data.deficit === 0 ? data.compound_breakdown.length : 0);
 
-  // [>]: Base height of 300px, add 28px per subcategory beyond 8.
-  const baseHeight = 300;
-  const extraHeight = Math.max(0, subcategoryCount - 8) * 28;
-  return Math.min(baseHeight + extraHeight, 600);
+  // [>]: Base height of 500px, add 40px per subcategory for two-line labels.
+  const baseHeight = 500;
+  const perSubcategoryHeight = 40;
+  const calculatedHeight = baseHeight + subcategoryCount * perSubcategoryHeight;
+  return Math.min(calculatedHeight, 900);
 }
 
 // [>]: Custom node renderer for Sankey diagram with category colors.
 // Labels positioned based on layer: inside for categories, outside for subcategories.
-// Each label shows category name with monetary amount for better understanding.
+// Category labels show name on first line, amount and percentage on second line.
 function CustomNode(props: {
   x: number;
   y: number;
@@ -248,11 +281,19 @@ function CustomNode(props: {
 
   const isSubcategory = payload.layer === 2;
   const isIncome = payload.layer === 0;
-  const formattedAmount = formatCurrency(payload.value);
+  // [>]: Use originalAmount which is preserved from our data transformation.
+  const formattedAmount = formatCurrency(payload.originalAmount);
 
   // [>]: Subcategory labels positioned outside on the right.
-  // Shows name and amount for better understanding.
+  // Two-line layout: name on top, amount below (same as categories).
   if (isSubcategory) {
+    // [>]: Allow longer names since we have more right margin now.
+    const maxNameLength = 28;
+    const displayName =
+      payload.displayName.length > maxNameLength
+        ? payload.displayName.slice(0, maxNameLength) + "…"
+        : payload.displayName;
+
     return (
       <Layer key={`CustomNode${props.index}`}>
         <Rectangle
@@ -266,27 +307,33 @@ function CustomNode(props: {
         />
         <text
           textAnchor="start"
-          x={x + width + 8}
+          x={x + width + 10}
           y={y + height / 2}
-          dy={4}
-          fontSize={11}
+          fontSize={12}
           fill="currentColor"
-          className="fill-foreground/80"
-          fontWeight={400}
+          className="fill-foreground/90"
+          fontWeight={500}
         >
-          <tspan>{payload.displayName}</tspan>
-          <tspan className="fill-foreground/50" fontWeight={400}>
-            {" "}
-            · {formattedAmount}
+          <tspan dy={-5}>{displayName}</tspan>
+          <tspan
+            x={x + width + 10}
+            dy={16}
+            fontSize={11}
+            fontWeight={400}
+            className="fill-foreground/60"
+          >
+            {formattedAmount}
           </tspan>
         </text>
       </Layer>
     );
   }
 
-  // [>]: Income label on the left side, category labels outside on right.
-  // Category labels positioned outside to ensure visibility in both light/dark modes.
-  // Shows category name and total amount for better understanding.
+  // [>]: Income and Category labels with two-line layout.
+  // Line 1: Category name (bold)
+  // Line 2: Amount and percentage
+  const hasPercentage = payload.percentage !== null;
+
   return (
     <Layer key={`CustomNode${props.index}`}>
       <Rectangle
@@ -298,20 +345,26 @@ function CustomNode(props: {
         fillOpacity={0.9}
         radius={2}
       />
+      {/* [>]: Two-line label: name on top, amount/percentage below */}
       <text
         textAnchor={isIncome ? "end" : "start"}
-        x={isIncome ? x - 8 : x + width + 8}
+        x={isIncome ? x - 12 : x + width + 12}
         y={y + height / 2}
-        dy={4}
-        fontSize={12}
+        fontSize={14}
         fill="currentColor"
-        className="fill-foreground/90"
+        className="fill-foreground"
         fontWeight={600}
       >
-        <tspan>{payload.displayName}</tspan>
-        <tspan className="fill-foreground/60" fontWeight={500}>
-          {" "}
-          · {formattedAmount}
+        <tspan dy={-6}>{payload.displayName}</tspan>
+        <tspan
+          x={isIncome ? x - 12 : x + width + 12}
+          dy={18}
+          fontSize={12}
+          fontWeight={500}
+          className="fill-foreground/70"
+        >
+          {formattedAmount}
+          {hasPercentage && ` (${payload.percentage}%)`}
         </tspan>
       </text>
     </Layer>
@@ -367,7 +420,7 @@ function CustomLink(props: {
   );
 }
 
-// [>]: Custom tooltip content with formatted currency.
+// [>]: Custom tooltip content with formatted currency and percentage.
 function CustomTooltipContent({
   active,
   payload,
@@ -391,19 +444,38 @@ function CustomTooltipContent({
     return null;
   }
 
+  // [>]: Use originalAmount from source node for accurate percentage calculation.
+  const sourceOriginal = linkData.source.originalAmount;
+  const targetOriginal = linkData.target.originalAmount;
+  const percentage =
+    sourceOriginal > 0
+      ? Math.round((targetOriginal / sourceOriginal) * 100)
+      : 0;
+
   return (
-    <div className="rounded-lg border border-border/50 bg-background px-3 py-2 text-xs shadow-xl">
+    <div className="rounded-lg border border-border/50 bg-background px-3 py-2.5 text-sm shadow-xl">
       <div className="flex items-center gap-2">
-        <span style={{ color: linkData.source.color }} className="font-medium">
+        <span
+          style={{ color: linkData.source.color }}
+          className="font-semibold"
+        >
           {linkData.source.displayName}
         </span>
         <span className="text-muted-foreground">→</span>
-        <span style={{ color: linkData.target.color }} className="font-medium">
+        <span
+          style={{ color: linkData.target.color }}
+          className="font-semibold"
+        >
           {linkData.target.displayName}
         </span>
       </div>
-      <div className="mt-1 font-mono font-medium tabular-nums">
-        {formatCurrency(linkData.value)}
+      <div className="mt-1.5 flex items-baseline gap-2">
+        <span className="font-mono font-semibold tabular-nums text-foreground">
+          {formatCurrency(targetOriginal)}
+        </span>
+        <span className="text-muted-foreground">
+          ({percentage}% de {linkData.source.displayName})
+        </span>
       </div>
     </div>
   );
@@ -421,7 +493,7 @@ const chartErrorFallback = (
 export function SankeyChart({ data, className }: SankeyChartProps) {
   const sankeyData = data ? transformToSankeyData(data) : null;
   const isEmpty = !sankeyData;
-  const chartHeight = data ? calculateChartHeight(data) : 300;
+  const chartHeight = data ? calculateChartHeight(data) : 450;
 
   return (
     <Card className={cn("border-0 shadow-lg", className)}>
@@ -440,7 +512,7 @@ export function SankeyChart({ data, className }: SankeyChartProps) {
         <ErrorBoundary fallback={chartErrorFallback}>
           {isEmpty ? (
             <div
-              className="flex h-[300px] items-center justify-center text-muted-foreground"
+              className="flex h-[500px] items-center justify-center text-muted-foreground"
               data-testid="empty-state"
             >
               {t.sankeyChart.empty}
@@ -449,11 +521,11 @@ export function SankeyChart({ data, className }: SankeyChartProps) {
             <ResponsiveContainer width="100%" height={chartHeight}>
               <Sankey
                 data={sankeyData}
-                nodeWidth={16}
-                nodePadding={24}
+                nodeWidth={20}
+                nodePadding={36}
                 linkCurvature={0.5}
                 iterations={128}
-                margin={{ left: 100, right: 200, top: 10, bottom: 10 }}
+                margin={{ left: 150, right: 250, top: 20, bottom: 20 }}
                 node={CustomNode}
                 link={CustomLink}
               >

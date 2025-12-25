@@ -63,8 +63,9 @@ function ScoreIcon({
   return <XCircle className={className} style={style} />;
 }
 
-// [>]: Line color - using a visible blue that works in both light and dark mode.
-const LINE_COLOR = "#6a9bcc";
+// [>]: Line color - neutral slate that doesn't compete with score-colored dots.
+// The dots provide the meaningful color (green=great, red=poor), line is just connective tissue.
+const LINE_COLOR = "#64748b";
 
 const chartConfig = {
   score: {
@@ -187,8 +188,8 @@ export function ScoreChart({ months, period }: ScoreChartProps) {
     <Card className="border-0 shadow-lg">
       <CardHeader className="pb-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/20">
-            <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-500/10 to-slate-600/20">
+            <TrendingUp className="h-5 w-5 text-slate-600 dark:text-slate-400" />
           </div>
           <div>
             <CardTitle className="text-base">{t.scoreChart.title}</CardTitle>
@@ -238,9 +239,9 @@ export function ScoreChart({ months, period }: ScoreChartProps) {
                 />
                 <Line
                   dataKey="score"
-                  type="natural"
+                  type="monotone"
                   stroke="var(--color-score)"
-                  strokeWidth={2.5}
+                  strokeWidth={2}
                   dot={({ cx, cy, payload }) => {
                     if (payload.score === null)
                       return <g key={payload.label} />;
