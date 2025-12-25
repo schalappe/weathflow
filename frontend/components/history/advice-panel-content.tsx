@@ -433,9 +433,13 @@ function ProblemAreaItem({ area, index }: ProblemAreaItemProps) {
       </div>
       {(area.root_cause || area.impact) && (
         <div className="text-sm text-muted-foreground space-y-2 pl-4 border-l-2 border-muted-foreground/30">
-          {area.root_cause && <p className="leading-relaxed">{area.root_cause}</p>}
+          {area.root_cause && (
+            <p className="leading-relaxed">{area.root_cause}</p>
+          )}
           {area.impact && (
-            <p className="text-amber-600 dark:text-amber-400 leading-relaxed">{area.impact}</p>
+            <p className="text-amber-600 dark:text-amber-400 leading-relaxed">
+              {area.impact}
+            </p>
           )}
         </div>
       )}
@@ -465,10 +469,10 @@ function SpendingPatternItem({ pattern }: SpendingPatternItemProps) {
           </span>
         </div>
       </div>
-      <p className="text-sm text-muted-foreground leading-relaxed">{pattern.description}</p>
-      <p className="text-sm text-muted-foreground italic">
-        {pattern.insight}
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        {pattern.description}
       </p>
+      <p className="text-sm text-muted-foreground italic">{pattern.insight}</p>
     </li>
   );
 }
@@ -590,7 +594,9 @@ function MonthlyGoalSection({ monthlyGoal }: MonthlyGoalSectionProps) {
   return (
     <div className="rounded-xl bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-5 space-y-3">
       <div className="flex items-center justify-between gap-4">
-        <span className="font-medium leading-snug">{monthlyGoal.objective}</span>
+        <span className="font-medium leading-snug">
+          {monthlyGoal.objective}
+        </span>
         <Badge
           variant="secondary"
           className="bg-violet-500/20 text-violet-700 dark:text-violet-300 flex-shrink-0"
@@ -598,7 +604,9 @@ function MonthlyGoalSection({ monthlyGoal }: MonthlyGoalSectionProps) {
           {t.advice.targetAmount}: {formatCurrency(monthlyGoal.target_amount)}
         </Badge>
       </div>
-      <p className="text-[15px] text-muted-foreground leading-relaxed">{monthlyGoal.strategy}</p>
+      <p className="text-[15px] text-muted-foreground leading-relaxed">
+        {monthlyGoal.strategy}
+      </p>
     </div>
   );
 }
@@ -637,7 +645,9 @@ function AdviceContent({
       <section className="space-y-4">
         <div className="flex items-center gap-2.5">
           <BarChart3 className="h-5 w-5 text-violet-600 dark:text-violet-400" />
-          <h4 className="text-lg font-semibold">{t.advice.sections.analysis}</h4>
+          <h4 className="text-lg font-semibold">
+            {t.advice.sections.analysis}
+          </h4>
         </div>
         <p className="text-[15px] text-muted-foreground leading-relaxed">
           {advice.analysis}
@@ -671,7 +681,9 @@ function AdviceContent({
           <section className="space-y-4">
             <div className="flex items-center gap-2.5">
               <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              <h4 className="text-lg font-semibold">{t.advice.sections.problems}</h4>
+              <h4 className="text-lg font-semibold">
+                {t.advice.sections.problems}
+              </h4>
             </div>
             <ul className="space-y-3">
               {advice.problem_areas.map((area, index) => (
@@ -725,7 +737,9 @@ function AdviceContent({
           <section className="space-y-4">
             <div className="flex items-center gap-2.5">
               <Target className="h-5 w-5 text-violet-600 dark:text-violet-400" />
-              <h4 className="text-lg font-semibold">{t.advice.sections.monthlyGoal}</h4>
+              <h4 className="text-lg font-semibold">
+                {t.advice.sections.monthlyGoal}
+              </h4>
             </div>
             <MonthlyGoalSection monthlyGoal={advice.monthly_goal} />
           </section>
@@ -737,7 +751,9 @@ function AdviceContent({
       <section className="space-y-4">
         <div className="flex items-center gap-2.5">
           <Sparkles className="h-5 w-5 text-violet-600 dark:text-violet-400" />
-          <h4 className="text-lg font-semibold">{t.advice.sections.encouragement}</h4>
+          <h4 className="text-lg font-semibold">
+            {t.advice.sections.encouragement}
+          </h4>
         </div>
         <p className="text-[15px] text-muted-foreground leading-relaxed">
           {advice.encouragement}

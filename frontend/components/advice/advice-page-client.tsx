@@ -208,9 +208,7 @@ export function AdvicePageClient() {
                 <h1 className="text-2xl font-bold tracking-tight">
                   {t.advicePage.title}
                 </h1>
-                <p className="text-muted-foreground">
-                  {t.advicePage.subtitle}
-                </p>
+                <p className="text-muted-foreground">{t.advicePage.subtitle}</p>
               </div>
               <MonthNavigator
                 months={state.monthsList}
