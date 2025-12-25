@@ -60,6 +60,7 @@ export interface ImportState {
   importMode: ImportMode;
   categorizeResponse: CategorizeResponse | null;
   error: string | null;
+  isReviewSheetOpen: boolean;
 }
 
 // [>]: Discriminated union for type-safe reducer actions.
@@ -77,7 +78,9 @@ export type ImportAction =
   | { type: "CATEGORIZE_START" }
   | { type: "CATEGORIZE_SUCCESS"; payload: CategorizeResponse }
   | { type: "CATEGORIZE_ERROR"; payload: string }
-  | { type: "RESET" };
+  | { type: "RESET" }
+  | { type: "OPEN_REVIEW_SHEET" }
+  | { type: "CLOSE_REVIEW_SHEET" };
 
 // [>]: Dashboard API response types - mirroring backend/app/responses/months.py.
 

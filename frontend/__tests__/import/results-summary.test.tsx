@@ -32,6 +32,7 @@ describe("ResultsSummary", () => {
         monthsNotFound={[]}
         totalApiCalls={5}
         onFinish={vi.fn()}
+        onReviewClick={vi.fn()}
       />,
     );
 
@@ -51,6 +52,7 @@ describe("ResultsSummary", () => {
         monthsNotFound={[]}
         totalApiCalls={5}
         onFinish={vi.fn()}
+        onReviewClick={vi.fn()}
       />,
     );
 
@@ -63,20 +65,22 @@ describe("ResultsSummary", () => {
     expect(needImprovementBadge).toHaveClass("bg-[#d97757]");
   });
 
-  it("View transactions button is disabled with tooltip", () => {
+  it("View transactions button is enabled and calls onReviewClick", () => {
+    const onReviewClick = vi.fn();
     render(
       <ResultsSummary
         results={mockResults}
         monthsNotFound={[]}
         totalApiCalls={5}
         onFinish={vi.fn()}
+        onReviewClick={onReviewClick}
       />,
     );
 
     const viewButton = screen.getByRole("button", {
       name: /Voir les transactions/i,
     });
-    expect(viewButton).toBeDisabled();
+    expect(viewButton).toBeEnabled();
   });
 
   it("displays warning when monthsNotFound contains items", () => {
@@ -86,6 +90,7 @@ describe("ResultsSummary", () => {
         monthsNotFound={["2024-11", "2024-12"]}
         totalApiCalls={5}
         onFinish={vi.fn()}
+        onReviewClick={vi.fn()}
       />,
     );
 
@@ -102,6 +107,7 @@ describe("ResultsSummary", () => {
         monthsNotFound={[]}
         totalApiCalls={5}
         onFinish={vi.fn()}
+        onReviewClick={vi.fn()}
       />,
     );
 
@@ -128,6 +134,7 @@ describe("ResultsSummary", () => {
         monthsNotFound={[]}
         totalApiCalls={2}
         onFinish={vi.fn()}
+        onReviewClick={vi.fn()}
       />,
     );
 

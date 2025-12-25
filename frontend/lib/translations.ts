@@ -267,6 +267,18 @@ export const t = {
     skipped: "ignorée(s) (erreur de catégorisation)",
   },
 
+  // Transaction Review Sheet
+  review: {
+    title: "Vérifier les transactions",
+    subtitle: "Vérifiez et corrigez les catégories si nécessaire",
+    lowConfidence: "à faible confiance",
+    noTransactions: "Aucune transaction pour ce mois",
+    loading: "Chargement des transactions...",
+    close: "Fermer",
+    transactions: "transactions",
+    of: "dont",
+  },
+
   // History Page
   history: {
     title: "Historique",

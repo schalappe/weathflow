@@ -16,11 +16,11 @@ This is a **frontend-only** feature. No backend changes required.
 
 **Dependencies:** None
 
-- [ ] 1.0 Complete infrastructure setup
-  - [ ] 1.1 Add shadcn/ui Sheet component via CLI (`bunx shadcn@latest add sheet`)
-  - [ ] 1.2 Add new action types to `ImportAction` in `frontend/types/index.ts`
-  - [ ] 1.3 Add `isReviewSheetOpen: boolean` to `ImportState` interface
-  - [ ] 1.4 Add French translations for review UI in `frontend/lib/translations.ts`
+- [x] 1.0 Complete infrastructure setup
+  - [x] 1.1 Add shadcn/ui Sheet component via CLI (`bunx shadcn@latest add sheet`)
+  - [x] 1.2 Add new action types to `ImportAction` in `frontend/types/index.ts`
+  - [x] 1.3 Add `isReviewSheetOpen: boolean` to `ImportState` interface
+  - [x] 1.4 Add French translations for review UI in `frontend/lib/translations.ts`
 
 **Acceptance Criteria:**
 
@@ -56,11 +56,11 @@ review: {
 
 **Dependencies:** Task Group 1
 
-- [ ] 2.0 Complete state machine integration
-  - [ ] 2.1 Add reducer cases for `OPEN_REVIEW_SHEET` and `CLOSE_REVIEW_SHEET` in `import-page-client.tsx`
-  - [ ] 2.2 Update `initialState` with `isReviewSheetOpen: false`
-  - [ ] 2.3 Add `handleOpenReviewSheet` and `handleCloseReviewSheet` callbacks
-  - [ ] 2.4 Verify state transitions work (manual testing)
+- [x] 2.0 Complete state machine integration
+  - [x] 2.1 Add reducer cases for `OPEN_REVIEW_SHEET` and `CLOSE_REVIEW_SHEET` in `import-page-client.tsx`
+  - [x] 2.2 Update `initialState` with `isReviewSheetOpen: false`
+  - [x] 2.3 Add `handleOpenReviewSheet` and `handleCloseReviewSheet` callbacks
+  - [x] 2.4 Verify state transitions work (manual testing)
 
 **Acceptance Criteria:**
 
@@ -80,12 +80,12 @@ review: {
 
 **Dependencies:** Task Group 2
 
-- [ ] 3.0 Complete UI components
-  - [ ] 3.1 Create `TransactionReviewList` component (`frontend/components/import/transaction-review-list.tsx`)
-  - [ ] 3.2 Create `TransactionReviewSheet` component (`frontend/components/import/transaction-review-sheet.tsx`)
-  - [ ] 3.3 Integrate `TransactionEditModal` inside sheet
-  - [ ] 3.4 Wire up API calls (`getMonthDetail`, `updateTransaction`)
-  - [ ] 3.5 Verify component rendering and interactions (manual testing)
+- [x] 3.0 Complete UI components
+  - [x] 3.1 Create `TransactionReviewList` component (`frontend/components/import/transaction-review-list.tsx`)
+  - [x] 3.2 Create `TransactionReviewSheet` component (`frontend/components/import/transaction-review-sheet.tsx`)
+  - [x] 3.3 Integrate `TransactionEditModal` inside sheet
+  - [x] 3.4 Wire up API calls (`getMonthDetail`, `updateTransaction`)
+  - [x] 3.5 Verify component rendering and interactions (manual testing)
 
 **Acceptance Criteria:**
 
@@ -129,12 +129,12 @@ interface TransactionReviewSheetProps {
 
 **Dependencies:** Task Group 3
 
-- [ ] 4.0 Complete feature integration
-  - [ ] 4.1 Modify `ResultsSummary` to accept `onReviewClick` prop
-  - [ ] 4.2 Enable the "Voir les transactions" button (remove `disabled`, remove tooltip)
-  - [ ] 4.3 Render `TransactionReviewSheet` in `ImportPageClient`
-  - [ ] 4.4 Pass props and wire callbacks between components
-  - [ ] 4.5 End-to-end manual testing of complete flow
+- [x] 4.0 Complete feature integration
+  - [x] 4.1 Modify `ResultsSummary` to accept `onReviewClick` prop
+  - [x] 4.2 Enable the "Voir les transactions" button (remove `disabled`, remove tooltip)
+  - [x] 4.3 Render `TransactionReviewSheet` in `ImportPageClient`
+  - [x] 4.4 Pass props and wire callbacks between components
+  - [x] 4.5 End-to-end manual testing of complete flow
 
 **Acceptance Criteria:**
 

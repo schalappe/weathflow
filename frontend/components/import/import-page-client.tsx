@@ -24,6 +24,7 @@ import { MonthPreviewTable } from "./month-preview-table";
 import { ImportOptions } from "./import-options";
 import { ProgressPanel } from "./progress-panel";
 import { ResultsSummary } from "./results-summary";
+import { TransactionReviewSheet } from "./transaction-review-sheet";
 import { uploadCSV, categorize } from "@/lib/api-client";
 import { getMonthKeys } from "@/lib/utils";
 import { t } from "@/lib/translations";
@@ -43,6 +44,7 @@ const initialState: ImportState = {
   importMode: "merge",
   categorizeResponse: null,
   error: null,
+  isReviewSheetOpen: false,
 };
 
 function importReducer(state: ImportState, action: ImportAction): ImportState {
@@ -142,6 +144,18 @@ function importReducer(state: ImportState, action: ImportAction): ImportState {
     case "RESET":
       return initialState;
 
+    case "OPEN_REVIEW_SHEET":
+      return {
+        ...state,
+        isReviewSheetOpen: true,
+      };
+
+    case "CLOSE_REVIEW_SHEET":
+      return {
+        ...state,
+        isReviewSheetOpen: false,
+      };
+
     default:
       return state;
   }
@@ -206,6 +220,14 @@ export function ImportPageClient() {
   const handleFinish = useCallback(() => {
     router.push("/");
   }, [router]);
+
+  const handleOpenReviewSheet = useCallback(() => {
+    dispatch({ type: "OPEN_REVIEW_SHEET" });
+  }, []);
+
+  const handleCloseReviewSheet = useCallback(() => {
+    dispatch({ type: "CLOSE_REVIEW_SHEET" });
+  }, []);
 
   const handleCancel = useCallback(() => {
     dispatch({ type: "RESET" });
@@ -357,12 +379,21 @@ export function ImportPageClient() {
 
       {/* Results state */}
       {state.pageState === "results" && state.categorizeResponse && (
-        <ResultsSummary
-          results={state.categorizeResponse.months_processed}
-          monthsNotFound={state.categorizeResponse.months_not_found}
-          totalApiCalls={state.categorizeResponse.total_api_calls}
-          onFinish={handleFinish}
-        />
+        <>
+          <ResultsSummary
+            results={state.categorizeResponse.months_processed}
+            monthsNotFound={state.categorizeResponse.months_not_found}
+            totalApiCalls={state.categorizeResponse.total_api_calls}
+            onFinish={handleFinish}
+            onReviewClick={handleOpenReviewSheet}
+          />
+
+          <TransactionReviewSheet
+            isOpen={state.isReviewSheetOpen}
+            onClose={handleCloseReviewSheet}
+            monthResults={state.categorizeResponse.months_processed}
+          />
+        </>
       )}
     </div>
   );

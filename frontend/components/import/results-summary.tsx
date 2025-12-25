@@ -4,12 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   formatMonthDisplay,
   SCORE_COLORS,
   sortMonthsChronologically,
@@ -23,6 +17,7 @@ interface ResultsSummaryProps {
   monthsNotFound: string[];
   totalApiCalls: number;
   onFinish: () => void;
+  onReviewClick: () => void;
 }
 
 export function ResultsSummary({
@@ -30,6 +25,7 @@ export function ResultsSummary({
   monthsNotFound,
   totalApiCalls,
   onFinish,
+  onReviewClick,
 }: ResultsSummaryProps) {
   const sortedResults = sortMonthsChronologically(results);
 
@@ -83,18 +79,9 @@ export function ResultsSummary({
 
       {/* Action buttons */}
       <div className="flex items-center gap-3">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="outline" disabled>
-                {t.results.viewTransactions}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{t.results.comingSoon}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Button variant="outline" onClick={onReviewClick}>
+          {t.results.viewTransactions}
+        </Button>
 
         <Button onClick={onFinish}>{t.results.finish}</Button>
       </div>
