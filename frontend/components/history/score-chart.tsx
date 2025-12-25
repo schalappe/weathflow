@@ -27,7 +27,6 @@ import type { MonthHistory } from "@/types";
 
 interface ScoreChartProps {
   months: MonthHistory[];
-  period: number;
 }
 
 interface ChartDataPoint {
@@ -172,12 +171,13 @@ function CustomTooltipContent({
   );
 }
 
-// [>]: Generate subtitle based on period selection. Valid periods: 3, 6, 12.
-function getPeriodDescription(period: number): string {
-  return t.scoreChart.lastMonths.replace("{n}", String(period));
+// [>]: Generate subtitle based on actual data count, not the requested period.
+function getSubtitle(dataCount: number): string {
+  if (dataCount === 0) return t.scoreChart.noRecentData;
+  return t.scoreChart.lastMonths.replace("{n}", String(dataCount));
 }
 
-export function ScoreChart({ months, period }: ScoreChartProps) {
+export function ScoreChart({ months }: ScoreChartProps) {
   const chartData = transformToChartData(months);
   const isEmpty = chartData.length === 0;
 
@@ -190,7 +190,7 @@ export function ScoreChart({ months, period }: ScoreChartProps) {
           </div>
           <div>
             <CardTitle className="text-base">{t.scoreChart.title}</CardTitle>
-            <CardDescription>{getPeriodDescription(period)}</CardDescription>
+            <CardDescription>{getSubtitle(chartData.length)}</CardDescription>
           </div>
         </div>
       </CardHeader>

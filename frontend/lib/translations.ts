@@ -304,6 +304,7 @@ export const t = {
   scoreChart: {
     title: "Évolution du score",
     lastMonths: "Performance des {n} derniers mois",
+    noRecentData: "Pas de données récentes",
     empty: "Aucune donnée historique disponible",
     error: "Impossible d'afficher le graphique",
     tooltipScore: "Score",

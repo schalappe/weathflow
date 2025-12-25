@@ -20,7 +20,7 @@ describe("ScoreChart", () => {
       createMonthHistory(now.getFullYear(), now.getMonth() + 1, 3),
     ];
 
-    const { container } = render(<ScoreChart months={months} period={12} />);
+    const { container } = render(<ScoreChart months={months} />);
 
     expect(screen.getByText(t.scoreChart.title)).toBeInTheDocument();
     expect(
@@ -30,7 +30,7 @@ describe("ScoreChart", () => {
   });
 
   it("displays empty state when no months provided", () => {
-    render(<ScoreChart months={[]} period={12} />);
+    render(<ScoreChart months={[]} />);
 
     expect(screen.getByTestId("empty-state")).toBeInTheDocument();
     expect(screen.getByText(t.scoreChart.empty)).toBeInTheDocument();
@@ -42,7 +42,7 @@ describe("ScoreChart", () => {
       createMonthHistory(now.getFullYear(), now.getMonth() + 1, 2),
     ];
 
-    const { container } = render(<ScoreChart months={months} period={6} />);
+    const { container } = render(<ScoreChart months={months} />);
 
     // [>]: Verify Recharts ResponsiveContainer renders (same pattern as spending-pie-chart test).
     expect(
@@ -54,9 +54,7 @@ describe("ScoreChart", () => {
     // [>]: Chart displays all valid months in the data, regardless of how old they are.
     const historicalMonths = [createMonthHistory(2020, 1, 3)];
 
-    const { container } = render(
-      <ScoreChart months={historicalMonths} period={12} />,
-    );
+    const { container } = render(<ScoreChart months={historicalMonths} />);
 
     // [>]: Chart should render with data, not show empty state.
     expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
