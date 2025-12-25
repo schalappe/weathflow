@@ -83,6 +83,31 @@ class MonthData(FrozenModel):
     past_advice: list[str] | None = None
 
 
+class SpendingPattern(FrozenModel):
+    """
+    A recurring spending pattern identified in transaction data.
+
+    Attributes
+    ----------
+    pattern_type : str
+        Type of pattern (e.g., 'Abonnements récurrents', 'Livraisons repas').
+    description : str
+        Detailed description of the pattern with merchants/services.
+    monthly_cost : float
+        Total monthly cost of this pattern (must be non-negative).
+    occurrences : int
+        Number of times this pattern occurs per month (must be at least 1).
+    insight : str
+        Analysis of what this pattern reveals about financial habits.
+    """
+
+    pattern_type: str
+    description: str
+    monthly_cost: float = Field(ge=0)
+    occurrences: int = Field(ge=1)
+    insight: str
+
+
 class ProblemArea(FrozenModel):
     """
     A spending category identified as a problem area.
@@ -95,36 +120,117 @@ class ProblemArea(FrozenModel):
     category : str
         Name of the spending category.
     amount : float
-        Amount spent in this category.
+        Amount spent in this category (must be non-negative).
     trend : str
         Trend indicator (e.g., '+20%', '-5%', 'N/A').
+    root_cause : str | None
+        Explanation of the underlying cause of the problem.
+    impact : str | None
+        Impact on achieving Money Map objectives.
     """
 
     category: str
-    amount: float
+    amount: float = Field(ge=0)
     trend: str
+    root_cause: str | None = None
+    impact: str | None = None
+
+
+class Recommendation(FrozenModel):
+    """
+    A prioritized actionable recommendation.
+
+    Attributes
+    ----------
+    priority : int
+        Priority ranking (1 = highest priority).
+    action : str
+        Main action to undertake.
+    details : str
+        Full explanation with context and specific transactions.
+    expected_savings : str
+        Estimated savings (monthly and annual).
+    difficulty : str
+        Difficulty level (Facile / Modéré / Exigeant).
+    quick_win : bool
+        Whether this is a quick win that can be implemented immediately.
+    """
+
+    priority: int = Field(ge=1, le=3)
+    action: str
+    details: str
+    expected_savings: str
+    difficulty: str
+    quick_win: bool = False
+
+
+class ProgressReview(FrozenModel):
+    """
+    Review of progress on previous advice.
+
+    Attributes
+    ----------
+    previous_advice_followed : str
+        Evaluation of how well previous advice was followed.
+    wins : list[str]
+        List of victories and progress to celebrate.
+    areas_for_growth : list[str]
+        Areas that still need work.
+    """
+
+    previous_advice_followed: str
+    wins: list[str] = Field(default_factory=list)
+    areas_for_growth: list[str] = Field(default_factory=list)
+
+
+class MonthlyGoal(FrozenModel):
+    """
+    A specific measurable goal for the next month.
+
+    Attributes
+    ----------
+    objective : str
+        Precise and measurable objective.
+    target_amount : float
+        Target amount to save or reduce (must be positive).
+    strategy : str
+        Concrete strategy to achieve the objective.
+    """
+
+    objective: str
+    target_amount: float = Field(gt=0)
+    strategy: str
 
 
 class AdviceResponse(FrozenModel):
     """
     Complete advice response from Claude API.
 
-    Contains analysis, identified problem areas, actionable recommendations,
-    and an encouragement message for the user.
+    Contains comprehensive analysis, spending patterns, problem areas,
+    actionable recommendations, progress review, and encouragement.
 
     Attributes
     ----------
     analysis : str
-        2-3 sentence trend analysis of the user's finances.
+        4-6 sentence in-depth analysis of financial trends.
+    spending_patterns : list[SpendingPattern]
+        Top 3 spending patterns identified.
     problem_areas : list[ProblemArea]
-        Top 3 spending categories requiring attention.
-    recommendations : list[str]
-        3 actionable improvement suggestions.
+        Top 3 spending categories requiring attention with root cause analysis.
+    recommendations : list[Recommendation]
+        3 prioritized actionable recommendations.
+    progress_review : ProgressReview
+        Review of progress on previous advice.
+    monthly_goal : MonthlyGoal
+        Specific goal for the next month.
     encouragement : str
-        Personalized encouragement message.
+        Personalized 3-4 sentence encouragement message.
     """
 
     analysis: str
+    spending_patterns: list[SpendingPattern] = Field(default_factory=list)
     problem_areas: list[ProblemArea]
-    recommendations: list[str]
+    recommendations: list[Recommendation] = Field(default_factory=list)
+    progress_review: ProgressReview | None = None
+    monthly_goal: MonthlyGoal | None = None
     encouragement: str

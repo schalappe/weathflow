@@ -3,36 +3,8 @@
 from pydantic import BaseModel, Field, model_validator
 
 from app.db.enums import MoneyMapType
+from app.domain.categories import ALLOWED_SUBCATEGORIES
 from app.responses.months import MonthSummary, TransactionResponse
-
-# ##>: Allowed subcategories per MoneyMapType - mirrors app/services/transactions.py.
-ALLOWED_SUBCATEGORIES: dict[MoneyMapType, list[str]] = {
-    MoneyMapType.INCOME: ["Job"],
-    MoneyMapType.CORE: [
-        "Housing",
-        "Groceries",
-        "Utilities",
-        "Healthcare",
-        "Transportation",
-        "Basic clothing",
-        "Phone and internet",
-        "Insurance",
-        "Debt payments",
-    ],
-    MoneyMapType.CHOICE: [
-        "Dining out",
-        "Entertainment",
-        "Travel and vacations",
-        "Electronics and gadgets",
-        "Hobby supplies",
-        "Fancy clothing",
-        "Subscription services",
-        "Home decor",
-        "Gifts",
-    ],
-    MoneyMapType.COMPOUND: ["Emergency Fund", "Education Fund", "Investments", "Other"],
-    MoneyMapType.EXCLUDED: [],
-}
 
 
 class UpdateTransactionRequest(BaseModel):
@@ -55,7 +27,7 @@ class UpdateTransactionRequest(BaseModel):
         if self.money_map_subcategory is None:
             return self
 
-        allowed = ALLOWED_SUBCATEGORIES.get(self.money_map_type, [])
+        allowed: tuple[str, ...] = ALLOWED_SUBCATEGORIES.get(self.money_map_type, ())
         if self.money_map_subcategory not in allowed:
             msg = f"Invalid subcategory '{self.money_map_subcategory}' for type {self.money_map_type.value}"
             raise ValueError(msg)

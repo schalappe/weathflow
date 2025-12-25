@@ -1,4 +1,4 @@
-// [>]: Valid subcategories per Money Map type - mirrors backend/app/services/transactions.py:16-42.
+// [!]: Keep in sync with backend/app/domain/categories.py (single source of truth).
 
 import type { MoneyMapType } from "@/types";
 
@@ -11,7 +11,7 @@ export const MONEY_MAP_TYPES: MoneyMapType[] = [
 ];
 
 export const SUBCATEGORY_OPTIONS: Record<MoneyMapType, string[]> = {
-  INCOME: ["Job"],
+  INCOME: ["Job", "Investments", "Reimbursements", "Other"],
   CORE: [
     "Housing",
     "Groceries",

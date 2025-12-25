@@ -27,6 +27,9 @@ export interface GroupedTransactions {
 const SUBCATEGORY_ICONS: Record<string, string> = {
   // INCOME
   Job: "Briefcase",
+  Investments: "TrendingUp",
+  Reimbursements: "RefreshCw",
+  Other: "MoreHorizontal",
   // CORE
   Housing: "Home",
   Groceries: "ShoppingCart",
@@ -47,11 +50,9 @@ const SUBCATEGORY_ICONS: Record<string, string> = {
   "Subscription services": "Repeat",
   "Home decor": "Sofa",
   Gifts: "Gift",
-  // COMPOUND
+  // COMPOUND (Investments and Other shared with INCOME, defined above)
   "Emergency Fund": "PiggyBank",
   "Education Fund": "GraduationCap",
-  Investments: "TrendingUp",
-  Other: "MoreHorizontal",
 };
 
 const FALLBACK_ICON = "Circle";

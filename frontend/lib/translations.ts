@@ -33,6 +33,7 @@ export const t = {
   subcategories: {
     // INCOME
     Job: "Salaire",
+    Reimbursements: "Remboursements",
     // CORE
     Housing: "Logement",
     Groceries: "Courses",
@@ -334,10 +335,25 @@ export const t = {
     generating: "Génération...",
     sections: {
       analysis: "Analyse des tendances",
+      spendingPatterns: "Habitudes de dépenses",
       problems: "Points de vigilance",
       recommendations: "Recommandations",
-      encouragement: "Continuez comme ça !",
+      progressReview: "Suivi des progrès",
+      monthlyGoal: "Objectif du mois",
+      encouragement: "Encouragements",
     },
+    difficulty: {
+      easy: "Facile",
+      moderate: "Modéré",
+      hard: "Exigeant",
+    },
+    quickWin: "Gain rapide",
+    expectedSavings: "Économie potentielle",
+    noPatterns: "Aucun pattern de dépenses identifié",
+    noProgress: "Premier mois d'analyse",
+    wins: "Victoires",
+    areasForGrowth: "Axes d'amélioration",
+    targetAmount: "Objectif",
     generated: "Généré",
     regenerate: "Régénérer",
     regenerating: "Régénération...",

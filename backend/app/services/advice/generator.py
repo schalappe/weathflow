@@ -1,13 +1,21 @@
 """Advice generation service using Claude API."""
 
 import json
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import anthropic
 from anthropic import Anthropic
 from loguru import logger
 
-from app.services.advice.models import AdviceResponse, MonthData, ProblemArea
+from app.services.advice.models import (
+    AdviceResponse,
+    MonthData,
+    MonthlyGoal,
+    ProblemArea,
+    ProgressReview,
+    Recommendation,
+    SpendingPattern,
+)
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
 from app.services.exceptions import (
     AdviceAPIError,
@@ -60,12 +68,17 @@ class AdviceGenerator:
 
     MIN_MONTHS_REQUIRED: ClassVar[int] = 2
     MAX_RETRIES: ClassVar[int] = 3
+    MIN_THINKING_BUDGET: ClassVar[int] = 1000
+    MAX_THINKING_BUDGET: ClassVar[int] = 100000
+    DEFAULT_THINKING_BUDGET: ClassVar[int] = 10000
 
     def __init__(
         self,
         api_key: str,
         base_url: str | None = None,
         model: str | None = None,
+        thinking_enabled: bool | None = None,
+        thinking_budget: int | None = None,
     ) -> None:
         """
         Initialize advice generator with API key.
@@ -78,11 +91,33 @@ class AdviceGenerator:
             Optional base URL for Anthropic API.
         model : str | None
             Claude model to use. Defaults to settings.anthropic_model.
+        thinking_enabled : bool | None
+            Enable extended thinking mode for complex reasoning. Defaults to settings.
+        thinking_budget : int | None
+            Token budget for thinking. Defaults to settings.anthropic_thinking_budget.
         """
         from app.config.settings import get_settings
 
+        settings = get_settings()
         self._client = Anthropic(api_key=api_key, base_url=base_url, max_retries=self.MAX_RETRIES)
-        self._model = model if model is not None else get_settings().anthropic_model
+        self._model = model if model is not None else settings.anthropic_model
+        self._thinking_enabled = (
+            thinking_enabled if thinking_enabled is not None else settings.anthropic_thinking_enabled
+        )
+
+        # ##>: Validate and clamp thinking budget to valid range.
+        raw_budget = thinking_budget if thinking_budget is not None else settings.anthropic_thinking_budget
+        if not (self.MIN_THINKING_BUDGET <= raw_budget <= self.MAX_THINKING_BUDGET):
+            logger.warning(
+                "Invalid thinking budget {}. Must be between {} and {}. Using default {}.",
+                raw_budget,
+                self.MIN_THINKING_BUDGET,
+                self.MAX_THINKING_BUDGET,
+                self.DEFAULT_THINKING_BUDGET,
+            )
+            self._thinking_budget = self.DEFAULT_THINKING_BUDGET
+        else:
+            self._thinking_budget = raw_budget
 
     def generate_advice(self, current_month: MonthData, history: list[MonthData]) -> AdviceResponse:
         """
@@ -231,12 +266,26 @@ class AdviceGenerator:
             If response is empty.
         """
         try:
-            # ##>: max_tokens is required by Anthropic API. Set high to let model respond fully.
-            response = self._client.messages.create(
-                model=self._model,
-                max_tokens=4096,
-                messages=[{"role": "user", "content": user_prompt}],
-            )
+            # ##>: Build API call parameters based on thinking mode configuration.
+            create_params: dict[str, Any] = {
+                "model": self._model,
+                "max_tokens": 4096,
+                "messages": [{"role": "user", "content": user_prompt}],
+            }
+
+            if self._thinking_enabled:
+                # ##>: Extended thinking mode for deeper financial analysis.
+                create_params["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": self._thinking_budget,
+                }
+                logger.debug("Using extended thinking mode with budget: {}", self._thinking_budget)
+            else:
+                # ##>: Request high-quality output via effort API (beta feature, model-agnostic).
+                create_params["extra_headers"] = {"anthropic-beta": "effort-2025-11-24"}
+                create_params["extra_body"] = {"output_config": {"effort": "high"}}
+
+            response = self._client.messages.create(**create_params)
         except anthropic.AuthenticationError as e:
             logger.error("Anthropic authentication failed: {}", e)
             raise AdviceGenerationError(
@@ -252,21 +301,35 @@ class AdviceGenerator:
             logger.error("Anthropic API error (status {}): {}", e.status_code, e.message)
             raise AdviceAPIError(retry_count=self.MAX_RETRIES) from e
 
-        # ##>: Extract text content from response.
+        # ##>: Extract text content from response. Handle both regular and thinking mode responses.
         if not response.content:
             logger.error("Claude API returned empty content array")
             raise AdviceParseError("Claude API returned empty response content")
 
-        content_block = response.content[0]
-        if not hasattr(content_block, "text"):
-            logger.error("Claude API returned unexpected content type: {}", type(content_block).__name__)
-            raise AdviceParseError(f"Unexpected response content type: {type(content_block).__name__}")
+        # ##>: Find the text block, skipping thinking blocks if present.
+        response_text: str | None = None
+        for content_block in response.content:
+            if hasattr(content_block, "type") and content_block.type == "thinking":
+                logger.debug("Thinking block received ({} chars)", len(getattr(content_block, "thinking", "")))
+                continue
+            if hasattr(content_block, "text"):
+                response_text = content_block.text
+                break
 
-        return content_block.text
+        if response_text is None:
+            logger.error(
+                "Claude API returned no text block. Content types: {}",
+                [getattr(b, "type", type(b).__name__) for b in response.content],
+            )
+            raise AdviceParseError("Claude API returned no text content")
+
+        return response_text
 
     def _parse_response(self, response_text: str) -> AdviceResponse:
         """
         Parse Claude's JSON response into AdviceResponse.
+
+        Handles both the new enriched format and legacy format for backward compatibility.
 
         Parameters
         ----------
@@ -301,19 +364,85 @@ class AdviceGenerator:
             raise AdviceParseError(response_text)
 
         try:
+            # ##>: Parse spending patterns (new format).
+            spending_patterns = [
+                SpendingPattern(
+                    pattern_type=item["pattern_type"],
+                    description=item["description"],
+                    monthly_cost=item["monthly_cost"],
+                    occurrences=item["occurrences"],
+                    insight=item["insight"],
+                )
+                for item in data.get("spending_patterns", [])
+            ]
+
+            # ##>: Parse problem areas with optional new fields.
             problem_areas = [
                 ProblemArea(
                     category=item["category"],
                     amount=item["amount"],
                     trend=item["trend"],
+                    root_cause=item.get("root_cause"),
+                    impact=item.get("impact"),
                 )
                 for item in data["problem_areas"]
             ]
 
+            # ##>: Parse recommendations - handle both new dict format and legacy string format.
+            raw_recommendations = data.get("recommendations", [])
+            if raw_recommendations and isinstance(raw_recommendations[0], dict):
+                recommendations = [
+                    Recommendation(
+                        priority=item["priority"],
+                        action=item["action"],
+                        details=item["details"],
+                        expected_savings=item["expected_savings"],
+                        difficulty=item["difficulty"],
+                        quick_win=item.get("quick_win", False),
+                    )
+                    for item in raw_recommendations
+                ]
+            else:
+                # ##>: Legacy format: recommendations as list of strings.
+                recommendations = [
+                    Recommendation(
+                        priority=idx + 1,
+                        action=rec,
+                        details=rec,
+                        expected_savings="Non spécifié",
+                        difficulty="Modéré",
+                        quick_win=False,
+                    )
+                    for idx, rec in enumerate(raw_recommendations)
+                ]
+
+            # ##>: Parse progress review (new format).
+            progress_review = None
+            if "progress_review" in data:
+                pr = data["progress_review"]
+                progress_review = ProgressReview(
+                    previous_advice_followed=pr["previous_advice_followed"],
+                    wins=pr.get("wins", []),
+                    areas_for_growth=pr.get("areas_for_growth", []),
+                )
+
+            # ##>: Parse monthly goal (new format).
+            monthly_goal = None
+            if "monthly_goal" in data:
+                mg = data["monthly_goal"]
+                monthly_goal = MonthlyGoal(
+                    objective=mg["objective"],
+                    target_amount=mg["target_amount"],
+                    strategy=mg["strategy"],
+                )
+
             return AdviceResponse(
                 analysis=data["analysis"],
+                spending_patterns=spending_patterns,
                 problem_areas=problem_areas,
-                recommendations=data["recommendations"],
+                recommendations=recommendations,
+                progress_review=progress_review,
+                monthly_goal=monthly_goal,
                 encouragement=data["encouragement"],
             )
         except (KeyError, TypeError, ValueError) as e:

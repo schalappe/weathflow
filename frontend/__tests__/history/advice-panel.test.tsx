@@ -3,7 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AdvicePanel } from "@/components/history/advice-panel";
 import * as apiClient from "@/lib/api-client";
-import { createMockAdviceData } from "@/__tests__/utils/test-factories";
+import {
+  createMockAdviceData,
+  createMockProblemArea,
+} from "@/__tests__/utils/test-factories";
 import type { EligibilityInfo } from "@/types";
 
 // [>]: Mock the API client module.
@@ -100,7 +103,7 @@ describe("AdvicePanel - State Management", () => {
     expect(screen.getByText(mockAdvice.analysis)).toBeInTheDocument();
     expect(screen.getByText("Points de vigilance")).toBeInTheDocument();
     expect(screen.getByText("Recommandations")).toBeInTheDocument();
-    expect(screen.getByText("Continuez comme ça !")).toBeInTheDocument();
+    expect(screen.getByText("Encouragements")).toBeInTheDocument();
     expect(screen.getByText(mockAdvice.encouragement)).toBeInTheDocument();
   });
 
@@ -121,8 +124,16 @@ describe("AdvicePanel - State Management", () => {
   it("trend colors are correct: red for positive, green for negative", async () => {
     const mockAdvice = createMockAdviceData({
       problem_areas: [
-        { category: "Abonnements", amount: 85, trend: "+20%" },
-        { category: "Restaurants", amount: 120, trend: "-15%" },
+        createMockProblemArea({
+          category: "Abonnements",
+          amount: 85,
+          trend: "+20%",
+        }),
+        createMockProblemArea({
+          category: "Restaurants",
+          amount: 120,
+          trend: "-15%",
+        }),
       ],
     });
 
@@ -408,7 +419,13 @@ describe("AdvicePanel - User Interactions", () => {
 
   it("shows gray color for neutral trend (0%)", async () => {
     const mockAdvice = createMockAdviceData({
-      problem_areas: [{ category: "Neutral", amount: 100, trend: "0%" }],
+      problem_areas: [
+        createMockProblemArea({
+          category: "Neutral",
+          amount: 100,
+          trend: "0%",
+        }),
+      ],
     });
 
     mockGetAdvice.mockResolvedValue({

@@ -238,16 +238,50 @@ export interface HistoryResponse {
 // [>]: Advice API response types based on backend/app/responses/advice.py.
 // [>]: Uses discriminated union for type-safe null handling (safer than backend's optional fields).
 
+export interface SpendingPattern {
+  pattern_type: string;
+  description: string;
+  monthly_cost: number;
+  occurrences: number;
+  insight: string;
+}
+
 export interface ProblemArea {
   category: string;
   amount: number;
   trend: string;
+  root_cause: string | null;
+  impact: string | null;
+}
+
+export interface Recommendation {
+  priority: number;
+  action: string;
+  details: string;
+  expected_savings: string;
+  difficulty: string;
+  quick_win: boolean;
+}
+
+export interface ProgressReview {
+  previous_advice_followed: string;
+  wins: string[];
+  areas_for_growth: string[];
+}
+
+export interface MonthlyGoal {
+  objective: string;
+  target_amount: number;
+  strategy: string;
 }
 
 export interface AdviceData {
   analysis: string;
+  spending_patterns: SpendingPattern[];
   problem_areas: ProblemArea[];
-  recommendations: string[];
+  recommendations: Recommendation[];
+  progress_review: ProgressReview | null;
+  monthly_goal: MonthlyGoal | null;
   encouragement: string;
 }
 

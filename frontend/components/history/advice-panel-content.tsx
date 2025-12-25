@@ -17,7 +17,14 @@ import {
   Upload,
   TrendingUp,
   TrendingDown,
+  Repeat,
+  Target,
+  Trophy,
+  Zap,
+  Clock,
+  Wallet,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { getAdvice, generateAdvice } from "@/lib/api-client";
 import {
   cn,
@@ -26,7 +33,15 @@ import {
   getErrorMessage,
 } from "@/lib/utils";
 import { t } from "@/lib/translations";
-import type { AdviceData, EligibilityInfo, ProblemArea } from "@/types";
+import type {
+  AdviceData,
+  EligibilityInfo,
+  ProblemArea,
+  SpendingPattern,
+  Recommendation,
+  ProgressReview,
+  MonthlyGoal,
+} from "@/types";
 
 type AdvicePanelState = "loading" | "loaded" | "empty" | "error";
 
@@ -390,31 +405,202 @@ function ProblemAreaItem({ area, index }: ProblemAreaItemProps) {
   const isDown = isTrendNegative(area.trend);
 
   return (
-    <li className="flex items-center justify-between rounded-xl bg-muted/50 px-4 py-3 transition-colors hover:bg-muted">
-      <span className="text-sm font-medium">
-        {index + 1}. {area.category}
-      </span>
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-semibold tabular-nums">
-          {formatCurrency(area.amount)}
+    <li className="rounded-xl bg-muted/50 px-4 py-3 transition-colors hover:bg-muted space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">
+          {index + 1}. {area.category}
         </span>
-        <span
-          className={cn(
-            "flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium",
-            isUp && "bg-red-500/10 text-red-700 dark:text-red-400",
-            isDown &&
-              "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-            !isUp &&
-              !isDown &&
-              "bg-gray-500/10 text-gray-600 dark:text-gray-400",
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold tabular-nums">
+            {formatCurrency(area.amount)}
+          </span>
+          <span
+            className={cn(
+              "flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium",
+              isUp && "bg-red-500/10 text-red-700 dark:text-red-400",
+              isDown &&
+                "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+              !isUp &&
+                !isDown &&
+                "bg-gray-500/10 text-gray-600 dark:text-gray-400",
+            )}
+          >
+            {isUp && <TrendingUp className="h-3 w-3" />}
+            {isDown && <TrendingDown className="h-3 w-3" />}
+            {area.trend}
+          </span>
+        </div>
+      </div>
+      {(area.root_cause || area.impact) && (
+        <div className="text-xs text-muted-foreground space-y-1 pl-4 border-l-2 border-muted-foreground/20">
+          {area.root_cause && <p>{area.root_cause}</p>}
+          {area.impact && (
+            <p className="text-amber-600 dark:text-amber-400">{area.impact}</p>
           )}
-        >
-          {isUp && <TrendingUp className="h-3 w-3" />}
-          {isDown && <TrendingDown className="h-3 w-3" />}
-          {area.trend}
+        </div>
+      )}
+    </li>
+  );
+}
+
+// [>]: Spending pattern item for the new spending patterns section.
+interface SpendingPatternItemProps {
+  pattern: SpendingPattern;
+}
+
+function SpendingPatternItem({ pattern }: SpendingPatternItemProps) {
+  return (
+    <li className="rounded-xl bg-muted/50 px-4 py-3 transition-colors hover:bg-muted space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Repeat className="h-4 w-4 text-blue-500" />
+          <span className="text-sm font-medium">{pattern.pattern_type}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">
+            {pattern.occurrences}x/mois
+          </span>
+          <span className="text-sm font-semibold tabular-nums text-blue-600 dark:text-blue-400">
+            {formatCurrency(pattern.monthly_cost)}
+          </span>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">{pattern.description}</p>
+      <p className="text-xs text-muted-foreground/80 italic">
+        {pattern.insight}
+      </p>
+    </li>
+  );
+}
+
+// [>]: Recommendation item for the new structured recommendations.
+interface RecommendationItemProps {
+  recommendation: Recommendation;
+}
+
+function RecommendationItem({ recommendation }: RecommendationItemProps) {
+  return (
+    <li className="rounded-lg bg-muted/30 p-4 space-y-3">
+      <div className="flex items-start gap-3">
+        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+          {recommendation.priority}
         </span>
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-sm">{recommendation.action}</span>
+            {recommendation.quick_win && (
+              <Badge
+                variant="secondary"
+                className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 gap-1"
+              >
+                <Zap className="h-3 w-3" />
+                {t.advice.quickWin}
+              </Badge>
+            )}
+            <Badge
+              variant="outline"
+              className={cn(
+                "text-xs",
+                recommendation.difficulty === "Facile" &&
+                  "border-green-500/50 text-green-600 dark:text-green-400",
+                recommendation.difficulty === "Modéré" &&
+                  "border-amber-500/50 text-amber-600 dark:text-amber-400",
+                recommendation.difficulty === "Exigeant" &&
+                  "border-red-500/50 text-red-600 dark:text-red-400",
+              )}
+            >
+              {recommendation.difficulty}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {recommendation.details}
+          </p>
+          <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+            <Wallet className="h-3 w-3" />
+            <span>
+              {t.advice.expectedSavings}: {recommendation.expected_savings}
+            </span>
+          </div>
+        </div>
       </div>
     </li>
+  );
+}
+
+// [>]: Progress review section component.
+interface ProgressReviewSectionProps {
+  progressReview: ProgressReview;
+}
+
+function ProgressReviewSection({ progressReview }: ProgressReviewSectionProps) {
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        {progressReview.previous_advice_followed}
+      </p>
+
+      {progressReview.wins.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+            <Trophy className="h-3.5 w-3.5" />
+            {t.advice.wins}
+          </div>
+          <ul className="space-y-1">
+            {progressReview.wins.map((win, index) => (
+              <li
+                key={index}
+                className="text-sm text-muted-foreground flex items-start gap-2"
+              >
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                {win}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {progressReview.areas_for_growth.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+            <Target className="h-3.5 w-3.5" />
+            {t.advice.areasForGrowth}
+          </div>
+          <ul className="space-y-1">
+            {progressReview.areas_for_growth.map((area, index) => (
+              <li
+                key={index}
+                className="text-sm text-muted-foreground flex items-start gap-2"
+              >
+                <Clock className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                {area}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// [>]: Monthly goal section component.
+interface MonthlyGoalSectionProps {
+  monthlyGoal: MonthlyGoal;
+}
+
+function MonthlyGoalSection({ monthlyGoal }: MonthlyGoalSectionProps) {
+  return (
+    <div className="rounded-xl bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="font-medium">{monthlyGoal.objective}</span>
+        <Badge
+          variant="secondary"
+          className="bg-violet-500/20 text-violet-700 dark:text-violet-300"
+        >
+          {t.advice.targetAmount}: {formatCurrency(monthlyGoal.target_amount)}
+        </Badge>
+      </div>
+      <p className="text-sm text-muted-foreground">{monthlyGoal.strategy}</p>
+    </div>
   );
 }
 
@@ -459,6 +645,26 @@ function AdviceContent({
         </p>
       </section>
 
+      {/* Spending Patterns Section */}
+      {advice.spending_patterns && advice.spending_patterns.length > 0 && (
+        <>
+          <Separator />
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Repeat className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
+              <h4 className="font-semibold">
+                {t.advice.sections.spendingPatterns}
+              </h4>
+            </div>
+            <ul className="space-y-2">
+              {advice.spending_patterns.map((pattern, index) => (
+                <SpendingPatternItem key={index} pattern={pattern} />
+              ))}
+            </ul>
+          </section>
+        </>
+      )}
+
       {/* Problem Areas Section */}
       {advice.problem_areas.length > 0 && (
         <>
@@ -488,19 +694,41 @@ function AdviceContent({
                 {t.advice.sections.recommendations}
               </h4>
             </div>
-            <ol className="space-y-2 text-sm text-muted-foreground">
+            <ol className="space-y-3">
               {advice.recommendations.map((rec, index) => (
-                <li
-                  key={index}
-                  className="flex gap-3 rounded-lg bg-muted/30 p-3 leading-relaxed"
-                >
-                  <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                    {index + 1}
-                  </span>
-                  <span>{rec}</span>
-                </li>
+                <RecommendationItem key={index} recommendation={rec} />
               ))}
             </ol>
+          </section>
+        </>
+      )}
+
+      {/* Progress Review Section */}
+      {advice.progress_review && (
+        <>
+          <Separator />
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />
+              <h4 className="font-semibold">
+                {t.advice.sections.progressReview}
+              </h4>
+            </div>
+            <ProgressReviewSection progressReview={advice.progress_review} />
+          </section>
+        </>
+      )}
+
+      {/* Monthly Goal Section */}
+      {advice.monthly_goal && (
+        <>
+          <Separator />
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Target className="h-4.5 w-4.5 text-violet-600 dark:text-violet-400" />
+              <h4 className="font-semibold">{t.advice.sections.monthlyGoal}</h4>
+            </div>
+            <MonthlyGoalSection monthlyGoal={advice.monthly_goal} />
           </section>
         </>
       )}
