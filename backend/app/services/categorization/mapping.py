@@ -27,6 +27,12 @@ class CategoryMapping:
         # Income
         ("Entrées d'argent", "Salaires"): (MoneyMapType.INCOME, "Job"),
         ("Entrées d'argent", "Primes"): (MoneyMapType.INCOME, "Job"),
+        ("Entrées d'argent", "Dividendes"): (MoneyMapType.INCOME, "Investments"),
+        ("Entrées d'argent", "Intérêts"): (MoneyMapType.INCOME, "Investments"),
+        ("Entrées d'argent", "Revenus locatifs"): (MoneyMapType.INCOME, "Other"),
+        ("Entrées d'argent", "Remboursements"): (MoneyMapType.INCOME, "Reimbursements"),
+        ("Santé", "Remboursement mutuelle"): (MoneyMapType.INCOME, "Reimbursements"),
+        ("Santé", "Remboursement Sécu"): (MoneyMapType.INCOME, "Reimbursements"),
         # Excluded - Internal transfers
         ("Entrées d'argent", "Virements internes"): (MoneyMapType.EXCLUDED, ""),
         ("Entrées d'argent", "Economies"): (MoneyMapType.EXCLUDED, ""),

@@ -5,9 +5,9 @@ from pydantic import BaseModel, Field, model_validator
 from app.db.enums import MoneyMapType
 from app.responses.months import MonthSummary, TransactionResponse
 
-# ##>: Allowed subcategories per MoneyMapType - mirrors app/services/transactions.py.
+# ##>: Allowed subcategories per MoneyMapType - mirrors app/services/data/transactions.py.
 ALLOWED_SUBCATEGORIES: dict[MoneyMapType, list[str]] = {
-    MoneyMapType.INCOME: ["Job"],
+    MoneyMapType.INCOME: ["Job", "Investments", "Reimbursements", "Other"],
     MoneyMapType.CORE: [
         "Housing",
         "Groceries",

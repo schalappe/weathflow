@@ -12,7 +12,7 @@ from app.services.exceptions import InvalidSubcategoryError, TransactionNotFound
 
 # ##>: Allowed subcategories per MoneyMapType from requirements.md.
 ALLOWED_SUBCATEGORIES: dict[MoneyMapType, list[str]] = {
-    MoneyMapType.INCOME: ["Job"],
+    MoneyMapType.INCOME: ["Job", "Investments", "Reimbursements", "Other"],
     MoneyMapType.CORE: [
         "Housing",
         "Groceries",

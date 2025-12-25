@@ -33,6 +33,7 @@ export const t = {
   subcategories: {
     // INCOME
     Job: "Salaire",
+    Reimbursements: "Remboursements",
     // CORE
     Housing: "Logement",
     Groceries: "Courses",

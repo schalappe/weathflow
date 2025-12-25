@@ -11,7 +11,7 @@ export const MONEY_MAP_TYPES: MoneyMapType[] = [
 ];
 
 export const SUBCATEGORY_OPTIONS: Record<MoneyMapType, string[]> = {
-  INCOME: ["Job"],
+  INCOME: ["Job", "Investments", "Reimbursements", "Other"],
   CORE: [
     "Housing",
     "Groceries",

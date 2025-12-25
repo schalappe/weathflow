@@ -7,7 +7,7 @@ Tu utilises le framework Money Map (règle 50/30/20).
 INCOME - Revenus
 - Job : Salaires, primes, bonus
 - Investments : Revenus des investissements (dividendes, intérêts)
-- Remboursements reçus (Sécurité sociale, mutuelle)
+- Reimbursements : Remboursements reçus (Sécurité sociale, mutuelle)
 - Other : Autres revenus (revenus locatifs, revenus de side projects)
 
 CORE - Nécessités (objectif ≤ 50% des revenus)

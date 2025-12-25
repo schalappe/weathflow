@@ -97,7 +97,7 @@ describe("groupTransactionsBySubcategory", () => {
 
     const result = groupTransactionsBySubcategory(transactions);
 
-    // [>]: INCOME with null subcategory defaults to "Job" (only INCOME subcategory).
+    // [>]: INCOME with null subcategory defaults to "Job" (first INCOME subcategory).
     expect(result.inputs).toHaveLength(1);
     expect(result.inputs[0].subcategory).toBe("Job");
   });
