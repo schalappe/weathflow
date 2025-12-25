@@ -298,15 +298,13 @@ export const t = {
     3: "3 mois",
     6: "6 mois",
     12: "12 mois",
-    0: "Tout",
   },
 
   // Score Chart
   scoreChart: {
     title: "Évolution du score",
-    allTime: "Performance globale",
-    lastMonth: "Performance du mois dernier",
     lastMonths: "Performance des {n} derniers mois",
+    noRecentData: "Pas de données récentes",
     empty: "Aucune donnée historique disponible",
     error: "Impossible d'afficher le graphique",
     tooltipScore: "Score",

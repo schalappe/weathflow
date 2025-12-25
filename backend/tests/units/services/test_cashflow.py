@@ -37,8 +37,13 @@ class TestBuildCashflowData(TestCase):
         assert result.income_total == 5000.0
         assert result.core_total == 1500.0
         assert result.choice_total == 150.0
-        assert result.compound_total == 1000.0
+        # [>]: compound_total is calculated as INCOME - (CORE + CHOICE), not from transactions.
+        assert result.compound_total == 5000.0 - (1500.0 + 150.0)  # 3350.0
         assert result.deficit == 0.0
+        # [>]: compound_breakdown retains actual savings transactions for subcategory display.
+        assert len(result.compound_breakdown) == 1
+        assert result.compound_breakdown[0].subcategory == "Investments"
+        assert result.compound_breakdown[0].amount == 1000.0
 
     def test_builds_breakdowns(self) -> None:
         """_build_cashflow_data correctly builds subcategory breakdowns."""

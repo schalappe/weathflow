@@ -14,7 +14,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
-import { SCORE_COLORS_HEX } from "@/lib/utils";
+import { SCORE_COLORS_HEX, sortMonthsChronologically } from "@/lib/utils";
 import { t } from "@/lib/translations";
 import {
   TrendingUp,
@@ -27,7 +27,6 @@ import type { MonthHistory } from "@/types";
 
 interface ScoreChartProps {
   months: MonthHistory[];
-  period: number;
 }
 
 interface ChartDataPoint {
@@ -74,51 +73,50 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-function transformToChartData(
-  months: MonthHistory[],
-  period: number,
-): ChartDataPoint[] {
+// [>]: Validate month data has required fields for score chart.
+function isValidMonthData(m: MonthHistory): boolean {
+  return (
+    typeof m?.year === "number" &&
+    typeof m?.month === "number" &&
+    m.month >= 1 &&
+    m.month <= 12 &&
+    typeof m?.score === "number"
+  );
+}
+
+// [>]: Data-driven transformation - only display months that exist in the data.
+function transformToChartData(months: MonthHistory[]): ChartDataPoint[] {
   if (!Array.isArray(months)) {
     console.warn("[ScoreChart] Invalid months data: expected array");
     return [];
   }
 
-  const now = new Date();
-  const result: ChartDataPoint[] = [];
+  const validMonths = months.filter((m) => {
+    if (!isValidMonthData(m)) {
+      console.warn("[ScoreChart] Skipping invalid month data:", m);
+      return false;
+    }
+    return true;
+  });
 
-  const monthMap = new Map<string, MonthHistory>();
-  for (const m of months) {
-    const key = `${m.year}-${m.month}`;
-    monthMap.set(key, m);
-  }
+  const sorted = sortMonthsChronologically(validMonths);
 
-  // [>]: Use period to determine how many months to display.
-  const monthCount = period === 0 ? 12 : period;
-  for (let i = monthCount - 1; i >= 0; i--) {
-    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const key = `${year}-${month}`;
-    const monthData = monthMap.get(key);
-
+  return sorted.map((m) => {
+    const date = new Date(m.year, m.month - 1);
     const label = date.toLocaleDateString("fr-FR", { month: "short" });
     const fullLabel = date.toLocaleDateString("fr-FR", {
       month: "long",
       year: "numeric",
     });
 
-    const score = monthData?.score ?? null;
-
-    result.push({
+    return {
       label,
-      score,
-      scoreLabel: monthData?.score_label ?? null,
+      score: m.score,
+      scoreLabel: m.score_label ?? null,
       fullLabel,
-      fill: getScoreColor(score),
-    });
-  }
-
-  return result;
+      fill: getScoreColor(m.score),
+    };
+  });
 }
 
 const chartErrorFallback = (
@@ -173,16 +171,15 @@ function CustomTooltipContent({
   );
 }
 
-// [>]: Generate subtitle based on period selection.
-function getPeriodDescription(period: number): string {
-  if (period === 0) return t.scoreChart.allTime;
-  if (period === 1) return t.scoreChart.lastMonth;
-  return t.scoreChart.lastMonths.replace("{n}", String(period));
+// [>]: Generate subtitle based on actual data count, not the requested period.
+function getSubtitle(dataCount: number): string {
+  if (dataCount === 0) return t.scoreChart.noRecentData;
+  return t.scoreChart.lastMonths.replace("{n}", String(dataCount));
 }
 
-export function ScoreChart({ months, period }: ScoreChartProps) {
-  const chartData = transformToChartData(months, period);
-  const isEmpty = chartData.every((d) => d.score === null);
+export function ScoreChart({ months }: ScoreChartProps) {
+  const chartData = transformToChartData(months);
+  const isEmpty = chartData.length === 0;
 
   return (
     <Card className="border-0 shadow-lg">
@@ -193,7 +190,7 @@ export function ScoreChart({ months, period }: ScoreChartProps) {
           </div>
           <div>
             <CardTitle className="text-base">{t.scoreChart.title}</CardTitle>
-            <CardDescription>{getPeriodDescription(period)}</CardDescription>
+            <CardDescription>{getSubtitle(chartData.length)}</CardDescription>
           </div>
         </div>
       </CardHeader>

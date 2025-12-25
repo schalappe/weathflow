@@ -144,7 +144,7 @@ export function AdvicePageClient() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       {/* Loading State */}
       {state.pageState === "loading" && <AdvicePageSkeleton />}
 
@@ -204,13 +204,11 @@ export function AdvicePageClient() {
           <div className="space-y-6 animate-fade-in-up">
             {/* Header Row */}
             <div className="flex items-center justify-between">
-              <div>
+              <div className="space-y-1">
                 <h1 className="text-2xl font-bold tracking-tight">
                   {t.advicePage.title}
                 </h1>
-                <p className="text-sm text-muted-foreground">
-                  {t.advicePage.subtitle}
-                </p>
+                <p className="text-muted-foreground">{t.advicePage.subtitle}</p>
               </div>
               <MonthNavigator
                 months={state.monthsList}

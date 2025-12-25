@@ -20,7 +20,7 @@ describe("ScoreChart", () => {
       createMonthHistory(now.getFullYear(), now.getMonth() + 1, 3),
     ];
 
-    const { container } = render(<ScoreChart months={months} period={12} />);
+    const { container } = render(<ScoreChart months={months} />);
 
     expect(screen.getByText(t.scoreChart.title)).toBeInTheDocument();
     expect(
@@ -30,7 +30,7 @@ describe("ScoreChart", () => {
   });
 
   it("displays empty state when no months provided", () => {
-    render(<ScoreChart months={[]} period={12} />);
+    render(<ScoreChart months={[]} />);
 
     expect(screen.getByTestId("empty-state")).toBeInTheDocument();
     expect(screen.getByText(t.scoreChart.empty)).toBeInTheDocument();
@@ -42,7 +42,7 @@ describe("ScoreChart", () => {
       createMonthHistory(now.getFullYear(), now.getMonth() + 1, 2),
     ];
 
-    const { container } = render(<ScoreChart months={months} period={6} />);
+    const { container } = render(<ScoreChart months={months} />);
 
     // [>]: Verify Recharts ResponsiveContainer renders (same pattern as spending-pie-chart test).
     expect(
@@ -50,13 +50,16 @@ describe("ScoreChart", () => {
     ).toBeInTheDocument();
   });
 
-  it("handles months outside 12-month window gracefully", () => {
-    // [>]: Old data should not appear in chart (outside window).
-    const oldMonths = [createMonthHistory(2020, 1, 3)];
+  it("displays historical data from any time period", () => {
+    // [>]: Chart displays all valid months in the data, regardless of how old they are.
+    const historicalMonths = [createMonthHistory(2020, 1, 3)];
 
-    render(<ScoreChart months={oldMonths} period={12} />);
+    const { container } = render(<ScoreChart months={historicalMonths} />);
 
-    // [>]: Chart treats this as empty since data is outside range.
-    expect(screen.getByTestId("empty-state")).toBeInTheDocument();
+    // [>]: Chart should render with data, not show empty state.
+    expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
+    expect(
+      container.querySelector(".recharts-responsive-container"),
+    ).toBeInTheDocument();
   });
 });

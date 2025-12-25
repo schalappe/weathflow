@@ -13,7 +13,7 @@ from app.services.upload.models import MonthData, ParsedMonthSummary, ParsedTran
 
 # ##>: Bankin subcategories to exclude during import. These transactions are internal
 # transfers that should not be stored, categorized, or counted in budgets.
-EXCLUDED_SUBCATEGORIES: frozenset[str] = frozenset({"Virements internes"})
+EXCLUDED_SUBCATEGORIES: frozenset[str] = frozenset({"Virements internes", "Total Option System' Epargne"})
 
 
 class BankinCSVParser:

@@ -94,7 +94,6 @@ def _build_cashflow_data(
     income_total = 0.0
     core_total = 0.0
     choice_total = 0.0
-    compound_total = 0.0
 
     core_breakdown: list[CategoryBreakdown] = []
     choice_breakdown: list[CategoryBreakdown] = []
@@ -112,18 +111,25 @@ def _build_cashflow_data(
             choice_total += amount
             choice_breakdown.append(CategoryBreakdown(subcategory=subcategory_name, amount=amount))
         elif money_map_type == MoneyMapType.COMPOUND.value:
-            compound_total += amount
+            # [>]: Collect actual savings transactions for breakdown display.
+            # compound_total is calculated below using Money Map formula.
             compound_breakdown.append(CategoryBreakdown(subcategory=subcategory_name, amount=amount))
 
-    # [>]: Calculate deficit: when Core + Choice > Income, there's a deficit.
-    # In this case, set compound_total to 0 and compute deficit.
+    # [>]: Calculate deficit or compound using Money Map formula.
+    # COMPOUND = INCOME - (CORE + CHOICE) when no overspending.
+    # Deficit = (CORE + CHOICE) - INCOME when overspending.
     spending = core_total + choice_total
-    deficit = max(0.0, spending - income_total)
 
-    # [>]: When deficit exists, compound is effectively 0 (user answer: replace Compound with Deficit).
-    if deficit > 0:
+    if spending > income_total:
+        # [>]: Overspending: show deficit, hide compound.
+        deficit = spending - income_total
         compound_total = 0.0
         compound_breakdown = []
+    else:
+        # [>]: No overspending: calculate disposable savings using Money Map formula.
+        # compound_breakdown retains actual savings transactions for subcategory display.
+        deficit = 0.0
+        compound_total = income_total - spending
 
     logger.info(
         "Cashflow aggregation complete: income={:.2f}, core={:.2f}, choice={:.2f}, compound={:.2f}, deficit={:.2f}",
