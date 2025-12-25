@@ -24,7 +24,7 @@ describe("PeriodSelector", () => {
     expect(handleChange).toHaveBeenCalledWith(3);
   });
 
-  it("displays all 4 period options", async () => {
+  it("displays all 3 period options", async () => {
     const user = userEvent.setup();
 
     render(<PeriodSelector value={12} onChange={() => {}} />);
@@ -35,6 +35,5 @@ describe("PeriodSelector", () => {
     expect(screen.getByRole("option", { name: "3 mois" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "6 mois" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "12 mois" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Tout" })).toBeInTheDocument();
   });
 });

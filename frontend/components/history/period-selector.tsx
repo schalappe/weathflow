@@ -14,12 +14,11 @@ interface PeriodSelectorProps {
   disabled?: boolean;
 }
 
-// [>]: Period options with French labels and numeric values.
+// [>]: Period options with French labels and numeric values. 12 months max for performance.
 const PERIOD_OPTIONS = [
   { label: "3 mois", value: 3 },
   { label: "6 mois", value: 6 },
   { label: "12 mois", value: 12 },
-  { label: "Tout", value: 0 },
 ] as const;
 
 export function PeriodSelector({
