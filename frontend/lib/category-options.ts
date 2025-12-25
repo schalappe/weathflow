@@ -1,4 +1,4 @@
-// [>]: Valid subcategories per Money Map type - mirrors backend/app/services/transactions.py:16-42.
+// [!]: Keep in sync with backend/app/domain/categories.py (single source of truth).
 
 import type { MoneyMapType } from "@/types";
 

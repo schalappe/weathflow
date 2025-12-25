@@ -3,36 +3,8 @@
 from pydantic import BaseModel, Field, model_validator
 
 from app.db.enums import MoneyMapType
+from app.domain.categories import ALLOWED_SUBCATEGORIES
 from app.responses.months import MonthSummary, TransactionResponse
-
-# ##>: Allowed subcategories per MoneyMapType - mirrors app/services/data/transactions.py.
-ALLOWED_SUBCATEGORIES: dict[MoneyMapType, list[str]] = {
-    MoneyMapType.INCOME: ["Job", "Investments", "Reimbursements", "Other"],
-    MoneyMapType.CORE: [
-        "Housing",
-        "Groceries",
-        "Utilities",
-        "Healthcare",
-        "Transportation",
-        "Basic clothing",
-        "Phone and internet",
-        "Insurance",
-        "Debt payments",
-    ],
-    MoneyMapType.CHOICE: [
-        "Dining out",
-        "Entertainment",
-        "Travel and vacations",
-        "Electronics and gadgets",
-        "Hobby supplies",
-        "Fancy clothing",
-        "Subscription services",
-        "Home decor",
-        "Gifts",
-    ],
-    MoneyMapType.COMPOUND: ["Emergency Fund", "Education Fund", "Investments", "Other"],
-    MoneyMapType.EXCLUDED: [],
-}
 
 
 class UpdateTransactionRequest(BaseModel):

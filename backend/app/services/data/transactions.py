@@ -5,39 +5,11 @@ from loguru import logger
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
+from app.domain.categories import ALLOWED_SUBCATEGORIES
 from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
 from app.services.calculation.service import calculate_and_update_month
 from app.services.exceptions import InvalidSubcategoryError, TransactionNotFoundError
-
-# ##>: Allowed subcategories per MoneyMapType from requirements.md.
-ALLOWED_SUBCATEGORIES: dict[MoneyMapType, list[str]] = {
-    MoneyMapType.INCOME: ["Job", "Investments", "Reimbursements", "Other"],
-    MoneyMapType.CORE: [
-        "Housing",
-        "Groceries",
-        "Utilities",
-        "Healthcare",
-        "Transportation",
-        "Basic clothing",
-        "Phone and internet",
-        "Insurance",
-        "Debt payments",
-    ],
-    MoneyMapType.CHOICE: [
-        "Dining out",
-        "Entertainment",
-        "Travel and vacations",
-        "Electronics and gadgets",
-        "Hobby supplies",
-        "Fancy clothing",
-        "Subscription services",
-        "Home decor",
-        "Gifts",
-    ],
-    MoneyMapType.COMPOUND: ["Emergency Fund", "Education Fund", "Investments", "Other"],
-    MoneyMapType.EXCLUDED: [],
-}
 
 
 def validate_subcategory(money_map_type: MoneyMapType, subcategory: str | None) -> str | None:
