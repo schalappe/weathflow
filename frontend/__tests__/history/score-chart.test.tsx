@@ -50,13 +50,18 @@ describe("ScoreChart", () => {
     ).toBeInTheDocument();
   });
 
-  it("handles months outside 12-month window gracefully", () => {
-    // [>]: Old data should not appear in chart (outside window).
-    const oldMonths = [createMonthHistory(2020, 1, 3)];
+  it("displays historical data from any time period", () => {
+    // [>]: Chart displays all valid months in the data, regardless of how old they are.
+    const historicalMonths = [createMonthHistory(2020, 1, 3)];
 
-    render(<ScoreChart months={oldMonths} period={12} />);
+    const { container } = render(
+      <ScoreChart months={historicalMonths} period={12} />,
+    );
 
-    // [>]: Chart treats this as empty since data is outside range.
-    expect(screen.getByTestId("empty-state")).toBeInTheDocument();
+    // [>]: Chart should render with data, not show empty state.
+    expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
+    expect(
+      container.querySelector(".recharts-responsive-container"),
+    ).toBeInTheDocument();
   });
 });
