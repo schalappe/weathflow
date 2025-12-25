@@ -1,14 +1,6 @@
 "use client";
 
-import { Loader2, Receipt } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Loader2, Receipt, ChevronRight, Pencil } from "lucide-react";
 import { formatCurrency, formatTransactionDate, cn } from "@/lib/utils";
 import { t } from "@/lib/translations";
 import type { TransactionResponse } from "@/types";
@@ -20,40 +12,57 @@ interface TransactionReviewListProps {
   onTransactionClick: (transaction: TransactionResponse) => void;
 }
 
-// [>]: Category badge styles matching dashboard/transaction-table.tsx.
-const CATEGORY_STYLES: Record<string, { bg: string; text: string }> = {
+// [>]: Category styling with semantic colors matching the Money Map system.
+const CATEGORY_CONFIG: Record<
+  string,
+  { bg: string; text: string; border: string; icon: string }
+> = {
   INCOME: {
-    bg: "bg-income/10 hover:bg-income/20",
+    bg: "bg-income/10",
     text: "text-income-text",
+    border: "border-income/20",
+    icon: "bg-income/20",
   },
   CORE: {
-    bg: "bg-core/10 hover:bg-core/20",
+    bg: "bg-core/10",
     text: "text-core-text",
+    border: "border-core/20",
+    icon: "bg-core/20",
   },
   CHOICE: {
-    bg: "bg-choice/10 hover:bg-choice/20",
+    bg: "bg-choice/10",
     text: "text-choice-text",
+    border: "border-choice/20",
+    icon: "bg-choice/20",
   },
   COMPOUND: {
-    bg: "bg-compound/10 hover:bg-compound/20",
+    bg: "bg-compound/10",
     text: "text-compound-text",
+    border: "border-compound/20",
+    icon: "bg-compound/20",
   },
   EXCLUDED: {
-    bg: "bg-excluded/10 hover:bg-excluded/20",
+    bg: "bg-excluded/10",
     text: "text-excluded-text",
+    border: "border-excluded/20",
+    icon: "bg-excluded/20",
   },
 };
 
 export function TransactionReviewList({
   transactions,
-  lowConfidenceCount,
   isLoading,
   onTransactionClick,
 }: TransactionReviewListProps) {
   if (isLoading) {
     return (
-      <div className="flex h-48 flex-col items-center justify-center gap-2 text-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex h-64 flex-col items-center justify-center gap-3">
+        <div className="relative">
+          <div className="absolute inset-0 animate-ping rounded-full bg-primary/20" />
+          <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        </div>
         <p className="text-sm text-muted-foreground">{t.review.loading}</p>
       </div>
     );
@@ -61,103 +70,118 @@ export function TransactionReviewList({
 
   if (transactions.length === 0) {
     return (
-      <div className="flex h-48 flex-col items-center justify-center gap-2 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-          <Receipt className="h-6 w-6 text-muted-foreground" />
+      <div className="flex h-64 flex-col items-center justify-center gap-3">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+          <Receipt className="h-8 w-8 text-muted-foreground" />
         </div>
-        <p className="text-sm text-muted-foreground">
-          {t.review.noTransactions}
-        </p>
+        <div className="text-center">
+          <p className="font-medium text-foreground">Aucune transaction</p>
+          <p className="text-sm text-muted-foreground">
+            {t.review.noTransactions}
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {/* Header with counts */}
-      <div className="text-sm text-muted-foreground">
-        {transactions.length} {t.review.transactions}
-        {lowConfidenceCount > 0 && (
-          <span className="text-amber-600">
-            {" "}
-            {t.review.of} {lowConfidenceCount} {t.review.lowConfidence}
-          </span>
-        )}
-      </div>
+    <div className="review-list-container h-[calc(100vh-380px)] overflow-y-auto pr-1">
+      <div className="space-y-2">
+        {transactions.map((tx, index) => {
+          const category = tx.money_map_type || "EXCLUDED";
+          const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.EXCLUDED;
 
-      {/* Transaction table */}
-      <div className="max-h-[60vh] overflow-auto rounded-lg border">
-        <Table>
-          <TableHeader className="sticky top-0 bg-background">
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="w-[70px] text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {t.transactions.headers.date}
-              </TableHead>
-              <TableHead className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {t.transactions.headers.description}
-              </TableHead>
-              <TableHead className="w-[100px] text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {t.transactions.headers.amount}
-              </TableHead>
-              <TableHead className="w-[110px] text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {t.transactions.headers.category}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {transactions.map((tx) => {
-              const categoryStyle = tx.money_map_type
-                ? CATEGORY_STYLES[tx.money_map_type] || CATEGORY_STYLES.EXCLUDED
-                : CATEGORY_STYLES.EXCLUDED;
+          return (
+            <button
+              key={tx.id}
+              onClick={() => onTransactionClick(tx)}
+              className={cn(
+                "review-transaction-card group relative w-full rounded-xl border bg-card p-4 text-left transition-all duration-200",
+                "hover:border-primary/30 hover:bg-muted/30 hover:shadow-md",
+                "focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2",
+                "animate-fade-in-up",
+              )}
+              style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}
+            >
+              <div className="flex items-center gap-4">
+                {/* [>]: Category indicator bar. */}
+                <div
+                  className={cn(
+                    "h-12 w-1 shrink-0 rounded-full transition-all duration-200",
+                    config.bg,
+                    "group-hover:h-14",
+                  )}
+                />
 
-              return (
-                <TableRow
-                  key={tx.id}
-                  onClick={() => onTransactionClick(tx)}
-                  className="cursor-pointer transition-colors hover:bg-muted/50"
-                >
-                  <TableCell className="py-3 font-mono text-xs text-muted-foreground">
-                    {formatTransactionDate(tx.date)}
-                  </TableCell>
-                  <TableCell className="max-w-[280px] py-3">
-                    <span className="truncate text-sm">{tx.description}</span>
-                  </TableCell>
-                  <TableCell className="py-3 text-right">
-                    <span
-                      className={cn(
-                        "font-mono text-sm font-semibold tabular-nums",
-                        tx.amount >= 0
-                          ? "text-compound-text"
-                          : "text-foreground",
-                      )}
-                    >
-                      {tx.amount >= 0 ? "+" : ""}
-                      {formatCurrency(tx.amount)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="py-3">
-                    {tx.money_map_type && (
-                      <span
-                        className={cn(
-                          "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium transition-colors",
-                          categoryStyle.bg,
-                          categoryStyle.text,
+                {/* [>]: Main content. */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-medium text-foreground">
+                          {tx.description}
+                        </p>
+                        {tx.is_manually_corrected && (
+                          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-choice/10">
+                            <Pencil className="h-3 w-3 text-choice-text" />
+                          </div>
                         )}
-                      >
-                        {
-                          t.categories[
-                            tx.money_map_type as keyof typeof t.categories
-                          ]
-                        }
-                      </span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                      </div>
+                      <div className="mt-1 flex items-center gap-3 text-sm">
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {formatTransactionDate(tx.date)}
+                        </span>
+                        <span className="text-muted-foreground/50">·</span>
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
+                            config.bg,
+                            config.text,
+                          )}
+                        >
+                          {t.categories[category as keyof typeof t.categories]}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* [>]: Amount and action indicator. */}
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p
+                          className={cn(
+                            "font-mono text-base font-semibold tabular-nums",
+                            tx.amount >= 0
+                              ? "text-compound-text"
+                              : "text-foreground",
+                          )}
+                        >
+                          {tx.amount >= 0 ? "+" : ""}
+                          {formatCurrency(tx.amount)}
+                        </p>
+                        {tx.money_map_subcategory && (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {t.subcategories[
+                              tx.money_map_subcategory as keyof typeof t.subcategories
+                            ] || tx.money_map_subcategory}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* [>]: Chevron indicator. */}
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/50 opacity-0 transition-all duration-200 group-hover:opacity-100">
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
       </div>
+
+      {/* [>]: Bottom fade gradient for scroll indication. */}
+      <div className="pointer-events-none sticky bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent" />
     </div>
   );
 }
