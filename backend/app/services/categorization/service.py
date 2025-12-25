@@ -1,7 +1,7 @@
 """Transaction categorization service using Claude API."""
 
 import json
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import anthropic
 from anthropic import Anthropic
@@ -48,6 +48,8 @@ class TransactionCategorizer:
         base_url: str | None = None,
         model: str | None = None,
         cache: CategorizationCache | None = None,
+        thinking_enabled: bool | None = None,
+        thinking_budget: int | None = None,
     ) -> None:
         """
         Initialize categorizer with API key and optional cache.
@@ -62,12 +64,21 @@ class TransactionCategorizer:
             Claude model to use. Defaults to settings.anthropic_model.
         cache : CategorizationCache | None
             Cache instance for recurring patterns. Creates default if None.
+        thinking_enabled : bool | None
+            Enable extended thinking mode for complex reasoning. Defaults to settings.
+        thinking_budget : int | None
+            Token budget for thinking. Defaults to settings.anthropic_thinking_budget.
         """
         from app.config.settings import get_settings
 
+        settings = get_settings()
         self._client = Anthropic(api_key=api_key, base_url=base_url, max_retries=self.MAX_RETRIES)
-        self._model = model if model is not None else get_settings().anthropic_model
+        self._model = model if model is not None else settings.anthropic_model
         self._cache = cache if cache is not None else CategorizationCache()
+        self._thinking_enabled = (
+            thinking_enabled if thinking_enabled is not None else settings.anthropic_thinking_enabled
+        )
+        self._thinking_budget = thinking_budget if thinking_budget is not None else settings.anthropic_thinking_budget
 
     def categorize(self, transactions: list[TransactionInput]) -> tuple[list[CategorizationResult], int]:
         """
@@ -248,14 +259,26 @@ class TransactionCategorizer:
         user_prompt = self._build_user_prompt(batch)
 
         try:
-            # ##>: Use effort parameter for Opus 4.5 optimal performance.
-            response = self._client.messages.create(
-                model=self._model,
-                max_tokens=self.MAX_TOKENS,
-                messages=[{"role": "user", "content": user_prompt}],
-                extra_headers={"anthropic-beta": "effort-2025-11-24"},
-                extra_body={"output_config": {"effort": "high"}},
-            )
+            # ##>: Build API call parameters based on thinking mode configuration.
+            create_params: dict[str, Any] = {
+                "model": self._model,
+                "max_tokens": self.MAX_TOKENS,
+                "messages": [{"role": "user", "content": user_prompt}],
+            }
+
+            if self._thinking_enabled:
+                # ##>: Extended thinking mode for deeper reasoning on complex transactions.
+                create_params["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": self._thinking_budget,
+                }
+                logger.debug("Using extended thinking mode with budget: {}", self._thinking_budget)
+            else:
+                # ##>: Use effort parameter for Opus 4.5 optimal performance.
+                create_params["extra_headers"] = {"anthropic-beta": "effort-2025-11-24"}
+                create_params["extra_body"] = {"output_config": {"effort": "high"}}
+
+            response = self._client.messages.create(**create_params)
         except anthropic.AuthenticationError as e:
             # ##!: Clear message for API key issues.
             raise CategorizationError(
@@ -268,7 +291,7 @@ class TransactionCategorizer:
             logger.error("Anthropic API error (status {}): {}", e.status_code, e.message)
             raise APIConnectionError(retry_count=self.MAX_RETRIES) from e
 
-        # ##>: Extract text content from response. Type narrowing for mypy.
+        # ##>: Extract text content from response. Handle both regular and thinking mode responses.
         if not response.content:
             logger.error(
                 "Claude API returned empty content array for batch of {} transactions",
@@ -276,15 +299,22 @@ class TransactionCategorizer:
             )
             raise InvalidResponseError("Claude API returned empty response content")
 
-        content_block = response.content[0]
-        if not hasattr(content_block, "text"):
-            logger.error(
-                "Claude API returned unexpected content type: {}. Expected text block.",
-                type(content_block).__name__,
-            )
-            raise InvalidResponseError(f"Unexpected response content type: {type(content_block).__name__}")
+        # ##>: Find the text block, skipping thinking blocks if present.
+        response_text: str | None = None
+        for content_block in response.content:
+            if hasattr(content_block, "type") and content_block.type == "thinking":
+                logger.debug("Thinking block received ({} chars)", len(getattr(content_block, "thinking", "")))
+                continue
+            if hasattr(content_block, "text"):
+                response_text = content_block.text
+                break
 
-        response_text: str = content_block.text
+        if response_text is None:
+            logger.error(
+                "Claude API returned no text block. Content types: {}",
+                [getattr(b, "type", type(b).__name__) for b in response.content],
+            )
+            raise InvalidResponseError("Claude API returned no text content")
         batch_ids = [tx.id for tx in batch]
 
         return self._parse_response(response_text, batch_ids)

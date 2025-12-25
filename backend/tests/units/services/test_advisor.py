@@ -321,7 +321,7 @@ class TestAdviceGeneratorAPICall(unittest.TestCase):
         with self.assertRaises(AdviceParseError) as context:
             self.generator._call_claude_api("test prompt")
 
-        self.assertIn("content type", str(context.exception))
+        self.assertIn("no text content", str(context.exception))
 
 
 class TestAdviceGeneratorResponseParsing(unittest.TestCase):
