@@ -172,10 +172,8 @@ function CustomTooltipContent({
   );
 }
 
-// [>]: Generate subtitle based on period selection.
+// [>]: Generate subtitle based on period selection. Valid periods: 3, 6, 12.
 function getPeriodDescription(period: number): string {
-  if (period === 0) return t.scoreChart.allTime;
-  if (period === 1) return t.scoreChart.lastMonth;
   return t.scoreChart.lastMonths.replace("{n}", String(period));
 }
 
