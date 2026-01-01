@@ -90,6 +90,9 @@ class CategoryMapping:
         ("Shopping", "Électronique"): (MoneyMapType.CHOICE, "Electronics and gadgets"),
         ("Shopping", "Décoration"): (MoneyMapType.CHOICE, "Home decor"),
         ("Shopping", "Cadeaux"): (MoneyMapType.CHOICE, "Gifts"),
+        ("Shopping", "Shopping - Autres"): (MoneyMapType.CHOICE, "Shopping"),
+        ("Shopping", "Autre"): (MoneyMapType.CHOICE, "Shopping"),
+        ("Shopping", "Divers"): (MoneyMapType.CHOICE, "Shopping"),
         # Choice - Travel
         ("Voyages / Vacances", "Hôtels"): (MoneyMapType.CHOICE, "Travel and vacations"),
         ("Voyages / Vacances", "Billets d'avion"): (MoneyMapType.CHOICE, "Travel and vacations"),

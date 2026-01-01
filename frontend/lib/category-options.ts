@@ -33,6 +33,7 @@ export const SUBCATEGORY_OPTIONS: Record<MoneyMapType, string[]> = {
     "Subscription services",
     "Home decor",
     "Gifts",
+    "Shopping",
   ],
   COMPOUND: ["Emergency Fund", "Education Fund", "Investments", "Other"],
   EXCLUDED: [],

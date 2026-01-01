@@ -31,6 +31,7 @@ ALLOWED_SUBCATEGORIES: Mapping[MoneyMapType, tuple[str, ...]] = MappingProxyType
             "Subscription services",
             "Home decor",
             "Gifts",
+            "Shopping",
         ),
         MoneyMapType.COMPOUND: ("Emergency Fund", "Education Fund", "Investments", "Other"),
         MoneyMapType.EXCLUDED: (),

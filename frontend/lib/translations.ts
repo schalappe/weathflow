@@ -54,6 +54,7 @@ export const t = {
     "Subscription services": "Abonnements",
     "Home decor": "Décoration",
     Gifts: "Cadeaux",
+    Shopping: "Shopping",
     // COMPOUND
     "Emergency Fund": "Fonds d'urgence",
     "Education Fund": "Épargne études",
