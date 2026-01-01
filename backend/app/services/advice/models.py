@@ -120,7 +120,7 @@ class ProblemArea(FrozenModel):
     category : str
         Name of the spending category.
     amount : float
-        Amount spent in this category (must be non-negative).
+        Amount in this category (can be negative for deficit scenarios like negative savings).
     trend : str
         Trend indicator (e.g., '+20%', '-5%', 'N/A').
     root_cause : str | None
@@ -130,7 +130,7 @@ class ProblemArea(FrozenModel):
     """
 
     category: str
-    amount: float = Field(ge=0)
+    amount: float
     trend: str
     root_cause: str | None = None
     impact: str | None = None
