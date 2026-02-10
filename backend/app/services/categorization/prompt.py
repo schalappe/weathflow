@@ -31,6 +31,7 @@ CHOICE - Envies (objectif ≤ 30% des revenus)
 - Subscription services : Netflix, Spotify, Disney+, abonnements SaaS personnels, cloud personnel
 - Home decor : Décoration, ameublement non essentiel, jardinage loisir
 - Gifts : Cadeaux pour autrui
+- Shopping : Achats divers non catégorisés (Amazon, marketplace, boutiques en ligne)
 
 COMPOUND - Épargne/Investissement (objectif ≥ 20% des revenus)
 - Emergency Fund : Épargne de précaution (Livret A, LDD)
@@ -108,6 +109,13 @@ LOGEMENT
 - Assurance habitation → CORE > Insurance
 - Décoration, meubles design → CHOICE > Home decor
 - Bricolage réparation → CORE > Housing
+
+SHOPPING
+- Amazon, FNAC, Cdiscount (divers) → CHOICE > Shopping
+- Marketplace (Vinted, Leboncoin) → CHOICE > Shopping
+- Achats non identifiables, mixtes → CHOICE > Shopping
+- High-tech identifiable → CHOICE > Electronics and gadgets
+- Vêtements identifiables → CHOICE > Fancy clothing
 </edge_cases>
 
 <output_format>
