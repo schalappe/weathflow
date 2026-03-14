@@ -269,7 +269,7 @@ class AdviceGenerator:
             # ##>: Build API call parameters based on thinking mode configuration.
             create_params: dict[str, Any] = {
                 "model": self._model,
-                "max_tokens": 4096,
+                "max_tokens": 16384,
                 "messages": [{"role": "user", "content": user_prompt}],
             }
 

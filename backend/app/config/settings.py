@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     anthropic_base_url : str | None
         Optional custom base URL for Anthropic API (for proxies).
     anthropic_model : str
-        Claude model identifier. Defaults to claude-opus-4-5-20251101.
+        Claude model identifier. Defaults to claude-opus-4-6.
     anthropic_thinking_enabled : bool
         Enable extended thinking mode for deeper reasoning. Defaults to False.
     anthropic_thinking_budget : int
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
 
     anthropic_api_key: SecretStr
     anthropic_base_url: str | None = None
-    anthropic_model: str = "claude-opus-4-5-20251101"
+    anthropic_model: str = "claude-opus-4-6"
     anthropic_thinking_enabled: bool = False
     anthropic_thinking_budget: int = 10000
     database_url: str = f"sqlite:///{Path(__file__).parent.parent.parent.parent / 'data' / 'moneymap.db'}"

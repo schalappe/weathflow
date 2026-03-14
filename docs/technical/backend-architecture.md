@@ -691,7 +691,7 @@ async def categorize(transactions: list[Transaction]) -> list[Transaction]:
 
 **Claude API Configuration:**
 
-- Model: `claude-sonnet-4-20250514`
+- Model: `claude-opus-4-6`
 - Batch size: 50 transactions
 - Max tokens: 8192
 - Max retries: 3
@@ -808,7 +808,7 @@ async def generate_advice(
 
     # 5. Call Claude
     response = await claude_client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-opus-4-6",
         messages=[{"role": "user", "content": prompt}]
     )
 
@@ -982,9 +982,9 @@ Database State: Month + Transactions + Scores persisted
 
 ### Claude API Configuration
 
-**Model:** `claude-sonnet-4-20250514`
+**Model:** `claude-opus-4-6`
 
-**Why Sonnet 4:**
+**Why Opus 4.6:**
 
 - Best cost/quality ratio for this use case
 - Fast inference (< 2s per batch)
@@ -1002,7 +1002,7 @@ results = []
 
 for batch in batches:
     response = await claude_client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-opus-4-6",
         max_tokens=8192,
         messages=[{
             "role": "user",
