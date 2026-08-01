@@ -62,7 +62,7 @@ Money Map Manager uses a decoupled frontend/backend architecture with Next.js fo
 | -------- | ------------------------ | ------- | ----------------------------------------- |
 | Provider | Anthropic Claude         | -       | LLM for categorization and advice         |
 | SDK      | anthropic                | 0.39+   | Official Python SDK                       |
-| Model    | claude-opus-4-6          | -       | Best cost/quality ratio for this use case |
+| Model    | claude-fable-5           | -       | Best cost/quality ratio for this use case |
 
 ### AI Conventions
 
