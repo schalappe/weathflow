@@ -67,3 +67,15 @@ _Avoid_: Fait daté, donnée observée
 **Fait expiré**:
 Fait mémorisé dont la validité a pris fin, visible mais exclu du conseil jusqu’à sa reconfirmation.
 _Avoid_: Fait supprimé, fait actif
+
+**Fait à confirmer**:
+Fait mémorisé expiré ou rendu incertain par une contradiction matérielle, qui reste visible mais ne peut plus influencer un conseil jusqu’à sa confirmation ou sa correction.
+_Avoid_: Fait actif, fait supprimé
+
+**Trace de décision**:
+Explication structurée qui relie une sortie à ses faits décisionnels, leur provenance, la règle ou le calcul appliqué, les conventions contestables, l’effet de l’incertitude et les conditions qui changeraient la sortie.
+_Avoid_: Raisonnement interne, justification libre
+
+**État d’incertitude décisionnel**:
+Qualification d’une sortie par l’effet observable de l’incertitude restante : étayée, robuste malgré une limite explicite, ou sujet non conclu.
+_Avoid_: Score de confiance, probabilité subjective
