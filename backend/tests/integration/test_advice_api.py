@@ -250,6 +250,71 @@ def test_priority_answer_is_remembered_and_changes_generated_output(
 
 @patch.dict("os.environ", MOCK_API_KEY_ENV)
 @patch("app.api.deps.AdviceGenerator")
+def test_first_session_priority_keeps_clarification_for_correction(
+    mock_generator_class: MagicMock,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """First session answer leaves the persisted question available."""
+    _create_month(db_session, 2025, 9)
+    _create_month(db_session, 2025, 10)
+    robust_output = _advice().model_dump(mode="json")["outputs"][0]
+    clarification = {
+        "type": "clarification",
+        "priority": "high",
+        "subject": "Trajectoire d'épargne",
+        "observation": "600 € sont disponibles pour l'épargne.",
+        "possible_effect": "La destination dépend de la priorité active.",
+        "question": "Quelle est votre priorité financière active ?",
+        "fact_type": "active_priority",
+        "material_effects": ["Fonds d'urgence", "Dette"],
+    }
+    session_output = _advice().model_dump(mode="json")["outputs"][0]
+    session_output["trace"]["details"]["declared_facts"] = [
+        {
+            "fact_type": "active_priority",
+            "goal": "Préparer un voyage",
+            "target": "2 000 €",
+            "deadline": None,
+            "state": "session",
+            "last_confirmed_at": "2026-08-02T12:00:00",
+            "valid_until": None,
+            "can_correct": True,
+            "can_delete": True,
+        }
+    ]
+    mock_generator = MagicMock()
+    mock_generator.generate_advice.side_effect = [
+        AdviceResponse.model_validate({"outputs": [robust_output, clarification]}),
+        AdviceResponse.model_validate({"outputs": [session_output]}),
+    ]
+    mock_generator_class.return_value = mock_generator
+    client.post("/api/advice/generate", json={"year": 2025, "month": 10})
+
+    answered = client.post(
+        "/api/advice/generate",
+        json={
+            "year": 2025,
+            "month": 10,
+            "active_priority": {
+                "goal": "Préparer un voyage",
+                "target": "2 000 €",
+                "deadline": None,
+            },
+            "remember_priority": False,
+        },
+    )
+    reloaded = client.get("/api/advice/2025/10")
+
+    assert answered.status_code == 200
+    assert reloaded.status_code == 200
+    assert reloaded.json()["exists"] is True
+    assert reloaded.json()["advice"]["outputs"][1]["type"] == "clarification"
+    assert client.get("/api/advice/context/active-priority").json() == {"priority": None}
+
+
+@patch.dict("os.environ", MOCK_API_KEY_ENV)
+@patch("app.api.deps.AdviceGenerator")
 def test_session_priority_changes_only_current_response(
     mock_generator_class: MagicMock,
     client: TestClient,

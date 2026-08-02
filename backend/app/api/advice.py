@@ -141,13 +141,13 @@ def generate_advice(
             )
 
         stored_priority = priority_repo.get()
-        if stored_priority is not None and stored_priority.state == "to_confirm":
+        if stored_priority is not None and stored_priority.state == "to_confirm" and request.active_priority is None:
             advice_repo.delete_depending_on_active_priority()
 
         priority_context: ActivePriorityContext | None
         if request.active_priority is not None:
-            advice_repo.delete_depending_on_active_priority()
             if request.remember_priority:
+                advice_repo.delete_depending_on_active_priority()
                 stored_priority = priority_repo.put(
                     request.active_priority.goal,
                     request.active_priority.target,

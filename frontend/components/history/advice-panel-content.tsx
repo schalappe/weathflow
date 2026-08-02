@@ -641,11 +641,9 @@ function TraceList({
 function DecisionTraceDetails({
   trace,
   onCorrectSession,
-  onDeleteSession,
 }: {
   trace: DecisionTrace;
   onCorrectSession: () => void;
-  onDeleteSession: () => Promise<void>;
 }) {
   return (
     <details className="group rounded-lg border bg-background/50 p-4">
@@ -721,7 +719,7 @@ function DecisionTraceDetails({
                         variant="destructive"
                         size="sm"
                         aria-label="Supprimer cette réponse de session"
-                        onClick={onDeleteSession}
+                        onClick={onCorrectSession}
                       >
                         Supprimer
                       </Button>
@@ -874,11 +872,9 @@ function ClarificationCard({
 function DecisionOutputCard({
   output,
   onCorrectSession,
-  onDeleteSession,
 }: {
   output: DecidedOutput;
   onCorrectSession: () => void;
-  onDeleteSession: () => Promise<void>;
 }) {
   const title =
     output.type === "recommendation" ? output.action : output.conclusion;
@@ -898,7 +894,6 @@ function DecisionOutputCard({
       <DecisionTraceDetails
         trace={output.trace}
         onCorrectSession={onCorrectSession}
-        onDeleteSession={onDeleteSession}
       />
     </article>
   );
@@ -948,7 +943,6 @@ function AdviceContent({
               key={index}
               output={output}
               onCorrectSession={onCorrectSession}
-              onDeleteSession={() => onClarificationAbstention("skip")}
             />
           ),
         )}

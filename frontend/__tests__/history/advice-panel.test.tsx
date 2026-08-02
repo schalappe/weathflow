@@ -211,6 +211,26 @@ describe("AdvicePanel decision outputs", () => {
       }),
     );
     expect(await screen.findByText(clarification.question)).toBeInTheDocument();
+    await user.type(
+      screen.getByLabelText("Objectif courant"),
+      "Fonds d'urgence",
+    );
+    await user.type(screen.getByLabelText("Cible"), "6 000 €");
+    await user.click(
+      screen.getByRole("button", { name: "Cette fois seulement" }),
+    );
+    await screen.findByRole("button", {
+      name: "Supprimer cette réponse de session",
+    });
+    await user.click(
+      screen.getByRole("button", {
+        name: "Supprimer cette réponse de session",
+      }),
+    );
+
+    await waitFor(() => expect(mockGetAdvice).toHaveBeenCalledTimes(3));
+    expect(mockGenerateAdvice).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(clarification.question)).toBeInTheDocument();
   });
 
   it("skip and unknown close the question without storing context", async () => {
