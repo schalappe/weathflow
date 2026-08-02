@@ -79,3 +79,23 @@ _Avoid_: Raisonnement interne, justification libre
 **État d’incertitude décisionnel**:
 Qualification d’une sortie par l’effet observable de l’incertitude restante : étayée, robuste malgré une limite explicite, ou sujet non conclu.
 _Avoid_: Score de confiance, probabilité subjective
+
+**Catalogue du contexte déclaré**:
+Ensemble fermé des types de faits financiers que l’application peut demander et utiliser dans une décision.
+_Avoid_: Profil financier, contexte libre
+
+**Fait à portée étroite**:
+Fait déclaré valide uniquement pour la transaction, la période, le poste ou l’action qu’il qualifie, sans extrapolation à des cas futurs.
+_Avoid_: Règle générale, préférence globale
+
+**Réserve liquide non affectée**:
+Montant immédiatement disponible qui n’est ni engagé par une obligation connue ni réservé à un objectif.
+_Avoid_: Solde de compte, épargne totale
+
+**Plancher de sécurité**:
+Montant minimal de réserve liquide que l’utilisateur choisit de protéger tant que ses obligations restent couvertes.
+_Avoid_: Fonds d’urgence calculé, solde disponible
+
+**Priorité active**:
+Unique objectif personnel qui oriente actuellement la trajectoire d’épargne, distinct des obligations qui continuent de primer.
+_Avoid_: Liste d’objectifs, obligation
