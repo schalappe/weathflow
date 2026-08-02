@@ -123,8 +123,13 @@ class AdviceRepository:
         self._db.flush()
         return count
 
-    def delete_depending_on_active_priority(self) -> int:
-        """Delete outputs blocked by or citing active priority.
+    def delete_depending_on_declared_fact(self, fact_type: str) -> int:
+        """Delete outputs blocked by or citing fact.
+
+        Parameters
+        ----------
+        fact_type : str
+            Closed-catalog fact type.
 
         Returns
         -------
@@ -135,12 +140,16 @@ class AdviceRepository:
             self._db.query(Advice)
             .filter(
                 Advice.advice_text.contains('"fact_type"'),
-                Advice.advice_text.contains('"active_priority"'),
+                Advice.advice_text.contains(f'"{fact_type}"'),
             )
-            .delete(synchronize_session=False)
+            .delete(synchronize_session="fetch")
         )
         self._db.commit()
         return count
+
+    def delete_depending_on_active_priority(self) -> int:
+        """Delete outputs blocked by or citing active priority."""
+        return self.delete_depending_on_declared_fact("active_priority")
 
     def commit(self) -> None:
         """Commit the current transaction."""

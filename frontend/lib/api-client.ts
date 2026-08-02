@@ -3,6 +3,10 @@
 import type {
   ActivePriorityInput,
   ActivePriorityResponse,
+  EmergencyFundContextResponse,
+  EmergencyFundFactInput,
+  EmergencyFundFactResponse,
+  EmergencyFundFactType,
   CashFlowResponse,
   CategorizeResponse,
   GenerateAdviceResponse,
@@ -430,6 +434,74 @@ export async function deleteActivePriority(): Promise<void> {
 }
 
 /**
+ * Load emergency-fund facts.
+ * @returns Stored facts, including expired values.
+ * @throws Network or API failure.
+ */
+export async function getEmergencyFundContext(): Promise<EmergencyFundContextResponse> {
+  const response = await fetch(`${API_BASE}/api/advice/context/emergency-fund`);
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(
+        response,
+        "Failed to load emergency-fund context",
+      ),
+    );
+  }
+  return safeParseJson<EmergencyFundContextResponse>(response);
+}
+
+/**
+ * Create, correct, or reconfirm emergency-fund amount.
+ * @param factType - Closed-catalog amount type.
+ * @param amount - Declared euro amount.
+ * @returns Updated lifecycle data.
+ * @throws Network or API failure.
+ */
+export async function putEmergencyFundFact(
+  factType: EmergencyFundFactType,
+  amount: number,
+): Promise<EmergencyFundFactResponse> {
+  const response = await fetch(
+    `${API_BASE}/api/advice/context/emergency-fund/${factType}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(response, "Failed to save emergency-fund fact"),
+    );
+  }
+  return safeParseJson<EmergencyFundFactResponse>(response);
+}
+
+/**
+ * Delete emergency-fund amount.
+ * @param factType - Closed-catalog amount type.
+ * @returns Completion.
+ * @throws Network or API failure.
+ */
+export async function deleteEmergencyFundFact(
+  factType: EmergencyFundFactType,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/advice/context/emergency-fund/${factType}`,
+    { method: "DELETE" },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(
+        response,
+        "Failed to delete emergency-fund fact",
+      ),
+    );
+  }
+}
+
+/**
  * Generate advice with optional clarification answer.
  * @param year - Advice year.
  * @param month - Advice month.
@@ -445,6 +517,8 @@ export async function generateAdvice(
     regenerate?: boolean;
     activePriority?: ActivePriorityInput;
     rememberPriority?: boolean;
+    emergencyFundFact?: EmergencyFundFactInput;
+    rememberFact?: boolean;
     clarificationAction?: "skip" | "unknown";
   } = {},
 ): Promise<GenerateAdviceResponse> {
@@ -459,6 +533,11 @@ export async function generateAdvice(
         regenerate: options.regenerate ?? false,
         active_priority: options.activePriority,
         remember_priority: options.rememberPriority ?? true,
+        emergency_fund_fact: options.emergencyFundFact,
+        remember_fact:
+          options.emergencyFundFact === undefined
+            ? undefined
+            : (options.rememberFact ?? true),
         clarification_action: options.clarificationAction,
       }),
     });

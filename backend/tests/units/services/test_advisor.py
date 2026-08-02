@@ -8,7 +8,13 @@ import anthropic
 import pytest
 
 from app.services.advice.generator import AdviceGenerator
-from app.services.advice.models import ActivePriorityContext, AdviceResponse, MonthData
+from app.services.advice.models import (
+    ActivePriorityContext,
+    AdviceContext,
+    AdviceResponse,
+    EmergencyFundFactContext,
+    MonthData,
+)
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
 from app.services.exceptions import AdviceAPIError, AdviceGenerationError, AdviceParseError, InsufficientDataError
 
@@ -158,24 +164,72 @@ def test_prompt_includes_all_observed_months() -> None:
 
 def test_prompt_keeps_expired_priority_visible_but_inactive() -> None:
     """Expired priority reaches materiality check without becoming proof."""
-    priority = ActivePriorityContext(
-        goal="Fonds d'urgence",
-        target="6 000 €",
-        deadline=None,
-        state="to_confirm",
-        last_confirmed_at=datetime(2026, 1, 1),
-        valid_until=datetime(2026, 6, 30),
+    context = AdviceContext(
+        active_priority=ActivePriorityContext(
+            goal="Fonds d'urgence",
+            target="6 000 €",
+            deadline=None,
+            state="to_confirm",
+            last_confirmed_at=datetime(2026, 1, 1),
+            valid_until=datetime(2026, 6, 30),
+        )
     )
 
     prompt = _generator()._build_user_prompt(
         _month(month=2),
         [_month(month=1)],
-        priority,
+        context,
     )
 
     assert '"state": "to_confirm"' in prompt
-    assert "uniquement si au moins deux priorités plausibles changent" in prompt
-    assert "Ne la cite jamais comme preuve active" in prompt
+    assert "peut changer l'action" in prompt
+    assert "reste visible mais inactif" in prompt
+
+
+def test_prompt_defines_emergency_fund_materiality_and_trajectory() -> None:
+    """Prompt keeps stocks declared and prescribes canonical trajectory math."""
+    confirmed_at = datetime(2026, 8, 2)
+    context = AdviceContext(
+        active_priority=ActivePriorityContext(
+            goal="Fonds d'urgence",
+            target="5 400 €",
+            state="active",
+            last_confirmed_at=confirmed_at,
+            valid_until=datetime(2027, 1, 29),
+        ),
+        emergency_fund_facts=[
+            EmergencyFundFactContext(
+                fact_type="liquid_reserve",
+                amount=2_000,
+                state="active",
+                last_confirmed_at=confirmed_at,
+                valid_until=datetime(2026, 9, 1),
+            ),
+            EmergencyFundFactContext(
+                fact_type="safety_floor",
+                amount=5_400,
+                state="active",
+                last_confirmed_at=confirmed_at,
+                valid_until=datetime(2027, 1, 29),
+            ),
+            EmergencyFundFactContext(
+                fact_type="priority_allocation",
+                amount=0,
+                state="active",
+                last_confirmed_at=confirmed_at,
+                valid_until=datetime(2026, 9, 1),
+            ),
+        ],
+    )
+
+    prompt = _generator()._build_user_prompt(_month(month=2), [_month(month=1)], context)
+
+    assert '"liquid_reserve":' not in prompt
+    assert '"fact_type": "liquid_reserve"' in prompt
+    assert "plancher - réserve liquide non affectée - montant déjà affecté" in prompt
+    assert "revenus - dépenses essentielles - dépenses discrétionnaires" in prompt
+    assert "N'infère jamais ces trois faits depuis les transactions" in prompt
+    assert "conclusion `no_action`" in prompt
 
 
 def test_api_authentication_error_is_explicit() -> None:
@@ -220,10 +274,10 @@ def test_thinking_mode_skips_reasoning_and_returns_text() -> None:
     thinking = MagicMock(type="thinking", thinking="internal")
     text = MagicMock(type="text", text=_decision_json())
     response = MagicMock(content=[thinking, text])
-    generator._client.messages.create.return_value = response  # type: ignore[attr-defined]
+    generator._client.messages.create.return_value = response
 
     result = generator._call_claude_api("prompt")
-    call = generator._client.messages.create.call_args.kwargs  # type: ignore[attr-defined]
+    call = generator._client.messages.create.call_args.kwargs
 
     assert result == _decision_json()
     assert call["thinking"] == {"type": "enabled", "budget_tokens": 5000}

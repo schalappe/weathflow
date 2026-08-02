@@ -9,6 +9,7 @@ from app.config.settings import Settings, get_settings
 from app.db.database import get_db
 from app.repositories.active_priority import ActivePriorityRepository
 from app.repositories.advice import AdviceRepository
+from app.repositories.emergency_fund_fact import EmergencyFundFactRepository
 from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
 from app.services.advice.generator import AdviceGenerator
@@ -74,6 +75,22 @@ def get_active_priority_repository(db: DbSession) -> ActivePriorityRepository:
     return ActivePriorityRepository(db)
 
 
+def get_emergency_fund_fact_repository(db: DbSession) -> EmergencyFundFactRepository:
+    """Provide emergency-fund fact repository.
+
+    Parameters
+    ----------
+    db : DbSession
+        Request database transaction.
+
+    Returns
+    -------
+    EmergencyFundFactRepository
+        Declared-fact persistence.
+    """
+    return EmergencyFundFactRepository(db)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Service Providers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -100,5 +117,6 @@ MonthRepo = Annotated[MonthRepository, Depends(get_month_repository)]
 TransactionRepo = Annotated[TransactionRepository, Depends(get_transaction_repository)]
 AdviceRepo = Annotated[AdviceRepository, Depends(get_advice_repository)]
 ActivePriorityRepo = Annotated[ActivePriorityRepository, Depends(get_active_priority_repository)]
+EmergencyFundRepo = Annotated[EmergencyFundFactRepository, Depends(get_emergency_fund_fact_repository)]
 UploadSvc = Annotated[UploadService, Depends(get_upload_service)]
 AdviceGen = Annotated[AdviceGenerator, Depends(get_advice_generator)]

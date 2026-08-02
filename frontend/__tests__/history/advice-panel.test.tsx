@@ -15,6 +15,9 @@ vi.mock("@/lib/api-client", () => ({
   getActivePriority: vi.fn(),
   putActivePriority: vi.fn(),
   deleteActivePriority: vi.fn(),
+  getEmergencyFundContext: vi.fn(),
+  putEmergencyFundFact: vi.fn(),
+  deleteEmergencyFundFact: vi.fn(),
 }));
 
 const mockGetAdvice = vi.mocked(apiClient.getAdvice);
@@ -22,6 +25,13 @@ const mockGenerateAdvice = vi.mocked(apiClient.generateAdvice);
 const mockGetActivePriority = vi.mocked(apiClient.getActivePriority);
 const mockPutActivePriority = vi.mocked(apiClient.putActivePriority);
 const mockDeleteActivePriority = vi.mocked(apiClient.deleteActivePriority);
+const mockGetEmergencyFundContext = vi.mocked(
+  apiClient.getEmergencyFundContext,
+);
+const mockPutEmergencyFundFact = vi.mocked(apiClient.putEmergencyFundFact);
+const mockDeleteEmergencyFundFact = vi.mocked(
+  apiClient.deleteEmergencyFundFact,
+);
 const eligibility: EligibilityInfo = {
   can_generate: true,
   is_first_advice: false,
@@ -43,6 +53,7 @@ describe("AdvicePanel decision outputs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetActivePriority.mockResolvedValue({ priority: null });
+    mockGetEmergencyFundContext.mockResolvedValue({ facts: [] });
   });
 
   it("renders recommendation, no-action, unresolved, and auditable trace", async () => {
@@ -233,6 +244,82 @@ describe("AdvicePanel decision outputs", () => {
     expect(screen.getByText(clarification.question)).toBeInTheDocument();
   });
 
+  it("answers a material safety-floor question and renders its trajectory", async () => {
+    const user = userEvent.setup();
+    const clarification = {
+      type: "clarification" as const,
+      priority: "high" as const,
+      subject: "Trajectoire du fonds d'urgence",
+      observation: "700 € de capacité mensuelle et 2 000 € de réserve.",
+      possible_effect: "Le plancher change l'écart et l'échéance.",
+      question: "Quel plancher de sécurité souhaitez-vous protéger ?",
+      fact_type: "safety_floor" as const,
+      material_effects: [
+        "Le plancher est atteint : aucune action.",
+        "Un écart subsiste : trajectoire mensuelle.",
+      ],
+    };
+    mockGetAdvice.mockResolvedValue(
+      loaded(createMockAdviceData({ outputs: [clarification] })),
+    );
+    const trajectory = createMockRecommendationOutput({
+      action: "Affecter 700 € par mois au fonds d'urgence.",
+      amount: 700,
+      deadline: "2026-01-31",
+    });
+    trajectory.trace.summary =
+      "Un écart de 3 400 € reste à combler en environ cinq mois.";
+    trajectory.trace.details.calculations = [
+      "5 400 € - 2 000 € - 0 € = 3 400 €.",
+      "3 400 € / 700 € = environ 5 mois.",
+    ];
+    trajectory.trace.details.declared_facts = [
+      {
+        fact_type: "safety_floor",
+        amount: 5_400,
+        state: "active",
+        last_confirmed_at: "2026-08-02T12:00:00Z",
+        valid_until: "2027-01-29T12:00:00Z",
+        can_correct: true,
+        can_delete: true,
+      },
+    ];
+    mockGenerateAdvice.mockResolvedValue({
+      success: true,
+      advice: createMockAdviceData({ outputs: [trajectory] }),
+      generated_at: "2026-08-02T12:00:00Z",
+      is_valid: true,
+      was_cached: false,
+    });
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    await user.type(
+      await screen.findByLabelText("Montant du plancher de sécurité"),
+      "5400",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Répondre et réutiliser" }),
+    );
+
+    expect(mockGenerateAdvice).toHaveBeenCalledWith(2025, 12, {
+      regenerate: true,
+      emergencyFundFact: {
+        fact_type: "safety_floor",
+        amount: 5_400,
+      },
+      rememberFact: true,
+    });
+    expect(
+      await screen.findByText("Affecter 700 € par mois au fonds d'urgence."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/écart de 3 400 €/i)).toBeInTheDocument();
+    expect(screen.getByText(/environ 5 mois/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Corriger ou supprimer" }),
+    ).toHaveAttribute("href", "#emergency-fund-context-safety_floor");
+  });
+
   it("skip and unknown close the question without storing context", async () => {
     const user = userEvent.setup();
     const recommendation = createMockRecommendationOutput();
@@ -327,6 +414,49 @@ describe("AdvicePanel decision outputs", () => {
     });
     await user.click(await screen.findByRole("button", { name: "Supprimer" }));
     expect(mockDeleteActivePriority).toHaveBeenCalledOnce();
+  });
+
+  it("shows expired emergency context and exposes correction and deletion", async () => {
+    const user = userEvent.setup();
+    const fact = {
+      fact_type: "safety_floor" as const,
+      amount: 5_400,
+      state: "to_confirm" as const,
+      last_confirmed_at: "2026-01-01T12:00:00Z",
+      valid_until: "2026-06-30T12:00:00Z",
+    };
+    mockGetAdvice.mockResolvedValue(loaded());
+    mockGetEmergencyFundContext.mockResolvedValue({ facts: [fact] });
+    mockPutEmergencyFundFact.mockResolvedValue({
+      fact: { ...fact, amount: 6_000, state: "corrected" },
+    });
+    mockDeleteEmergencyFundFact.mockResolvedValue();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    expect(await screen.findByText("Plancher de sécurité")).toBeInTheDocument();
+    expect(screen.getByText("À confirmer")).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Corriger Plancher de sécurité",
+      }),
+    );
+    const amount = screen.getByLabelText("Montant en euros");
+    await user.clear(amount);
+    await user.type(amount, "6000");
+    await user.click(screen.getByRole("button", { name: "Enregistrer" }));
+
+    expect(mockPutEmergencyFundFact).toHaveBeenCalledWith(
+      "safety_floor",
+      6_000,
+    );
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Supprimer Plancher de sécurité",
+      }),
+    );
+    expect(mockDeleteEmergencyFundFact).toHaveBeenCalledWith("safety_floor");
   });
 
   it("shows derived amount and deadline only when present", async () => {

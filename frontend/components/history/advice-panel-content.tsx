@@ -26,10 +26,13 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   deleteActivePriority,
+  deleteEmergencyFundFact,
   generateAdvice,
+  getEmergencyFundContext,
   getActivePriority,
   getAdvice,
   putActivePriority,
+  putEmergencyFundFact,
 } from "@/lib/api-client";
 import { t } from "@/lib/translations";
 import {
@@ -42,6 +45,9 @@ import type {
   ActivePriority,
   ActivePriorityInput,
   AdviceData,
+  EmergencyFundFact,
+  EmergencyFundFactInput,
+  EmergencyFundFactType,
   ClarificationOutput,
   DecisionOutput,
   DecisionPriority,
@@ -82,6 +88,18 @@ const initialState: AdviceState = {
   isRegenerating: false,
   error: null,
   eligibility: null,
+};
+
+const emergencyFundFactLabels: Record<EmergencyFundFactType, string> = {
+  liquid_reserve: "Réserve liquide non affectée",
+  safety_floor: "Plancher de sécurité",
+  priority_allocation: "Montant déjà affecté à la priorité",
+};
+
+const emergencyFundInputLabels: Record<EmergencyFundFactType, string> = {
+  liquid_reserve: "Montant de la réserve liquide non affectée",
+  safety_floor: "Montant du plancher de sécurité",
+  priority_allocation: "Montant déjà affecté à la priorité",
 };
 
 function adviceReducer(state: AdviceState, action: AdviceAction): AdviceState {
@@ -141,16 +159,20 @@ export function AdvicePanelContent({
   const [activePriority, setActivePriority] = useState<ActivePriority | null>(
     null,
   );
+  const [emergencyFundFacts, setEmergencyFundFacts] = useState<
+    EmergencyFundFact[]
+  >([]);
   const [contextError, setContextError] = useState<string | null>(null);
   const canGenerate = state.eligibility?.can_generate ?? false;
 
   useEffect(() => {
     let active = true;
     dispatch({ type: "FETCH_START" });
-    getActivePriority()
-      .then(({ priority }) => {
+    Promise.all([getActivePriority(), getEmergencyFundContext()])
+      .then(([{ priority }, { facts }]) => {
         if (active) {
           setActivePriority(priority);
+          setEmergencyFundFacts(facts);
           setContextError(null);
         }
       })
@@ -232,6 +254,32 @@ export function AdvicePanelContent({
     [year, month],
   );
 
+  const handleEmergencyFundAnswer = useCallback(
+    async (fact: EmergencyFundFactInput, rememberFact: boolean) => {
+      dispatch({ type: "REGENERATE_START" });
+      try {
+        const response = await generateAdvice(year, month, {
+          regenerate: true,
+          emergencyFundFact: fact,
+          rememberFact,
+        });
+        dispatch({
+          type: "REGENERATE_SUCCESS",
+          advice: response.advice,
+          generatedAt: response.generated_at,
+        });
+        const context = await getEmergencyFundContext();
+        setEmergencyFundFacts(context.facts);
+      } catch (error) {
+        dispatch({
+          type: "REGENERATE_ERROR",
+          error: getErrorMessage(error, t.advice.generateError),
+        });
+      }
+    },
+    [year, month],
+  );
+
   const handleClarificationAbstention = useCallback(
     async (clarificationAction: "skip" | "unknown") => {
       dispatch({ type: "REGENERATE_START" });
@@ -279,6 +327,38 @@ export function AdvicePanelContent({
     }
   }, []);
 
+  const handleEmergencyFundCorrection = useCallback(
+    async (factType: EmergencyFundFactType, amount: number) => {
+      try {
+        const { fact } = await putEmergencyFundFact(factType, amount);
+        setEmergencyFundFacts((facts) => [
+          ...facts.filter((item) => item.fact_type !== factType),
+          fact,
+        ]);
+        reload();
+      } catch (error) {
+        setContextError(getErrorMessage(error, "Correction impossible."));
+      }
+    },
+    [],
+  );
+
+  const handleEmergencyFundDeletion = useCallback(
+    async (factType: EmergencyFundFactType) => {
+      if (!window.confirm("Supprimer ce fait mémorisé ?")) return;
+      try {
+        await deleteEmergencyFundFact(factType);
+        setEmergencyFundFacts((facts) =>
+          facts.filter((fact) => fact.fact_type !== factType),
+        );
+        reload();
+      } catch (error) {
+        setContextError(getErrorMessage(error, "Suppression impossible."));
+      }
+    },
+    [],
+  );
+
   return (
     <div className={cn("space-y-6", className)}>
       <ActivePriorityPanel
@@ -286,6 +366,11 @@ export function AdvicePanelContent({
         error={contextError}
         onCorrect={handlePriorityCorrection}
         onDelete={handlePriorityDeletion}
+      />
+      <EmergencyFundFactsPanel
+        facts={emergencyFundFacts}
+        onCorrect={handleEmergencyFundCorrection}
+        onDelete={handleEmergencyFundDeletion}
       />
       {state.panelState === "loading" && <AdviceSkeletonLoader />}
       {state.panelState === "empty" && (
@@ -309,6 +394,7 @@ export function AdvicePanelContent({
           regenerateError={state.error}
           canRegenerate={canGenerate}
           onPriorityAnswer={handlePriorityAnswer}
+          onEmergencyFundAnswer={handleEmergencyFundAnswer}
           onClarificationAbstention={handleClarificationAbstention}
           onCorrectSession={reload}
         />
@@ -463,6 +549,138 @@ function ActivePriorityPanel({
         </form>
       )}
     </section>
+  );
+}
+
+interface EmergencyFundFactsPanelProps {
+  facts: EmergencyFundFact[];
+  onCorrect: (factType: EmergencyFundFactType, amount: number) => Promise<void>;
+  onDelete: (factType: EmergencyFundFactType) => Promise<void>;
+}
+
+function EmergencyFundFactsPanel({
+  facts,
+  onCorrect,
+  onDelete,
+}: EmergencyFundFactsPanelProps) {
+  return (
+    <section className="space-y-4 rounded-xl border bg-muted/20 p-5">
+      <h4 className="font-semibold">Contexte du fonds d’urgence</h4>
+      {facts.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Aucun montant mémorisé.</p>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-3">
+          {facts.map((fact) => (
+            <EmergencyFundFactCard
+              key={fact.fact_type}
+              fact={fact}
+              onCorrect={onCorrect}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function EmergencyFundFactCard({
+  fact,
+  onCorrect,
+  onDelete,
+}: {
+  fact: EmergencyFundFact;
+  onCorrect: (factType: EmergencyFundFactType, amount: number) => Promise<void>;
+  onDelete: (factType: EmergencyFundFactType) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const label = emergencyFundFactLabels[fact.fact_type];
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    await onCorrect(fact.fact_type, Number(data.get("amount")));
+    setEditing(false);
+  }
+
+  return (
+    <article
+      id={`emergency-fund-context-${fact.fact_type}`}
+      className="space-y-3 rounded-lg border bg-background/50 p-4"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h5 className="text-sm font-medium">{label}</h5>
+        <Badge variant={fact.state === "to_confirm" ? "secondary" : "outline"}>
+          {fact.state === "active"
+            ? "Actif"
+            : fact.state === "corrected"
+              ? "Corrigé"
+              : "À confirmer"}
+        </Badge>
+      </div>
+      {editing ? (
+        <form className="space-y-3" onSubmit={handleSubmit}>
+          <Label htmlFor={`context-${fact.fact_type}-amount`}>
+            Montant en euros
+          </Label>
+          <Input
+            id={`context-${fact.fact_type}-amount`}
+            name="amount"
+            type="number"
+            min="0"
+            step="0.01"
+            defaultValue={fact.amount}
+            required
+          />
+          <div className="flex gap-2">
+            <Button type="submit" size="sm">
+              Enregistrer
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setEditing(false)}
+            >
+              Annuler
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <p className="text-lg font-semibold">{formatCurrency(fact.amount)}</p>
+          <p className="text-xs text-muted-foreground">
+            Confirmé le {formatAdviceTimestamp(fact.last_confirmed_at)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Valide jusqu’au{" "}
+            {new Date(fact.valid_until).toLocaleDateString("fr-FR")}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label={`Corriger ${label}`}
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="h-4 w-4" />
+              Corriger
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              aria-label={`Supprimer ${label}`}
+              onClick={() => onDelete(fact.fact_type)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Supprimer
+            </Button>
+          </div>
+        </>
+      )}
+    </article>
   );
 }
 
@@ -680,15 +898,24 @@ function DecisionTraceDetails({
                   key={`${fact.fact_type}-${fact.last_confirmed_at}`}
                   className="space-y-1 rounded-lg bg-muted/50 p-3 text-sm"
                 >
-                  <p className="font-medium">
-                    {fact.goal} — {fact.target}
-                  </p>
-                  {fact.deadline && (
-                    <p className="text-muted-foreground">
-                      Échéance :{" "}
-                      {new Date(`${fact.deadline}T00:00:00`).toLocaleDateString(
-                        "fr-FR",
+                  {fact.fact_type === "active_priority" ? (
+                    <>
+                      <p className="font-medium">
+                        {fact.goal} — {fact.target}
+                      </p>
+                      {fact.deadline && (
+                        <p className="text-muted-foreground">
+                          Échéance :{" "}
+                          {new Date(
+                            `${fact.deadline}T00:00:00`,
+                          ).toLocaleDateString("fr-FR")}
+                        </p>
                       )}
+                    </>
+                  ) : (
+                    <p className="font-medium">
+                      {emergencyFundFactLabels[fact.fact_type]} —{" "}
+                      {formatCurrency(fact.amount)}
                     </p>
                   )}
                   <p className="text-muted-foreground">
@@ -726,7 +953,11 @@ function DecisionTraceDetails({
                     </div>
                   ) : (
                     <a
-                      href="#active-priority-context"
+                      href={
+                        fact.fact_type === "active_priority"
+                          ? "#active-priority-context"
+                          : `#emergency-fund-context-${fact.fact_type}`
+                      }
                       className="inline-block font-medium text-primary underline-offset-4 hover:underline"
                     >
                       Corriger ou supprimer
@@ -762,9 +993,13 @@ type DecidedOutput = Exclude<DecisionOutput, ClarificationOutput>;
 interface ClarificationCardProps {
   output: ClarificationOutput;
   isSubmitting: boolean;
-  onAnswer: (
+  onPriorityAnswer: (
     priority: ActivePriorityInput,
     rememberPriority: boolean,
+  ) => Promise<void>;
+  onEmergencyFundAnswer: (
+    fact: EmergencyFundFactInput,
+    rememberFact: boolean,
   ) => Promise<void>;
   onAbstain: (action: "skip" | "unknown") => Promise<void>;
 }
@@ -772,7 +1007,8 @@ interface ClarificationCardProps {
 function ClarificationCard({
   output,
   isSubmitting,
-  onAnswer,
+  onPriorityAnswer,
+  onEmergencyFundAnswer,
   onAbstain,
 }: ClarificationCardProps) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -780,14 +1016,25 @@ function ClarificationCard({
     const data = new FormData(event.currentTarget);
     const submitter = (event.nativeEvent as SubmitEvent)
       .submitter as HTMLButtonElement | null;
-    await onAnswer(
-      {
-        goal: String(data.get("goal")),
-        target: String(data.get("target")),
-        deadline: String(data.get("deadline")) || null,
-      },
-      submitter?.value === "true",
-    );
+    const remember = submitter?.value === "true";
+    if (output.fact_type === "active_priority") {
+      await onPriorityAnswer(
+        {
+          goal: String(data.get("goal")),
+          target: String(data.get("target")),
+          deadline: String(data.get("deadline")) || null,
+        },
+        remember,
+      );
+    } else {
+      await onEmergencyFundAnswer(
+        {
+          fact_type: output.fact_type,
+          amount: Number(data.get("amount")),
+        },
+        remember,
+      );
+    }
   }
 
   return (
@@ -815,18 +1062,36 @@ function ClarificationCard({
         </AlertDescription>
       </Alert>
       <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
-        <div className="space-y-2">
-          <Label htmlFor="priority-goal">Objectif courant</Label>
-          <Input id="priority-goal" name="goal" required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="priority-target">Cible</Label>
-          <Input id="priority-target" name="target" required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="priority-deadline">Échéance éventuelle</Label>
-          <Input id="priority-deadline" name="deadline" type="date" />
-        </div>
+        {output.fact_type === "active_priority" ? (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="priority-goal">Objectif courant</Label>
+              <Input id="priority-goal" name="goal" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="priority-target">Cible</Label>
+              <Input id="priority-target" name="target" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="priority-deadline">Échéance éventuelle</Label>
+              <Input id="priority-deadline" name="deadline" type="date" />
+            </div>
+          </>
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor={`clarification-${output.fact_type}-amount`}>
+              {emergencyFundInputLabels[output.fact_type]}
+            </Label>
+            <Input
+              id={`clarification-${output.fact_type}-amount`}
+              name="amount"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+            />
+          </div>
+        )}
         <div className="flex flex-wrap items-end gap-2">
           <Button
             type="submit"
@@ -910,6 +1175,10 @@ interface AdviceContentProps {
     priority: ActivePriorityInput,
     rememberPriority: boolean,
   ) => Promise<void>;
+  onEmergencyFundAnswer: (
+    fact: EmergencyFundFactInput,
+    rememberFact: boolean,
+  ) => Promise<void>;
   onClarificationAbstention: (action: "skip" | "unknown") => Promise<void>;
   onCorrectSession: () => void;
 }
@@ -922,6 +1191,7 @@ function AdviceContent({
   regenerateError,
   canRegenerate,
   onPriorityAnswer,
+  onEmergencyFundAnswer,
   onClarificationAbstention,
   onCorrectSession,
 }: AdviceContentProps) {
@@ -935,7 +1205,8 @@ function AdviceContent({
               key={index}
               output={output}
               isSubmitting={isRegenerating}
-              onAnswer={onPriorityAnswer}
+              onPriorityAnswer={onPriorityAnswer}
+              onEmergencyFundAnswer={onEmergencyFundAnswer}
               onAbstain={onClarificationAbstention}
             />
           ) : (

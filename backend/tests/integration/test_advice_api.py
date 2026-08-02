@@ -37,7 +37,7 @@ def _create_month(db: Session, year: int, month: int) -> Month:
 
 def _advice(output_type: str = "recommendation") -> AdviceResponse:
     """Build strict generated advice."""
-    common = {
+    common: dict[str, object] = {
         "type": output_type,
         "priority": "high",
         "trace": {
@@ -239,8 +239,8 @@ def test_priority_answer_is_remembered_and_changes_generated_output(
     context = client.get("/api/advice/context/active-priority").json()["priority"]
     assert context["goal"] == "Constituer un fonds d'urgence"
     generation_context = mock_generator.generate_advice.call_args.args[2]
-    assert generation_context.goal == context["goal"]
-    assert generation_context.state == "active"
+    assert generation_context.active_priority.goal == context["goal"]
+    assert generation_context.active_priority.state == "active"
     citation = response.json()["advice"]["outputs"][0]["trace"]["details"]["declared_facts"][0]
     assert citation["fact_type"] == "active_priority"
     assert citation["state"] == "active"

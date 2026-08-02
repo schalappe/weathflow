@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.db.models.emergency_fund_fact import EmergencyFundFactType
 from app.services.advice.models import AdviceResponse
 
 AdviceData = AdviceResponse
@@ -27,6 +28,10 @@ class GenerateAdviceRequest(BaseModel):
         Clarification answer.
     remember_priority : bool
         Reuse answer after current session.
+    emergency_fund_fact : EmergencyFundFactAnswer | None
+        Emergency-fund clarification answer.
+    remember_fact : bool
+        Reuse emergency-fund answer after current session.
     clarification_action : Literal["skip", "unknown"] | None
         Resolve question without storing a fact.
     """
@@ -36,6 +41,8 @@ class GenerateAdviceRequest(BaseModel):
     regenerate: bool = False
     active_priority: ActivePriorityInput | None = None
     remember_priority: bool = True
+    emergency_fund_fact: EmergencyFundFactAnswer | None = None
+    remember_fact: bool = True
     clarification_action: Literal["skip", "unknown"] | None = None
 
 
@@ -85,6 +92,75 @@ class ActivePriorityResponse(BaseModel):
     """
 
     priority: ActivePriorityData | None
+
+
+class EmergencyFundFactInput(BaseModel):
+    """Declared emergency-fund amount.
+
+    Attributes
+    ----------
+    amount : float
+        Non-negative euro amount.
+    """
+
+    amount: float = Field(ge=0, allow_inf_nan=False)
+
+
+class EmergencyFundFactAnswer(EmergencyFundFactInput):
+    """Emergency-fund clarification answer.
+
+    Attributes
+    ----------
+    fact_type : EmergencyFundFactType
+        Closed-catalog fact key.
+    """
+
+    fact_type: EmergencyFundFactType
+
+
+class EmergencyFundFactData(EmergencyFundFactInput):
+    """Stored emergency-fund amount lifecycle.
+
+    Attributes
+    ----------
+    fact_type : EmergencyFundFactType
+        Closed-catalog fact key.
+    state : Literal["active", "corrected", "to_confirm"]
+        Lifecycle state.
+    last_confirmed_at : datetime
+        Explicit answer time.
+    valid_until : datetime
+        Reuse cutoff.
+    """
+
+    fact_type: EmergencyFundFactType
+    state: Literal["active", "corrected", "to_confirm"]
+    last_confirmed_at: datetime
+    valid_until: datetime
+
+
+class EmergencyFundFactResponse(BaseModel):
+    """One emergency-fund amount.
+
+    Attributes
+    ----------
+    fact : EmergencyFundFactData
+        Stored lifecycle value.
+    """
+
+    fact: EmergencyFundFactData
+
+
+class EmergencyFundContextResponse(BaseModel):
+    """All declared emergency-fund amounts.
+
+    Attributes
+    ----------
+    facts : list[EmergencyFundFactData]
+        Stored values, including expired facts.
+    """
+
+    facts: list[EmergencyFundFactData]
 
 
 class GenerateAdviceResponse(BaseModel):

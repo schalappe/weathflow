@@ -49,7 +49,7 @@ def init_db() -> None:
     """
     # ##>: Import all models to register them with SQLAlchemy before creating tables.
     # This ensures relationships like Month.advice_records can resolve the Advice class.
-    from app.db.models import active_priority, advice, month, transaction  # noqa: F401
+    from app.db.models import active_priority, advice, emergency_fund_fact, month, transaction  # noqa: F401
 
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)

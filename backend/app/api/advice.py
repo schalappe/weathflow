@@ -5,22 +5,44 @@ from datetime import UTC
 from fastapi import HTTPException, Path, Response, status
 from loguru import logger
 
-from app.api.deps import ActivePriorityRepo, AdviceGen, AdviceRepo, MonthRepo, create_router
+from app.api.deps import (
+    ActivePriorityRepo,
+    AdviceGen,
+    AdviceRepo,
+    EmergencyFundRepo,
+    MonthRepo,
+    create_router,
+)
 from app.db.models.active_priority import ActivePriority
 from app.db.models.base import utc_now
+from app.db.models.emergency_fund_fact import EmergencyFundFact, EmergencyFundFactType
 from app.responses.advice import (
     ActivePriorityData,
     ActivePriorityInput,
     ActivePriorityResponse,
     AdviceData,
     EligibilityInfo,
+    EmergencyFundContextResponse,
+    EmergencyFundFactAnswer,
+    EmergencyFundFactData,
+    EmergencyFundFactInput,
+    EmergencyFundFactResponse,
     GenerateAdviceRequest,
     GenerateAdviceResponse,
     GetAdviceResponse,
 )
 from app.services.advice import service as advice_service
 from app.services.advice.eligibility import check_eligibility
-from app.services.advice.models import ActivePriorityContext
+from app.services.advice.models import (
+    ActivePriorityContext,
+    AdviceContext,
+    DecisionOutput,
+    DecisionTrace,
+    DecisionTraceDetails,
+    EmergencyFundFactContext,
+    ObservedFact,
+    UnresolvedOutput,
+)
 from app.services.data import months as months_service
 from app.services.exceptions import (
     AdviceAPIError,
@@ -63,6 +85,7 @@ def generate_advice(
     month_repo: MonthRepo,
     advice_repo: AdviceRepo,
     priority_repo: ActivePriorityRepo,
+    fact_repo: EmergencyFundRepo,
     generator: AdviceGen,
 ) -> GenerateAdviceResponse:
     """
@@ -110,17 +133,30 @@ def generate_advice(
                 status_code=403,
                 detail=eligibility.reason or "This month is not eligible for advice generation.",
             )
+        previous_question_count = 0
+        if request.active_priority is not None or request.emergency_fund_fact is not None:
+            previous_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
+            if previous_advice is not None:
+                previous_data = AdviceData.model_validate_json(previous_advice.advice_text)
+                previous_question = next(
+                    (output for output in previous_data.outputs if output.type == "clarification"),
+                    None,
+                )
+                if previous_question is not None:
+                    previous_question_count = previous_question.question_number
+        if request.active_priority is not None and request.emergency_fund_fact is not None:
+            raise HTTPException(status_code=422, detail="Answer one clarification at a time.")
         if request.clarification_action is not None:
-            if request.active_priority is not None:
+            if request.active_priority is not None or request.emergency_fund_fact is not None:
                 raise HTTPException(
                     status_code=422,
                     detail="A clarification cannot be answered and skipped together.",
                 )
             existing_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
             if existing_advice is None:
-                raise HTTPException(status_code=409, detail="No priority clarification to resolve.")
+                raise HTTPException(status_code=409, detail="No clarification to resolve.")
             current_advice = AdviceData.model_validate_json(existing_advice.advice_text)
-            resolved_advice = advice_service.resolve_priority_clarification(
+            resolved_advice = advice_service.resolve_clarification(
                 current_advice,
                 request.year,
                 request.month,
@@ -161,7 +197,13 @@ def generate_advice(
         else:
             priority_context = _priority_context(stored_priority) if stored_priority is not None else None
 
-        if not request.regenerate and request.active_priority is None:
+        emergency_fund_contexts = _prepare_emergency_fund_context(
+            request,
+            fact_repo,
+            advice_repo,
+        )
+
+        if not request.regenerate and request.active_priority is None and request.emergency_fund_fact is None:
             existing_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
             if existing_advice:
                 return GenerateAdviceResponse(
@@ -182,20 +224,48 @@ def generate_advice(
         history_data = [advice_service.month_to_month_data(month) for month in filtered_history]
         current_data = advice_service.month_to_month_data(month_record)
 
-        advice_response = generator.generate_advice(current_data, history_data, priority_context)
+        generation_context = AdviceContext(
+            active_priority=priority_context,
+            emergency_fund_facts=emergency_fund_contexts,
+            clarifications_remaining=max(0, 3 - previous_question_count),
+        )
+        advice_response = generator.generate_advice(current_data, history_data, generation_context)
         advice_response = AdviceData.model_validate(advice_response)
-        if request.active_priority is not None:
-            still_blocked = any(output.type == "clarification" for output in advice_response.outputs)
+        answered_fact_type = (
+            "active_priority"
+            if request.active_priority is not None
+            else request.emergency_fund_fact.fact_type
+            if request.emergency_fund_fact is not None
+            else None
+        )
+        if answered_fact_type is not None:
+            repeats_answered_question = any(
+                output.type == "clarification" and output.fact_type == answered_fact_type
+                for output in advice_response.outputs
+            )
+            has_next_question = any(output.type == "clarification" for output in advice_response.outputs)
             cites_answer = any(
-                fact.fact_type == "active_priority"
+                fact.fact_type == answered_fact_type
                 for output in advice_response.outputs
                 if output.type != "clarification"
                 for fact in output.trace.details.declared_facts
             )
-            if still_blocked or not cites_answer:
+            if repeats_answered_question or (not has_next_question and not cites_answer):
                 raise AdviceParseError(advice_response.model_dump_json())
+        advice_response = _apply_clarification_limit(
+            advice_response,
+            previous_question_count,
+            request.year,
+            request.month,
+        )
 
-        if request.active_priority is not None and not request.remember_priority:
+        session_only_answer = (
+            request.active_priority is not None
+            and not request.remember_priority
+            or request.emergency_fund_fact is not None
+            and not request.remember_fact
+        )
+        if session_only_answer:
             return GenerateAdviceResponse(
                 success=True,
                 advice=advice_response,
@@ -311,6 +381,199 @@ def _session_priority_context(payload: ActivePriorityInput) -> ActivePriorityCon
     )
 
 
+def _emergency_fund_fact_data(fact: EmergencyFundFact) -> EmergencyFundFactData:
+    """Map emergency-fund persistence to API data.
+
+    Parameters
+    ----------
+    fact : EmergencyFundFact
+        Stored lifecycle value.
+
+    Returns
+    -------
+    EmergencyFundFactData
+        UTC API value.
+    """
+    return EmergencyFundFactData.model_validate(
+        {
+            "fact_type": fact.fact_type,
+            "amount": fact.amount,
+            "state": fact.state,
+            "last_confirmed_at": fact.last_confirmed_at.replace(tzinfo=UTC),
+            "valid_until": fact.valid_until.replace(tzinfo=UTC),
+        }
+    )
+
+
+def _emergency_fund_fact_context(fact: EmergencyFundFact) -> EmergencyFundFactContext:
+    """Map emergency-fund persistence to generation context.
+
+    Parameters
+    ----------
+    fact : EmergencyFundFact
+        Stored lifecycle value.
+
+    Returns
+    -------
+    EmergencyFundFactContext
+        UTC generation fact.
+    """
+    return EmergencyFundFactContext.model_validate(
+        {
+            "fact_type": fact.fact_type,
+            "amount": fact.amount,
+            "state": fact.state,
+            "last_confirmed_at": fact.last_confirmed_at.replace(tzinfo=UTC),
+            "valid_until": fact.valid_until.replace(tzinfo=UTC),
+        }
+    )
+
+
+def _session_emergency_fund_fact_context(
+    payload: EmergencyFundFactAnswer,
+) -> EmergencyFundFactContext:
+    """Build request-scoped emergency-fund amount.
+
+    Parameters
+    ----------
+    payload : EmergencyFundFactAnswer
+        Explicit answer.
+
+    Returns
+    -------
+    EmergencyFundFactContext
+        Session-only fact.
+    """
+    return EmergencyFundFactContext(
+        fact_type=payload.fact_type,
+        amount=payload.amount,
+        state="session",
+        last_confirmed_at=utc_now(),
+        valid_until=None,
+    )
+
+
+def _load_emergency_fund_facts(
+    fact_repo: EmergencyFundRepo,
+    advice_repo: AdviceRepo,
+) -> list[EmergencyFundFact]:
+    """Load facts and invalidate advice that cites expired values.
+
+    Parameters
+    ----------
+    fact_repo : EmergencyFundRepo
+        Declared-fact persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+
+    Returns
+    -------
+    list[EmergencyFundFact]
+        Stored facts, including inactive expired values.
+    """
+    facts = fact_repo.get_all()
+    for fact in facts:
+        if fact.state == "to_confirm":
+            advice_repo.delete_depending_on_declared_fact(fact.fact_type)
+    return facts
+
+
+def _prepare_emergency_fund_context(
+    request: GenerateAdviceRequest,
+    fact_repo: EmergencyFundRepo,
+    advice_repo: AdviceRepo,
+) -> list[EmergencyFundFactContext]:
+    """Build generation facts from stored and request-scoped values.
+
+    Parameters
+    ----------
+    request : GenerateAdviceRequest
+        Current generation request.
+    fact_repo : EmergencyFundRepo
+        Declared-fact persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+
+    Returns
+    -------
+    list[EmergencyFundFactContext]
+        Facts available to the current generation.
+    """
+    contexts = [_emergency_fund_fact_context(fact) for fact in _load_emergency_fund_facts(fact_repo, advice_repo)]
+    answer = request.emergency_fund_fact
+    if answer is None:
+        return contexts
+    contexts = [context for context in contexts if context.fact_type != answer.fact_type]
+    if request.remember_fact:
+        advice_repo.delete_depending_on_declared_fact(answer.fact_type)
+        stored_fact = fact_repo.put(answer.fact_type, answer.amount)
+        contexts.append(_emergency_fund_fact_context(stored_fact))
+    else:
+        fact_repo.mark_to_confirm(answer.fact_type)
+        contexts.append(_session_emergency_fund_fact_context(answer))
+    return contexts
+
+
+def _apply_clarification_limit(
+    advice: AdviceData,
+    previous_count: int,
+    year: int,
+    month: int,
+) -> AdviceData:
+    """Count questions and replace a fourth question with an unresolved output.
+
+    Parameters
+    ----------
+    advice : AdviceData
+        Newly generated decision outputs.
+    previous_count : int
+        Questions already shown in this flow.
+    year : int
+        Advice year.
+    month : int
+        Advice month.
+
+    Returns
+    -------
+    AdviceData
+        Advice with bounded clarification count.
+    """
+    clarification = next(
+        (output for output in advice.outputs if output.type == "clarification"),
+        None,
+    )
+    if clarification is None:
+        return advice
+    if previous_count < 3:
+        next_question = clarification.model_copy(update={"question_number": previous_count + 1})
+        outputs: list[DecisionOutput] = [
+            next_question if output.type == "clarification" else output for output in advice.outputs
+        ]
+        return AdviceData(outputs=outputs)
+
+    unresolved = UnresolvedOutput(
+        type="unresolved",
+        priority=clarification.priority,
+        conclusion=f"{clarification.subject} : information manquante après trois clarifications.",
+        trace=DecisionTrace(
+            summary=clarification.possible_effect,
+            details=DecisionTraceDetails(
+                observations=[
+                    ObservedFact(
+                        fact=clarification.observation,
+                        period=f"{year}-{month:02d}",
+                        scope=clarification.subject,
+                        source="observed_data",
+                    )
+                ],
+                limits=["Plafond de trois questions atteint."],
+            ),
+        ),
+    )
+    outputs = [unresolved if output.type == "clarification" else output for output in advice.outputs]
+    return AdviceData(outputs=outputs)
+
+
 @router.get("/context/active-priority", response_model=ActivePriorityResponse)
 def get_active_priority(
     priority_repo: ActivePriorityRepo,
@@ -373,11 +636,99 @@ def delete_active_priority(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get("/context/emergency-fund", response_model=EmergencyFundContextResponse)
+def get_emergency_fund_context(
+    fact_repo: EmergencyFundRepo,
+    advice_repo: AdviceRepo,
+) -> EmergencyFundContextResponse:
+    """Return emergency-fund facts, visible after expiry.
+
+    Parameters
+    ----------
+    fact_repo : EmergencyFundRepo
+        Declared-fact persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+
+    Returns
+    -------
+    EmergencyFundContextResponse
+        Stored values, including expired facts.
+    """
+    facts = _load_emergency_fund_facts(fact_repo, advice_repo)
+    return EmergencyFundContextResponse(facts=[_emergency_fund_fact_data(fact) for fact in facts])
+
+
+@router.put(
+    "/context/emergency-fund/{fact_type}",
+    response_model=EmergencyFundFactResponse,
+)
+def put_emergency_fund_fact(
+    payload: EmergencyFundFactInput,
+    fact_repo: EmergencyFundRepo,
+    advice_repo: AdviceRepo,
+    fact_type: EmergencyFundFactType,
+) -> EmergencyFundFactResponse:
+    """Create, correct, or reconfirm emergency-fund fact.
+
+    Parameters
+    ----------
+    payload : EmergencyFundFactInput
+        Declared euro amount.
+    fact_repo : EmergencyFundRepo
+        Declared-fact persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+    fact_type : EmergencyFundFactType
+        Closed-catalog fact key.
+
+    Returns
+    -------
+    EmergencyFundFactResponse
+        Stored lifecycle value.
+    """
+    fact = fact_repo.put(fact_type, payload.amount)
+    advice_repo.delete_depending_on_declared_fact(fact_type)
+    return EmergencyFundFactResponse(fact=_emergency_fund_fact_data(fact))
+
+
+@router.delete(
+    "/context/emergency-fund/{fact_type}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+def delete_emergency_fund_fact(
+    fact_repo: EmergencyFundRepo,
+    advice_repo: AdviceRepo,
+    fact_type: EmergencyFundFactType,
+) -> Response:
+    """Delete emergency-fund fact and dependent advice.
+
+    Parameters
+    ----------
+    fact_repo : EmergencyFundRepo
+        Declared-fact persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+    fact_type : EmergencyFundFactType
+        Closed-catalog fact key.
+
+    Returns
+    -------
+    Response
+        Empty 204 response.
+    """
+    fact_repo.delete(fact_type)
+    advice_repo.delete_depending_on_declared_fact(fact_type)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/{year}/{month}", response_model=GetAdviceResponse)
 def get_advice(
     month_repo: MonthRepo,
     advice_repo: AdviceRepo,
     priority_repo: ActivePriorityRepo,
+    fact_repo: EmergencyFundRepo,
     year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
     month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
 ) -> GetAdviceResponse:
@@ -413,6 +764,7 @@ def get_advice(
         priority = priority_repo.get()
         if priority is not None and priority.state == "to_confirm":
             advice_repo.delete_depending_on_active_priority()
+        _load_emergency_fund_facts(fact_repo, advice_repo)
 
         # ##>: Check eligibility for this month.
         eligibility = check_eligibility(year, month, month_record.id, month_repo, advice_repo)

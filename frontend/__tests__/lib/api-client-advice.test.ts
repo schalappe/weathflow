@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   deleteActivePriority,
+  deleteEmergencyFundFact,
   generateAdvice,
   getActivePriority,
+  getEmergencyFundContext,
   getAdvice,
   putActivePriority,
+  putEmergencyFundFact,
 } from "@/lib/api-client";
 import { createMockAdviceData } from "@/__tests__/utils/test-factories";
 
@@ -217,6 +220,46 @@ describe("API Client - Advice Functions", () => {
       );
     });
 
+    it("sends a session-only emergency-fund fact", async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            advice: createMockAdviceData(),
+            generated_at: "2026-08-02T12:00:00Z",
+            is_valid: true,
+            was_cached: false,
+          }),
+      });
+
+      await generateAdvice(2025, 12, {
+        regenerate: true,
+        emergencyFundFact: {
+          fact_type: "priority_allocation",
+          amount: 600,
+        },
+        rememberFact: false,
+      });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/advice/generate"),
+        expect.objectContaining({
+          body: JSON.stringify({
+            year: 2025,
+            month: 12,
+            regenerate: true,
+            remember_priority: true,
+            emergency_fund_fact: {
+              fact_type: "priority_allocation",
+              amount: 600,
+            },
+            remember_fact: false,
+          }),
+        }),
+      );
+    });
+
     it("persists unknown clarification as an abstention", async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -312,6 +355,59 @@ describe("API Client - Advice Functions", () => {
       expect(global.fetch).toHaveBeenNthCalledWith(
         3,
         expect.stringContaining("/api/advice/context/active-priority"),
+        { method: "DELETE" },
+      );
+    });
+  });
+
+  describe("emergency-fund context", () => {
+    it("reads, corrects, and deletes each amount through its fact type", async () => {
+      const context = {
+        facts: [
+          {
+            fact_type: "liquid_reserve" as const,
+            amount: 2_000,
+            state: "active" as const,
+            last_confirmed_at: "2026-08-02T12:00:00Z",
+            valid_until: "2026-09-01T12:00:00Z",
+          },
+        ],
+      };
+      global.fetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(context),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ fact: context.facts[0] }),
+        })
+        .mockResolvedValueOnce({ ok: true });
+
+      await expect(getEmergencyFundContext()).resolves.toEqual(context);
+      await expect(
+        putEmergencyFundFact("liquid_reserve", 2_000),
+      ).resolves.toEqual({ fact: context.facts[0] });
+      await expect(
+        deleteEmergencyFundFact("liquid_reserve"),
+      ).resolves.toBeUndefined();
+
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining(
+          "/api/advice/context/emergency-fund/liquid_reserve",
+        ),
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({ amount: 2_000 }),
+        }),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining(
+          "/api/advice/context/emergency-fund/liquid_reserve",
+        ),
         { method: "DELETE" },
       );
     });

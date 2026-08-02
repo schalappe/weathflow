@@ -5,6 +5,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import ConfigDict, Field, model_validator
 
+from app.db.models.emergency_fund_fact import EmergencyFundFactType
 from app.services.models import FrozenModel
 
 
@@ -133,23 +134,91 @@ class ActivePriorityContext(DecisionModel):
     valid_until: datetime | None
 
 
-class DeclaredFactCitation(ActivePriorityContext):
+class EmergencyFundFactContext(DecisionModel):
+    """Declared emergency-fund amount available to generation.
+
+    Attributes
+    ----------
+    fact_type : EmergencyFundFactType
+        Closed-catalog fact key.
+    amount : float
+        Declared euro amount.
+    state : Literal["active", "corrected", "to_confirm", "session"]
+        Lifecycle state.
+    last_confirmed_at : datetime
+        Explicit answer time.
+    valid_until : datetime | None
+        Reuse cutoff; None for session.
+    """
+
+    fact_type: EmergencyFundFactType
+    amount: float = Field(ge=0)
+    state: Literal["active", "corrected", "to_confirm", "session"]
+    last_confirmed_at: datetime
+    valid_until: datetime | None
+
+
+class AdviceContext(DecisionModel):
+    """Declared facts and remaining clarification budget.
+
+    Attributes
+    ----------
+    active_priority : ActivePriorityContext | None
+        Current declared objective.
+    emergency_fund_facts : list[EmergencyFundFactContext]
+        Emergency-fund context.
+    clarifications_remaining : int
+        Questions available before abstention.
+    """
+
+    active_priority: ActivePriorityContext | None = None
+    emergency_fund_facts: list[EmergencyFundFactContext] = Field(default_factory=list)
+    clarifications_remaining: int = Field(default=3, ge=0, le=3)
+
+
+class EmergencyFundFactCitation(EmergencyFundFactContext):
+    """Emergency-fund amount cited by decision.
+
+    Attributes
+    ----------
+    state : Literal["active", "corrected", "session"]
+        Active citation state.
+    can_correct : Literal[True]
+        Correction capability.
+    can_delete : Literal[True]
+        Deletion capability.
+    """
+
+    state: Literal["active", "corrected", "session"]
+    can_correct: Literal[True]
+    can_delete: Literal[True]
+
+
+class ActivePriorityCitation(ActivePriorityContext):
     """Active priority cited by decision.
 
     Attributes
     ----------
     fact_type : Literal["active_priority"]
-        Closed-catalog fact.
+        Citation discriminator.
+    state : Literal["active", "corrected", "session"]
+        Active citation state.
     can_correct : Literal[True]
-        Correction control.
+        Correction capability.
     can_delete : Literal[True]
-        Deletion control.
+        Deletion capability.
     """
 
     fact_type: Literal["active_priority"]
     state: Literal["active", "corrected", "session"]
     can_correct: Literal[True]
     can_delete: Literal[True]
+
+
+DeclaredFactCitation = Annotated[
+    ActivePriorityCitation | EmergencyFundFactCitation,
+    Field(discriminator="fact_type"),
+]
 
 
 class DecisionTraceDetails(DecisionModel):
@@ -277,26 +346,28 @@ class UnresolvedOutput(DecisionModel):
 
 
 class ClarificationOutput(DecisionModel):
-    """Material active-priority question.
+    """Material question for one closed-catalog fact.
 
     Attributes
     ----------
     type : Literal["clarification"]
         Output discriminator.
     priority : Literal["high", "medium", "low"]
-        Blocked subject priority.
+        Decision priority.
     subject : str
         Blocked subject.
     observation : str
-        Known situation.
+        Certain observation.
     possible_effect : str
-        Decision impact.
+        Decision effect of the missing fact.
     question : str
-        Single requested fact.
-    fact_type : Literal["active_priority"]
-        Closed-catalog fact.
+        User-facing question.
+    question_number : int
+        One-based position in the capped flow.
+    fact_type : Literal
+        Requested closed-catalog fact.
     material_effects : list[str]
-        At least two distinct decision outcomes.
+        Distinct possible decisions.
     """
 
     type: Literal["clarification"]
@@ -305,7 +376,8 @@ class ClarificationOutput(DecisionModel):
     observation: str = Field(min_length=1)
     possible_effect: str = Field(min_length=1)
     question: str = Field(min_length=1)
-    fact_type: Literal["active_priority"]
+    question_number: int = Field(default=1, ge=1, le=3)
+    fact_type: Literal["active_priority", "liquid_reserve", "safety_floor", "priority_allocation"]
     material_effects: list[str] = Field(min_length=2)
 
     @model_validator(mode="after")

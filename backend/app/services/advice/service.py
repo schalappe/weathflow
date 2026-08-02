@@ -159,13 +159,13 @@ def advice_response_to_json(advice: AdviceResponse) -> str:
     return advice.model_dump_json()
 
 
-def resolve_priority_clarification(
+def resolve_clarification(
     advice: AdviceResponse,
     year: int,
     month: int,
     action: Literal["skip", "unknown"],
 ) -> AdviceResponse:
-    """Replace active-priority question with persisted abstention.
+    """Replace declared-fact question with persisted abstention.
 
     Parameters
     ----------
@@ -188,16 +188,22 @@ def resolve_priority_clarification(
         if output.type != "clarification":
             outputs.append(output)
             continue
+        label = {
+            "active_priority": "priorité active",
+            "liquid_reserve": "réserve liquide non affectée",
+            "safety_floor": "plancher de sécurité",
+            "priority_allocation": "montant déjà affecté",
+        }[output.fact_type]
         limit = (
-            "Priorité active non fournie : question passée."
+            f"{label.capitalize()} non fourni : question passée."
             if action == "skip"
-            else "Priorité active inconnue selon la réponse explicite."
+            else f"{label.capitalize()} inconnu selon la réponse explicite."
         )
         outputs.append(
             UnresolvedOutput(
                 type="unresolved",
                 priority=output.priority,
-                conclusion=f"{output.subject} : aucune action robuste sans priorité active.",
+                conclusion=f"{output.subject} : aucune action robuste sans {label}.",
                 trace=DecisionTrace(
                     summary=output.possible_effect,
                     details=DecisionTraceDetails(

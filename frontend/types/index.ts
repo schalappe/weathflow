@@ -269,7 +269,33 @@ export interface ActivePriorityResponse {
   priority: ActivePriority | null;
 }
 
-export interface DeclaredFactCitation extends ActivePriorityInput {
+export type EmergencyFundFactType =
+  | "liquid_reserve"
+  | "safety_floor"
+  | "priority_allocation";
+
+export type DeclaredFactType = "active_priority" | EmergencyFundFactType;
+
+export interface EmergencyFundFactInput {
+  fact_type: EmergencyFundFactType;
+  amount: number;
+}
+
+export interface EmergencyFundFact extends EmergencyFundFactInput {
+  state: Exclude<ActivePriorityState, "session">;
+  last_confirmed_at: string;
+  valid_until: string;
+}
+
+export interface EmergencyFundContextResponse {
+  facts: EmergencyFundFact[];
+}
+
+export interface EmergencyFundFactResponse {
+  fact: EmergencyFundFact;
+}
+
+export interface ActivePriorityCitation extends ActivePriorityInput {
   fact_type: "active_priority";
   state: Exclude<ActivePriorityState, "to_confirm">;
   last_confirmed_at: string;
@@ -277,6 +303,18 @@ export interface DeclaredFactCitation extends ActivePriorityInput {
   can_correct: true;
   can_delete: true;
 }
+
+export interface EmergencyFundFactCitation extends EmergencyFundFactInput {
+  state: Exclude<ActivePriorityState, "to_confirm">;
+  last_confirmed_at: string;
+  valid_until: string | null;
+  can_correct: true;
+  can_delete: true;
+}
+
+export type DeclaredFactCitation =
+  | ActivePriorityCitation
+  | EmergencyFundFactCitation;
 
 export interface DecisionTrace {
   summary: string;
@@ -318,7 +356,8 @@ export interface ClarificationOutput {
   observation: string;
   possible_effect: string;
   question: string;
-  fact_type: "active_priority";
+  question_number?: number;
+  fact_type: DeclaredFactType;
   material_effects: string[];
 }
 

@@ -54,6 +54,7 @@ def test_parses_recommendation_with_auditable_trace() -> None:
     assert output.trace.details.observations[0].scope == "Transactions CHOICE / Dining out"
     assert output.trace.details.calculations == ["240 € - 120 € = 120 € d'écart mensuel."]
     assert output.amount == 120
+    assert output.deadline is not None
     assert output.deadline.isoformat() == "2026-01-31"
 
 

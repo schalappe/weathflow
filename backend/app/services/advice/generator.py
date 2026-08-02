@@ -8,7 +8,7 @@ from anthropic import Anthropic
 from loguru import logger
 from pydantic import ValidationError
 
-from app.services.advice.models import ActivePriorityContext, AdviceResponse, MonthData
+from app.services.advice.models import AdviceContext, AdviceResponse, MonthData
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
 from app.services.exceptions import (
     AdviceAPIError,
@@ -83,7 +83,7 @@ class AdviceGenerator:
         self,
         current_month: MonthData,
         history: list[MonthData],
-        active_priority: ActivePriorityContext | None = None,
+        context: AdviceContext | None = None,
     ) -> AdviceResponse:
         """
         Generate personalized financial advice based on historical data.
@@ -94,8 +94,8 @@ class AdviceGenerator:
             Current month's financial data.
         history : list[MonthData]
             Historical months (at least 1 required).
-        active_priority : ActivePriorityContext | None
-            Declared or expired active priority.
+        context : AdviceContext | None
+            Declared facts, including expired visible values.
 
         Returns
         -------
@@ -116,7 +116,7 @@ class AdviceGenerator:
         self._validate_data(current_month, history)
         logger.debug("Data validation passed with {} history months", len(history))
 
-        prompt = self._build_user_prompt(current_month, history, active_priority)
+        prompt = self._build_user_prompt(current_month, history, context)
         logger.debug("User prompt built ({} characters)", len(prompt))
 
         response_text = self._call_claude_api(prompt)
@@ -151,7 +151,7 @@ class AdviceGenerator:
         self,
         current_month: MonthData,
         history: list[MonthData],
-        active_priority: ActivePriorityContext | None = None,
+        context: AdviceContext | None = None,
     ) -> str:
         """
         Build user prompt with financial data for Claude.
@@ -165,8 +165,8 @@ class AdviceGenerator:
             Current month's data.
         history : list[MonthData]
             Historical months.
-        active_priority : ActivePriorityContext | None
-            Declared or expired active priority.
+        context : AdviceContext | None
+            Declared facts, including expired visible values.
 
         Returns
         -------
@@ -202,14 +202,14 @@ class AdviceGenerator:
 
             months_data.append(month_dict)
 
-        priority_data = active_priority.model_dump(mode="json") if active_priority is not None else None
+        context_data = (context or AdviceContext()).model_dump(mode="json")
         return (
             f"{ADVICE_SYSTEM_PROMPT}\n\n"
             "---\n\n"
             "Analyse les données financières observées et le contexte déclaré séparément. "
             "Retourne uniquement l'objet JSON demandé, sans markdown ni texte additionnel.\n\n"
             f"Données observées :\n{json.dumps(months_data, ensure_ascii=False, indent=2)}\n\n"
-            f"Contexte déclaré :\n{json.dumps({'active_priority': priority_data}, ensure_ascii=False, indent=2)}"
+            f"Contexte déclaré :\n{json.dumps(context_data, ensure_ascii=False, indent=2)}"
         )
 
     def _call_claude_api(self, user_prompt: str) -> str:
