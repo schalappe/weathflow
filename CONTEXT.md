@@ -1,0 +1,33 @@
+# Conseil financier personnel
+
+Ce contexte fixe le vocabulaire utilisé pour produire un conseil financier personnel à partir des transactions et des faits fournis par l’utilisateur.
+
+## Language
+
+**Données observées**:
+Faits financiers calculés directement depuis les transactions importées et leurs tendances.
+_Avoid_: Données utilisateur, contexte connu
+
+**Contexte déclaré**:
+Faits financiers fournis ou confirmés par l’utilisateur et qui ne peuvent pas être déduits sûrement des transactions.
+_Avoid_: Données observées, profil utilisateur
+
+**Fait matériel**:
+Fait dont une variation plausible peut changer la bonne action, sa priorité, son montant ou son échéance, ou justifier une conclusion sans action.
+_Avoid_: Information utile, détail personnel
+
+**Recommandation personnalisée**:
+Recommandation dont le contenu décisionnel réagit aux faits matériels de l’utilisateur, plutôt que de seulement reformuler un conseil générique avec ses chiffres.
+_Avoid_: Conseil contextualisé, conseil chiffré
+
+**Préférence soutenable**:
+Choix déclaré compatible avec les obligations, la trésorerie et les objectifs financiers connus.
+_Avoid_: Préférence utilisateur
+
+**Conclusion sans action**:
+Conclusion explicite qu’aucune action financière n’est justifiée par les faits disponibles.
+_Avoid_: Absence de réponse, conseil vide
+
+**Défaut invalidant**:
+Défaut d’une recommandation qui rend la réponse entière impropre à être présentée comme personnalisée.
+_Avoid_: Imperfection, réserve
