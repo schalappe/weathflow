@@ -31,3 +31,15 @@ _Avoid_: Absence de réponse, conseil vide
 **Défaut invalidant**:
 Défaut d’une recommandation qui rend la réponse entière impropre à être présentée comme personnalisée.
 _Avoid_: Imperfection, réserve
+
+**Clarification utile**:
+Question dont la réponse peut départager des sorties décisionnelles différentes et que l’utilisateur peut raisonnablement fournir.
+_Avoid_: Question utile, collecte de contexte
+
+**Recommandation robuste à l’incertitude**:
+Recommandation qui reste valide pour toutes les valeurs plausibles d’un fait matériel incertain.
+_Avoid_: Conseil prudent, conseil par défaut
+
+**Réponse sélective**:
+Réponse qui ne présente que les recommandations robustes et rend explicites les sujets sur lesquels aucune conclusion n’est étayée.
+_Avoid_: Réponse partielle, conseil incomplet
