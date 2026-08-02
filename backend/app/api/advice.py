@@ -4,11 +4,13 @@ from datetime import UTC
 
 from fastapi import HTTPException, Path, Response, status
 from loguru import logger
+from pydantic import TypeAdapter
 
 from app.api.deps import (
     ActivePriorityRepo,
     AdviceGen,
     AdviceRepo,
+    CommitmentRepo,
     EmergencyFundRepo,
     MonthRepo,
     create_router,
@@ -21,6 +23,10 @@ from app.responses.advice import (
     ActivePriorityInput,
     ActivePriorityResponse,
     AdviceData,
+    CommitmentContextResponse,
+    CommitmentFactData,
+    CommitmentFactInput,
+    CommitmentFactResponse,
     EligibilityInfo,
     EmergencyFundContextResponse,
     EmergencyFundFactAnswer,
@@ -36,6 +42,7 @@ from app.services.advice.eligibility import check_eligibility
 from app.services.advice.models import (
     ActivePriorityContext,
     AdviceContext,
+    CommitmentFactContext,
     DecisionOutput,
     DecisionTrace,
     DecisionTraceDetails,
@@ -54,6 +61,7 @@ from app.services.exceptions import (
 )
 
 router = create_router("advice")
+commitment_fact_adapter: TypeAdapter[CommitmentFactData] = TypeAdapter(CommitmentFactData)
 
 
 def _http_detail_for_advice_error(error: AdviceGenerationError) -> str:
@@ -86,6 +94,7 @@ def generate_advice(
     advice_repo: AdviceRepo,
     priority_repo: ActivePriorityRepo,
     fact_repo: EmergencyFundRepo,
+    commitment_repo: CommitmentRepo,
     generator: AdviceGen,
 ) -> GenerateAdviceResponse:
     """
@@ -133,8 +142,16 @@ def generate_advice(
                 status_code=403,
                 detail=eligibility.reason or "This month is not eligible for advice generation.",
             )
+        answer_count = sum(
+            answer is not None
+            for answer in (
+                request.active_priority,
+                request.emergency_fund_fact,
+                request.commitment_fact,
+            )
+        )
         previous_question_count = 0
-        if request.active_priority is not None or request.emergency_fund_fact is not None:
+        if answer_count:
             previous_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
             if previous_advice is not None:
                 previous_data = AdviceData.model_validate_json(previous_advice.advice_text)
@@ -144,10 +161,10 @@ def generate_advice(
                 )
                 if previous_question is not None:
                     previous_question_count = previous_question.question_number
-        if request.active_priority is not None and request.emergency_fund_fact is not None:
+        if answer_count > 1:
             raise HTTPException(status_code=422, detail="Answer one clarification at a time.")
         if request.clarification_action is not None:
-            if request.active_priority is not None or request.emergency_fund_fact is not None:
+            if answer_count:
                 raise HTTPException(
                     status_code=422,
                     detail="A clarification cannot be answered and skipped together.",
@@ -202,8 +219,14 @@ def generate_advice(
             fact_repo,
             advice_repo,
         )
+        commitment_contexts = advice_service.prepare_commitment_context(
+            commitment_repo,
+            advice_repo,
+            _session_commitment_context(request.commitment_fact) if request.commitment_fact is not None else None,
+            request.remember_fact,
+        )
 
-        if not request.regenerate and request.active_priority is None and request.emergency_fund_fact is None:
+        if not request.regenerate and not answer_count:
             existing_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
             if existing_advice:
                 return GenerateAdviceResponse(
@@ -227,6 +250,7 @@ def generate_advice(
         generation_context = AdviceContext(
             active_priority=priority_context,
             emergency_fund_facts=emergency_fund_contexts,
+            commitment_facts=commitment_contexts,
             clarifications_remaining=max(0, 3 - previous_question_count),
         )
         advice_response = generator.generate_advice(current_data, history_data, generation_context)
@@ -236,6 +260,8 @@ def generate_advice(
             if request.active_priority is not None
             else request.emergency_fund_fact.fact_type
             if request.emergency_fund_fact is not None
+            else request.commitment_fact.fact_type
+            if request.commitment_fact is not None
             else None
         )
         if answered_fact_type is not None:
@@ -263,6 +289,8 @@ def generate_advice(
             request.active_priority is not None
             and not request.remember_priority
             or request.emergency_fund_fact is not None
+            and not request.remember_fact
+            or request.commitment_fact is not None
             and not request.remember_fact
         )
         if session_only_answer:
@@ -723,12 +751,174 @@ def delete_emergency_fund_fact(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+def _commitment_fact_data(fact: CommitmentFactContext) -> CommitmentFactData:
+    """Map commitment context to API data.
+
+    Parameters
+    ----------
+    fact : CommitmentFactContext
+        Stored obligation or debt context.
+
+    Returns
+    -------
+    CommitmentFactData
+        API fact data.
+    """
+    return commitment_fact_adapter.validate_python(fact.model_dump())
+
+
+def _session_commitment_context(payload: CommitmentFactInput) -> CommitmentFactContext:
+    """Build request-scoped obligation or debt fact.
+
+    Parameters
+    ----------
+    payload : CommitmentFactInput
+        Validated API answer.
+
+    Returns
+    -------
+    CommitmentFactContext
+        Session-only generation context.
+    """
+    return CommitmentFactContext.model_validate(
+        {
+            **payload.model_dump(),
+            "fact_id": None,
+            "state": "session",
+            "last_confirmed_at": utc_now().replace(tzinfo=None),
+            "valid_until": None,
+        }
+    )
+
+
+@router.get("/context/commitments", response_model=CommitmentContextResponse)
+def get_commitment_context(
+    fact_repo: CommitmentRepo,
+    advice_repo: AdviceRepo,
+) -> CommitmentContextResponse:
+    """Return stored obligation and debt facts.
+
+    Parameters
+    ----------
+    fact_repo : CommitmentRepo
+        Commitment persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+
+    Returns
+    -------
+    CommitmentContextResponse
+        Facts, including expired values.
+    """
+    facts = advice_service.load_commitment_context(fact_repo, advice_repo)
+    return CommitmentContextResponse(facts=[_commitment_fact_data(fact) for fact in facts])
+
+
+@router.post("/context/commitments", response_model=CommitmentFactResponse)
+def create_commitment_fact(
+    payload: CommitmentFactInput,
+    fact_repo: CommitmentRepo,
+    advice_repo: AdviceRepo,
+) -> CommitmentFactResponse:
+    """Create one obligation or debt fact.
+
+    Parameters
+    ----------
+    payload : CommitmentFactInput
+        Validated fact fields.
+    fact_repo : CommitmentRepo
+        Commitment persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+
+    Returns
+    -------
+    CommitmentFactResponse
+        Stored fact.
+    """
+    fact = advice_service.create_commitment_fact(fact_repo, advice_repo, payload.model_dump())
+    return CommitmentFactResponse(fact=_commitment_fact_data(advice_service.commitment_fact_context(fact)))
+
+
+@router.put("/context/commitments/{fact_id}", response_model=CommitmentFactResponse)
+def update_commitment_fact(
+    payload: CommitmentFactInput,
+    fact_repo: CommitmentRepo,
+    advice_repo: AdviceRepo,
+    fact_id: int = Path(..., ge=1),
+) -> CommitmentFactResponse:
+    """Correct or reconfirm one obligation or debt fact.
+
+    Parameters
+    ----------
+    payload : CommitmentFactInput
+        Validated replacement fields.
+    fact_repo : CommitmentRepo
+        Commitment persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+    fact_id : int
+        Stored fact id.
+
+    Returns
+    -------
+    CommitmentFactResponse
+        Updated fact.
+
+    Raises
+    ------
+    HTTPException
+        Fact is absent.
+    """
+    fact = advice_service.update_commitment_fact(fact_repo, advice_repo, fact_id, payload.model_dump())
+    if fact is None:
+        raise HTTPException(status_code=404, detail="Commitment fact not found.")
+    return CommitmentFactResponse(fact=_commitment_fact_data(advice_service.commitment_fact_context(fact)))
+
+
+@router.delete(
+    "/context/commitments/{fact_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+def delete_commitment_fact(
+    fact_repo: CommitmentRepo,
+    advice_repo: AdviceRepo,
+    fact_id: int = Path(..., ge=1),
+) -> Response:
+    """Delete one obligation or debt fact.
+
+    Parameters
+    ----------
+    fact_repo : CommitmentRepo
+        Commitment persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+    fact_id : int
+        Stored fact id.
+
+    Returns
+    -------
+    Response
+        Empty response.
+
+    Raises
+    ------
+    HTTPException
+        Fact is absent.
+    """
+    if not advice_service.delete_commitment_fact(fact_repo, advice_repo, fact_id):
+        raise HTTPException(status_code=404, detail="Commitment fact not found.")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/{year}/{month}", response_model=GetAdviceResponse)
 def get_advice(
     month_repo: MonthRepo,
     advice_repo: AdviceRepo,
     priority_repo: ActivePriorityRepo,
     fact_repo: EmergencyFundRepo,
+    commitment_repo: CommitmentRepo,
     year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
     month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
 ) -> GetAdviceResponse:
@@ -765,6 +955,7 @@ def get_advice(
         if priority is not None and priority.state == "to_confirm":
             advice_repo.delete_depending_on_active_priority()
         _load_emergency_fund_facts(fact_repo, advice_repo)
+        advice_service.load_commitment_context(commitment_repo, advice_repo)
 
         # ##>: Check eligibility for this month.
         eligibility = check_eligibility(year, month, month_record.id, month_repo, advice_repo)

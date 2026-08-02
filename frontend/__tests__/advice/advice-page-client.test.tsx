@@ -8,13 +8,16 @@ import type { MonthSummary } from "@/types";
 // [>]: Mock the API client module.
 vi.mock("@/lib/api-client", () => ({
   deleteActivePriority: vi.fn(),
+  deleteCommitmentFact: vi.fn(),
   deleteEmergencyFundFact: vi.fn(),
   generateAdvice: vi.fn(),
   getActivePriority: vi.fn().mockResolvedValue({ priority: null }),
+  getCommitmentContext: vi.fn().mockResolvedValue({ facts: [] }),
   getEmergencyFundContext: vi.fn().mockResolvedValue({ facts: [] }),
   getAdvice: vi.fn(),
   getMonthsList: vi.fn(),
   putActivePriority: vi.fn(),
+  putCommitmentFact: vi.fn(),
   putEmergencyFundFact: vi.fn(),
 }));
 

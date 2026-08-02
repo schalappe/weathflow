@@ -1,16 +1,19 @@
 """Advice storage and generation-data services."""
 
-from typing import Literal
+from typing import Any, Literal, cast
 
 from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.models.advice import Advice
+from app.db.models.commitment_fact import CommitmentFact
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.repositories.advice import AdviceRepository
+from app.repositories.commitment_fact import CommitmentFactRepository, CommitmentFactType
 from app.services.advice.models import (
     AdviceResponse,
+    CommitmentFactContext,
     DecisionOutput,
     DecisionTrace,
     DecisionTraceDetails,
@@ -159,6 +162,204 @@ def advice_response_to_json(advice: AdviceResponse) -> str:
     return advice.model_dump_json()
 
 
+_COMMITMENT_FIELDS: dict[CommitmentFactType, tuple[str, ...]] = {
+    "recurring_obligation": ("amount", "frequency", "end_date"),
+    "one_off_obligation": ("amount", "due_date"),
+    "debt_position": ("balance", "overdue_amount"),
+    "debt_terms": ("minimum_payment", "annual_rate", "cost", "end_date"),
+}
+
+
+def commitment_fact_context(fact: CommitmentFact) -> CommitmentFactContext:
+    """Map persistence to generation context.
+
+    Parameters
+    ----------
+    fact : CommitmentFact
+        Stored obligation or debt fact.
+
+    Returns
+    -------
+    CommitmentFactContext
+        Typed generation fact.
+    """
+    fact_type = cast(CommitmentFactType, fact.fact_type)
+    data: dict[str, Any] = {
+        "fact_id": fact.id,
+        "fact_type": fact_type,
+        "label": fact.label,
+        "state": fact.state,
+        "last_confirmed_at": fact.last_confirmed_at,
+        "valid_until": fact.valid_until,
+    }
+    data.update({field: getattr(fact, field) for field in _COMMITMENT_FIELDS[fact_type]})
+    return CommitmentFactContext.model_validate(data)
+
+
+def load_commitment_context(
+    fact_repo: CommitmentFactRepository,
+    advice_repo: AdviceRepository,
+) -> list[CommitmentFactContext]:
+    """Load commitments and invalidate advice citing expired facts.
+
+    Parameters
+    ----------
+    fact_repo : CommitmentFactRepository
+        Commitment persistence.
+    advice_repo : AdviceRepository
+        Advice persistence.
+
+    Returns
+    -------
+    list[CommitmentFactContext]
+        Stored facts, including inactive values.
+    """
+    facts = fact_repo.get_all()
+    for fact in facts:
+        if fact.state == "to_confirm":
+            advice_repo.delete_depending_on_commitment(fact.id, fact.fact_type)
+    return [commitment_fact_context(fact) for fact in facts]
+
+
+def create_commitment_fact(
+    fact_repo: CommitmentFactRepository,
+    advice_repo: AdviceRepository,
+    values: dict[str, Any],
+) -> CommitmentFact:
+    """Create a commitment and invalidate cached advice.
+
+    Parameters
+    ----------
+    fact_repo : CommitmentFactRepository
+        Commitment persistence.
+    advice_repo : AdviceRepository
+        Advice persistence.
+    values : dict[str, Any]
+        Validated fact fields.
+
+    Returns
+    -------
+    CommitmentFact
+        Stored fact.
+    """
+    fact = fact_repo.put(values)
+    advice_repo.invalidate_all()
+    return fact
+
+
+def update_commitment_fact(
+    fact_repo: CommitmentFactRepository,
+    advice_repo: AdviceRepository,
+    fact_id: int,
+    values: dict[str, Any],
+) -> CommitmentFact | None:
+    """Update a commitment and invalidate dependent advice.
+
+    Parameters
+    ----------
+    fact_repo : CommitmentFactRepository
+        Commitment persistence.
+    advice_repo : AdviceRepository
+        Advice persistence.
+    fact_id : int
+        Stored fact id.
+    values : dict[str, Any]
+        Validated replacement fields.
+
+    Returns
+    -------
+    CommitmentFact | None
+        Updated fact, or None when absent.
+    """
+    previous = fact_repo.get(fact_id)
+    if previous is None:
+        return None
+    fact = fact_repo.put(values, fact_id)
+    advice_repo.delete_depending_on_commitment(previous.id, previous.fact_type)
+    return fact
+
+
+def delete_commitment_fact(
+    fact_repo: CommitmentFactRepository,
+    advice_repo: AdviceRepository,
+    fact_id: int,
+) -> bool:
+    """Delete a commitment and invalidate dependent advice.
+
+    Parameters
+    ----------
+    fact_repo : CommitmentFactRepository
+        Commitment persistence.
+    advice_repo : AdviceRepository
+        Advice persistence.
+    fact_id : int
+        Stored fact id.
+
+    Returns
+    -------
+    bool
+        Whether a fact was deleted.
+    """
+    fact = fact_repo.get(fact_id)
+    if fact is None:
+        return False
+    fact_repo.delete(fact_id)
+    advice_repo.delete_depending_on_commitment(fact.id, fact.fact_type)
+    return True
+
+
+def prepare_commitment_context(
+    fact_repo: CommitmentFactRepository,
+    advice_repo: AdviceRepository,
+    answer: CommitmentFactContext | None,
+    remember: bool,
+) -> list[CommitmentFactContext]:
+    """Apply an optional answer to stored commitment context.
+
+    Parameters
+    ----------
+    fact_repo : CommitmentFactRepository
+        Commitment persistence.
+    advice_repo : AdviceRepository
+        Advice persistence.
+    answer : CommitmentFactContext | None
+        Request-scoped fact.
+    remember : bool
+        Persist the answer when true.
+
+    Returns
+    -------
+    list[CommitmentFactContext]
+        Context for the current generation.
+    """
+    contexts = load_commitment_context(fact_repo, advice_repo)
+    if answer is None:
+        return contexts
+    matching = next(
+        (context for context in contexts if context.fact_type == answer.fact_type and context.label == answer.label),
+        None,
+    )
+    matching_id = matching.fact_id if matching is not None else None
+    contexts = [context for context in contexts if context is not matching]
+    if remember:
+        fields = {"fact_type", "label", *_COMMITMENT_FIELDS[answer.fact_type]}
+        values = answer.model_dump(include=fields)
+        fact = (
+            create_commitment_fact(fact_repo, advice_repo, values)
+            if matching_id is None
+            else update_commitment_fact(fact_repo, advice_repo, matching_id, values)
+        )
+        if fact is None:
+            raise RuntimeError("commitment disappeared during update")
+        contexts.append(commitment_fact_context(fact))
+    else:
+        if matching_id is not None and matching is not None:
+            fact_repo.mark_to_confirm(matching_id)
+            advice_repo.delete_depending_on_commitment(matching_id, matching.fact_type)
+        contexts.append(answer)
+    return contexts
+
+
 def resolve_clarification(
     advice: AdviceResponse,
     year: int,
@@ -193,11 +394,15 @@ def resolve_clarification(
             "liquid_reserve": "réserve liquide non affectée",
             "safety_floor": "plancher de sécurité",
             "priority_allocation": "montant déjà affecté",
+            "recurring_obligation": "obligation récurrente",
+            "one_off_obligation": "obligation ponctuelle",
+            "debt_position": "position de dette",
+            "debt_terms": "conditions de dette",
         }[output.fact_type]
         limit = (
-            f"{label.capitalize()} non fourni : question passée."
+            f"Information non fournie ({label}) : question passée."
             if action == "skip"
-            else f"{label.capitalize()} inconnu selon la réponse explicite."
+            else f"Information inconnue ({label}) selon la réponse explicite."
         )
         outputs.append(
             UnresolvedOutput(

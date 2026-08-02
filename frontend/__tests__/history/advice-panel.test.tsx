@@ -18,6 +18,9 @@ vi.mock("@/lib/api-client", () => ({
   getEmergencyFundContext: vi.fn(),
   putEmergencyFundFact: vi.fn(),
   deleteEmergencyFundFact: vi.fn(),
+  getCommitmentContext: vi.fn(),
+  putCommitmentFact: vi.fn(),
+  deleteCommitmentFact: vi.fn(),
 }));
 
 const mockGetAdvice = vi.mocked(apiClient.getAdvice);
@@ -32,6 +35,9 @@ const mockPutEmergencyFundFact = vi.mocked(apiClient.putEmergencyFundFact);
 const mockDeleteEmergencyFundFact = vi.mocked(
   apiClient.deleteEmergencyFundFact,
 );
+const mockGetCommitmentContext = vi.mocked(apiClient.getCommitmentContext);
+const mockPutCommitmentFact = vi.mocked(apiClient.putCommitmentFact);
+const mockDeleteCommitmentFact = vi.mocked(apiClient.deleteCommitmentFact);
 const eligibility: EligibilityInfo = {
   can_generate: true,
   is_first_advice: false,
@@ -54,6 +60,7 @@ describe("AdvicePanel decision outputs", () => {
     vi.clearAllMocks();
     mockGetActivePriority.mockResolvedValue({ priority: null });
     mockGetEmergencyFundContext.mockResolvedValue({ facts: [] });
+    mockGetCommitmentContext.mockResolvedValue({ facts: [] });
   });
 
   it("renders recommendation, no-action, unresolved, and auditable trace", async () => {
@@ -550,5 +557,116 @@ describe("AdvicePanel decision outputs", () => {
     await user.click(await screen.findByRole("button", { name: /Réessayer/i }));
 
     await waitFor(() => expect(mockGetAdvice).toHaveBeenCalledTimes(2));
+  });
+
+  it("answers debt terms and shows their declared provenance", async () => {
+    const user = userEvent.setup();
+    const clarification = {
+      type: "clarification" as const,
+      priority: "high" as const,
+      subject: "Paiement de dette",
+      observation: "Une capacité mensuelle est observée.",
+      possible_effect: "Un minimum exigible changerait la priorité.",
+      question: "Quelles sont les conditions essentielles de la dette ?",
+      fact_type: "debt_terms" as const,
+      material_effects: ["Payer le minimum.", "Ne pas conclure de paiement."],
+    };
+    mockGetAdvice.mockResolvedValue(
+      loaded(createMockAdviceData({ outputs: [clarification] })),
+    );
+    const recommendation = createMockRecommendationOutput({
+      action: "Payer le minimum exigible du prêt auto.",
+      amount: 250,
+    });
+    recommendation.trace.details.declared_facts = [
+      {
+        fact_id: 7,
+        fact_type: "debt_terms",
+        label: "Prêt auto",
+        minimum_payment: 250,
+        annual_rate: 4.2,
+        cost: null,
+        end_date: null,
+        state: "active",
+        last_confirmed_at: "2026-08-02T12:00:00Z",
+        valid_until: "2026-10-31T12:00:00Z",
+        can_correct: true,
+        can_delete: true,
+      },
+    ];
+    mockGenerateAdvice.mockResolvedValue({
+      success: true,
+      advice: createMockAdviceData({ outputs: [recommendation] }),
+      generated_at: "2026-08-02T12:00:00Z",
+      is_valid: true,
+      was_cached: false,
+    });
+
+    render(<AdvicePanel year={2025} month={12} />);
+    await user.type(await screen.findByLabelText("Libellé"), "Prêt auto");
+    await user.type(screen.getByLabelText("Paiement minimum"), "250");
+    await user.type(screen.getByLabelText("Taux annuel (%)"), "4.2");
+    await user.click(
+      screen.getByRole("button", { name: "Répondre et réutiliser" }),
+    );
+
+    expect(mockGenerateAdvice).toHaveBeenCalledWith(2025, 12, {
+      regenerate: true,
+      commitmentFact: {
+        fact_type: "debt_terms",
+        label: "Prêt auto",
+        minimum_payment: 250,
+        annual_rate: 4.2,
+        cost: null,
+        end_date: null,
+      },
+      rememberFact: true,
+    });
+    expect(await screen.findByText(/Prêt auto — minimum/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Corriger ou supprimer" }),
+    ).toHaveAttribute("href", "#commitment-context-7");
+  });
+
+  it("corrects and deletes remembered obligations from declared context", async () => {
+    const user = userEvent.setup();
+    const fact = {
+      fact_id: 3,
+      fact_type: "recurring_obligation" as const,
+      label: "Pension alimentaire",
+      amount: 300,
+      frequency: "monthly" as const,
+      end_date: null,
+      state: "active" as const,
+      last_confirmed_at: "2026-08-02T12:00:00Z",
+      valid_until: "2026-10-31T12:00:00Z",
+    };
+    mockGetCommitmentContext.mockResolvedValue({ facts: [fact] });
+    mockGetAdvice.mockResolvedValue(loaded());
+    mockPutCommitmentFact.mockResolvedValue({
+      fact: { ...fact, amount: 350, state: "corrected" },
+    });
+    mockDeleteCommitmentFact.mockResolvedValue();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<AdvicePanel year={2025} month={12} />);
+    expect(
+      await screen.findByText(/Pension alimentaire — 300/),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Corriger" }));
+    const amount = screen.getByLabelText("Montant");
+    await user.clear(amount);
+    await user.type(amount, "350");
+    await user.click(screen.getByRole("button", { name: "Enregistrer" }));
+
+    expect(mockPutCommitmentFact).toHaveBeenCalledWith(3, {
+      fact_type: "recurring_obligation",
+      label: "Pension alimentaire",
+      amount: 350,
+      frequency: "monthly",
+      end_date: null,
+    });
+    await user.click(screen.getByRole("button", { name: "Supprimer" }));
+    expect(mockDeleteCommitmentFact).toHaveBeenCalledWith(3);
   });
 });

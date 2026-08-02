@@ -6,6 +6,7 @@ from typing import Annotated, Literal, Self
 from pydantic import ConfigDict, Field, model_validator
 
 from app.db.models.emergency_fund_fact import EmergencyFundFactType
+from app.repositories.commitment_fact import CommitmentFactType
 from app.services.models import FrozenModel
 
 
@@ -158,6 +159,84 @@ class EmergencyFundFactContext(DecisionModel):
     valid_until: datetime | None
 
 
+class CommitmentFactContext(DecisionModel):
+    """Provide one obligation or debt fact to generation.
+
+    Attributes
+    ----------
+    fact_id : int | None
+        Stored id; None for session.
+    fact_type : CommitmentFactType
+        Closed-catalog type.
+    label : str
+        User-facing identifier.
+    amount : float | None
+        Obligation amount.
+    frequency : str | None
+        Recurrence.
+    balance : float | None
+        Debt balance.
+    overdue_amount : float | None
+        Known overdue amount.
+    minimum_payment : float | None
+        Contractual minimum.
+    annual_rate : float | None
+        Annual percentage rate.
+    cost : float | None
+        Known debt cost.
+    due_date : date | None
+        One-off deadline.
+    end_date : date | None
+        Explicit end.
+    state : str
+        Lifecycle state.
+    last_confirmed_at : datetime
+        Explicit answer time.
+    valid_until : datetime | None
+        Reuse cutoff.
+    """
+
+    fact_id: int | None = None
+    fact_type: CommitmentFactType
+    label: str = Field(min_length=1)
+    amount: float | None = Field(default=None, gt=0)
+    frequency: Literal["weekly", "biweekly", "monthly", "quarterly", "yearly"] | None = None
+    balance: float | None = Field(default=None, ge=0)
+    overdue_amount: float | None = Field(default=None, ge=0)
+    minimum_payment: float | None = Field(default=None, gt=0)
+    annual_rate: float | None = Field(default=None, ge=0)
+    cost: float | None = Field(default=None, ge=0)
+    due_date: date | None = None
+    end_date: date | None = None
+    state: Literal["active", "corrected", "to_confirm", "session"]
+    last_confirmed_at: datetime
+    valid_until: datetime | None
+
+    @model_validator(mode="after")
+    def require_fact_fields(self) -> Self:
+        """Reject incomplete fact variants.
+
+        Returns
+        -------
+        Self
+            Validated fact.
+
+        Raises
+        ------
+        ValueError
+            Required variant field is absent.
+        """
+        required = {
+            "recurring_obligation": ("amount", "frequency"),
+            "one_off_obligation": ("amount", "due_date"),
+            "debt_position": ("balance",),
+            "debt_terms": ("minimum_payment",),
+        }[self.fact_type]
+        if any(getattr(self, field) is None for field in required):
+            raise ValueError(f"{self.fact_type} requires {', '.join(required)}")
+        return self
+
+
 class AdviceContext(DecisionModel):
     """Declared facts and remaining clarification budget.
 
@@ -167,12 +246,15 @@ class AdviceContext(DecisionModel):
         Current declared objective.
     emergency_fund_facts : list[EmergencyFundFactContext]
         Emergency-fund context.
+    commitment_facts : list[CommitmentFactContext]
+        Obligation and debt context.
     clarifications_remaining : int
         Questions available before abstention.
     """
 
     active_priority: ActivePriorityContext | None = None
     emergency_fund_facts: list[EmergencyFundFactContext] = Field(default_factory=list)
+    commitment_facts: list[CommitmentFactContext] = Field(default_factory=list)
     clarifications_remaining: int = Field(default=3, ge=0, le=3)
 
 
@@ -215,8 +297,26 @@ class ActivePriorityCitation(ActivePriorityContext):
     can_delete: Literal[True]
 
 
+class CommitmentFactCitation(CommitmentFactContext):
+    """Expose an obligation or debt fact cited by a decision.
+
+    Attributes
+    ----------
+    state : Literal["active", "corrected", "session"]
+        Active citation state.
+    can_correct : Literal[True]
+        Correction capability.
+    can_delete : Literal[True]
+        Deletion capability.
+    """
+
+    state: Literal["active", "corrected", "session"]
+    can_correct: Literal[True]
+    can_delete: Literal[True]
+
+
 DeclaredFactCitation = Annotated[
-    ActivePriorityCitation | EmergencyFundFactCitation,
+    ActivePriorityCitation | EmergencyFundFactCitation | CommitmentFactCitation,
     Field(discriminator="fact_type"),
 ]
 
@@ -377,7 +477,16 @@ class ClarificationOutput(DecisionModel):
     possible_effect: str = Field(min_length=1)
     question: str = Field(min_length=1)
     question_number: int = Field(default=1, ge=1, le=3)
-    fact_type: Literal["active_priority", "liquid_reserve", "safety_floor", "priority_allocation"]
+    fact_type: Literal[
+        "active_priority",
+        "liquid_reserve",
+        "safety_floor",
+        "priority_allocation",
+        "recurring_obligation",
+        "one_off_obligation",
+        "debt_position",
+        "debt_terms",
+    ]
     material_effects: list[str] = Field(min_length=2)
 
     @model_validator(mode="after")

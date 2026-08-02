@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -42,6 +42,7 @@ class GenerateAdviceRequest(BaseModel):
     active_priority: ActivePriorityInput | None = None
     remember_priority: bool = True
     emergency_fund_fact: EmergencyFundFactAnswer | None = None
+    commitment_fact: CommitmentFactInput | None = None
     remember_fact: bool = True
     clarification_action: Literal["skip", "unknown"] | None = None
 
@@ -161,6 +162,201 @@ class EmergencyFundContextResponse(BaseModel):
     """
 
     facts: list[EmergencyFundFactData]
+
+
+CommitmentFactType = Literal[
+    "recurring_obligation",
+    "one_off_obligation",
+    "debt_position",
+    "debt_terms",
+]
+Frequency = Literal["weekly", "biweekly", "monthly", "quarterly", "yearly"]
+
+
+class CommitmentFactBase(BaseModel):
+    """Share declared-fact identity.
+
+    Attributes
+    ----------
+    label : str
+        User-facing identifier.
+    """
+
+    label: str = Field(min_length=1, max_length=200)
+
+
+class RecurringObligationInput(CommitmentFactBase):
+    """Accept a recurring obligation answer.
+
+    Attributes
+    ----------
+    fact_type : Literal["recurring_obligation"]
+        Discriminator.
+    amount : float
+        Payment amount.
+    frequency : Frequency
+        Recurrence.
+    end_date : date | None
+        Explicit end.
+    """
+
+    fact_type: Literal["recurring_obligation"]
+    amount: float = Field(gt=0, allow_inf_nan=False)
+    frequency: Frequency
+    end_date: date | None = None
+
+
+class OneOffObligationInput(CommitmentFactBase):
+    """Accept a dated obligation answer.
+
+    Attributes
+    ----------
+    fact_type : Literal["one_off_obligation"]
+        Discriminator.
+    amount : float
+        Payment amount.
+    due_date : date
+        Payment deadline.
+    """
+
+    fact_type: Literal["one_off_obligation"]
+    amount: float = Field(gt=0, allow_inf_nan=False)
+    due_date: date
+
+
+class DebtPositionInput(CommitmentFactBase):
+    """Accept a current debt position.
+
+    Attributes
+    ----------
+    fact_type : Literal["debt_position"]
+        Discriminator.
+    balance : float
+        Current balance.
+    overdue_amount : float | None
+        Known overdue amount.
+    """
+
+    fact_type: Literal["debt_position"]
+    balance: float = Field(ge=0, allow_inf_nan=False)
+    overdue_amount: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+
+class DebtTermsInput(CommitmentFactBase):
+    """Accept essential debt terms.
+
+    Attributes
+    ----------
+    fact_type : Literal["debt_terms"]
+        Discriminator.
+    minimum_payment : float
+        Contractual minimum.
+    annual_rate : float | None
+        Annual percentage rate.
+    cost : float | None
+        Known cost.
+    end_date : date | None
+        Explicit end.
+    """
+
+    fact_type: Literal["debt_terms"]
+    minimum_payment: float = Field(gt=0, allow_inf_nan=False)
+    annual_rate: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    cost: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    end_date: date | None = None
+
+
+CommitmentFactInput = Annotated[
+    RecurringObligationInput | OneOffObligationInput | DebtPositionInput | DebtTermsInput,
+    Field(discriminator="fact_type"),
+]
+
+
+class CommitmentFactLifecycle(BaseModel):
+    """Expose stored fact lifecycle.
+
+    Attributes
+    ----------
+    fact_id : int
+        Stored fact id.
+    state : Literal["active", "corrected", "to_confirm"]
+        Lifecycle state.
+    last_confirmed_at : datetime
+        Explicit answer time.
+    valid_until : datetime
+        Reuse cutoff.
+    """
+
+    fact_id: int
+    state: Literal["active", "corrected", "to_confirm"]
+    last_confirmed_at: datetime
+    valid_until: datetime
+
+
+class RecurringObligationData(RecurringObligationInput, CommitmentFactLifecycle):
+    """Expose stored recurring obligation.
+
+    Notes
+    -----
+    Combines recurring input and lifecycle fields.
+    """
+
+
+class OneOffObligationData(OneOffObligationInput, CommitmentFactLifecycle):
+    """Expose stored dated obligation.
+
+    Notes
+    -----
+    Combines dated input and lifecycle fields.
+    """
+
+
+class DebtPositionData(DebtPositionInput, CommitmentFactLifecycle):
+    """Expose stored debt position.
+
+    Notes
+    -----
+    Combines position input and lifecycle fields.
+    """
+
+
+class DebtTermsData(DebtTermsInput, CommitmentFactLifecycle):
+    """Expose stored debt terms.
+
+    Notes
+    -----
+    Combines terms input and lifecycle fields.
+    """
+
+
+CommitmentFactData = Annotated[
+    RecurringObligationData | OneOffObligationData | DebtPositionData | DebtTermsData,
+    Field(discriminator="fact_type"),
+]
+
+
+class CommitmentFactResponse(BaseModel):
+    """Wrap one stored obligation or debt fact.
+
+    Attributes
+    ----------
+    fact : CommitmentFactData
+        Stored fact.
+    """
+
+    fact: CommitmentFactData
+
+
+class CommitmentContextResponse(BaseModel):
+    """List stored obligation and debt facts.
+
+    Attributes
+    ----------
+    facts : list[CommitmentFactData]
+        Stored facts.
+    """
+
+    facts: list[CommitmentFactData]
 
 
 class GenerateAdviceResponse(BaseModel):

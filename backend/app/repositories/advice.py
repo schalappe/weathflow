@@ -1,6 +1,6 @@
 """Repository for Advice data access operations."""
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.db.models.advice import Advice
@@ -121,6 +121,50 @@ class AdviceRepository:
         """
         count = self._db.query(Advice).delete(synchronize_session=False)
         self._db.flush()
+        return count
+
+    def invalidate_all(self) -> int:
+        """Delete and commit all cached advice.
+
+        Returns
+        -------
+        int
+            Deleted record count.
+        """
+        count = self.delete_all()
+        self._db.commit()
+        return count
+
+    def delete_depending_on_commitment(self, fact_id: int, fact_type: str) -> int:
+        """Delete outputs citing one commitment or requesting its type.
+
+        Parameters
+        ----------
+        fact_id : int
+            Stored commitment id.
+        fact_type : str
+            Closed-catalog commitment type.
+
+        Returns
+        -------
+        int
+            Deleted advice count.
+        """
+        count = (
+            self._db.query(Advice)
+            .filter(
+                or_(
+                    Advice.advice_text.contains(f'"fact_id":{fact_id}'),
+                    Advice.advice_text.contains(f'"fact_id": {fact_id}'),
+                    and_(
+                        Advice.advice_text.contains('"clarification"'),
+                        Advice.advice_text.contains(f'"{fact_type}"'),
+                    ),
+                )
+            )
+            .delete(synchronize_session="fetch")
+        )
+        self._db.commit()
         return count
 
     def delete_depending_on_declared_fact(self, fact_type: str) -> int:

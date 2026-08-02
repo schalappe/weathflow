@@ -9,6 +9,7 @@ from app.config.settings import Settings, get_settings
 from app.db.database import get_db
 from app.repositories.active_priority import ActivePriorityRepository
 from app.repositories.advice import AdviceRepository
+from app.repositories.commitment_fact import CommitmentFactRepository
 from app.repositories.emergency_fund_fact import EmergencyFundFactRepository
 from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
@@ -91,6 +92,22 @@ def get_emergency_fund_fact_repository(db: DbSession) -> EmergencyFundFactReposi
     return EmergencyFundFactRepository(db)
 
 
+def get_commitment_fact_repository(db: DbSession) -> CommitmentFactRepository:
+    """Provide obligation and debt fact repository.
+
+    Parameters
+    ----------
+    db : DbSession
+        Request database session.
+
+    Returns
+    -------
+    CommitmentFactRepository
+        Commitment persistence.
+    """
+    return CommitmentFactRepository(db)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Service Providers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -118,5 +135,6 @@ TransactionRepo = Annotated[TransactionRepository, Depends(get_transaction_repos
 AdviceRepo = Annotated[AdviceRepository, Depends(get_advice_repository)]
 ActivePriorityRepo = Annotated[ActivePriorityRepository, Depends(get_active_priority_repository)]
 EmergencyFundRepo = Annotated[EmergencyFundFactRepository, Depends(get_emergency_fund_fact_repository)]
+CommitmentRepo = Annotated[CommitmentFactRepository, Depends(get_commitment_fact_repository)]
 UploadSvc = Annotated[UploadService, Depends(get_upload_service)]
 AdviceGen = Annotated[AdviceGenerator, Depends(get_advice_generator)]

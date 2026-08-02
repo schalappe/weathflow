@@ -3,6 +3,9 @@
 import type {
   ActivePriorityInput,
   ActivePriorityResponse,
+  CommitmentContextResponse,
+  CommitmentFactInput,
+  CommitmentFactResponse,
   EmergencyFundContextResponse,
   EmergencyFundFactInput,
   EmergencyFundFactResponse,
@@ -502,6 +505,66 @@ export async function deleteEmergencyFundFact(
 }
 
 /**
+ * Fetch obligations and debt facts.
+ * @returns Stored facts, including expired values.
+ * @throws Network or API failure.
+ */
+export async function getCommitmentContext(): Promise<CommitmentContextResponse> {
+  const response = await fetch(`${API_BASE}/api/advice/context/commitments`);
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(response, "Failed to load commitments"),
+    );
+  }
+  return safeParseJson<CommitmentContextResponse>(response);
+}
+
+/**
+ * Correct or reconfirm obligation or debt fact.
+ * @param factId - Stored fact id.
+ * @param fact - Replacement value.
+ * @returns Updated lifecycle data.
+ * @throws Network or API failure.
+ */
+export async function putCommitmentFact(
+  factId: number,
+  fact: CommitmentFactInput,
+): Promise<CommitmentFactResponse> {
+  const response = await fetch(
+    `${API_BASE}/api/advice/context/commitments/${factId}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fact),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(response, "Failed to save commitment"),
+    );
+  }
+  return safeParseJson<CommitmentFactResponse>(response);
+}
+
+/**
+ * Delete obligation or debt fact.
+ * @param factId - Stored fact id.
+ * @returns Completion.
+ * @throws Network or API failure.
+ */
+export async function deleteCommitmentFact(factId: number): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/advice/context/commitments/${factId}`,
+    { method: "DELETE" },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(response, "Failed to delete commitment"),
+    );
+  }
+}
+
+/**
  * Generate advice with optional clarification answer.
  * @param year - Advice year.
  * @param month - Advice month.
@@ -518,6 +581,7 @@ export async function generateAdvice(
     activePriority?: ActivePriorityInput;
     rememberPriority?: boolean;
     emergencyFundFact?: EmergencyFundFactInput;
+    commitmentFact?: CommitmentFactInput;
     rememberFact?: boolean;
     clarificationAction?: "skip" | "unknown";
   } = {},
@@ -534,8 +598,10 @@ export async function generateAdvice(
         active_priority: options.activePriority,
         remember_priority: options.rememberPriority ?? true,
         emergency_fund_fact: options.emergencyFundFact,
+        commitment_fact: options.commitmentFact,
         remember_fact:
-          options.emergencyFundFact === undefined
+          options.emergencyFundFact === undefined &&
+          options.commitmentFact === undefined
             ? undefined
             : (options.rememberFact ?? true),
         clarification_action: options.clarificationAction,

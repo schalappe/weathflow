@@ -12,10 +12,12 @@ from app.services.advice.models import (
     ActivePriorityContext,
     AdviceContext,
     AdviceResponse,
+    CommitmentFactContext,
     EmergencyFundFactContext,
     MonthData,
 )
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
+from app.services.advice.service import resolve_clarification
 from app.services.exceptions import AdviceAPIError, AdviceGenerationError, AdviceParseError, InsufficientDataError
 
 
@@ -230,6 +232,71 @@ def test_prompt_defines_emergency_fund_materiality_and_trajectory() -> None:
     assert "revenus - dépenses essentielles - dépenses discrétionnaires" in prompt
     assert "N'infère jamais ces trois faits depuis les transactions" in prompt
     assert "conclusion `no_action`" in prompt
+
+
+def test_prompt_protects_obligations_and_debt_before_savings() -> None:
+    """Prompt subtracts hard commitments and keeps debt contracts declared."""
+    confirmed_at = datetime(2026, 8, 2)
+    context = AdviceContext(
+        commitment_facts=[
+            CommitmentFactContext(
+                fact_id=1,
+                fact_type="recurring_obligation",
+                label="Pension alimentaire",
+                amount=300,
+                frequency="monthly",
+                state="active",
+                last_confirmed_at=confirmed_at,
+                valid_until=datetime(2026, 10, 31),
+            ),
+            CommitmentFactContext(
+                fact_id=2,
+                fact_type="debt_terms",
+                label="Prêt auto",
+                minimum_payment=250,
+                annual_rate=4.2,
+                state="active",
+                last_confirmed_at=confirmed_at,
+                valid_until=datetime(2026, 10, 31),
+            ),
+        ]
+    )
+
+    prompt = _generator()._build_user_prompt(_month(month=2), [_month(month=1)], context)
+
+    assert '"fact_type": "recurring_obligation"' in prompt
+    assert '"fact_type": "debt_terms"' in prompt
+    assert "obligations exigibles" in prompt
+    assert "paiements minimums" in prompt
+    assert "prime sur toute épargne" in prompt
+    assert "50/30/20" in prompt
+    assert "N'infère jamais" in prompt
+    assert "date explicite la plus proche" in prompt
+
+
+def test_debt_clarification_can_be_skipped() -> None:
+    """Debt clarification resolves to an explicit abstention."""
+    advice = AdviceResponse.model_validate(
+        {
+            "outputs": [
+                {
+                    "type": "clarification",
+                    "priority": "high",
+                    "subject": "Dette auto",
+                    "observation": "Le minimum est inconnu.",
+                    "possible_effect": "Le paiement peut primer sur l'épargne.",
+                    "question": "Quel est le minimum exigible ?",
+                    "fact_type": "debt_terms",
+                    "material_effects": ["Payer le minimum.", "Suspendre l'épargne."],
+                }
+            ]
+        }
+    )
+
+    resolved = resolve_clarification(advice, 2025, 7, "skip")
+
+    assert resolved.outputs[0].type == "unresolved"
+    assert "Information non fournie (conditions de dette)" in resolved.outputs[0].trace.details.limits[0]
 
 
 def test_api_authentication_error_is_explicit() -> None:

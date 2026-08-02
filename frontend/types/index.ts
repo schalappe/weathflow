@@ -274,7 +274,16 @@ export type EmergencyFundFactType =
   | "safety_floor"
   | "priority_allocation";
 
-export type DeclaredFactType = "active_priority" | EmergencyFundFactType;
+export type CommitmentFactType =
+  | "recurring_obligation"
+  | "one_off_obligation"
+  | "debt_position"
+  | "debt_terms";
+
+export type DeclaredFactType =
+  | "active_priority"
+  | EmergencyFundFactType
+  | CommitmentFactType;
 
 export interface EmergencyFundFactInput {
   fact_type: EmergencyFundFactType;
@@ -295,6 +304,65 @@ export interface EmergencyFundFactResponse {
   fact: EmergencyFundFact;
 }
 
+export type CommitmentFrequency =
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "quarterly"
+  | "yearly";
+
+interface CommitmentFactBase {
+  label: string;
+}
+
+export interface RecurringObligationInput extends CommitmentFactBase {
+  fact_type: "recurring_obligation";
+  amount: number;
+  frequency: CommitmentFrequency;
+  end_date: string | null;
+}
+
+export interface OneOffObligationInput extends CommitmentFactBase {
+  fact_type: "one_off_obligation";
+  amount: number;
+  due_date: string;
+}
+
+export interface DebtPositionInput extends CommitmentFactBase {
+  fact_type: "debt_position";
+  balance: number;
+  overdue_amount: number | null;
+}
+
+export interface DebtTermsInput extends CommitmentFactBase {
+  fact_type: "debt_terms";
+  minimum_payment: number;
+  annual_rate: number | null;
+  cost: number | null;
+  end_date: string | null;
+}
+
+export type CommitmentFactInput =
+  | RecurringObligationInput
+  | OneOffObligationInput
+  | DebtPositionInput
+  | DebtTermsInput;
+
+export type CommitmentFact = CommitmentFactInput & {
+  fact_id: number;
+  state: Exclude<ActivePriorityState, "session">;
+  last_confirmed_at: string;
+  valid_until: string;
+};
+
+export interface CommitmentContextResponse {
+  facts: CommitmentFact[];
+}
+
+export interface CommitmentFactResponse {
+  fact: CommitmentFact;
+}
+
 export interface ActivePriorityCitation extends ActivePriorityInput {
   fact_type: "active_priority";
   state: Exclude<ActivePriorityState, "to_confirm">;
@@ -312,9 +380,19 @@ export interface EmergencyFundFactCitation extends EmergencyFundFactInput {
   can_delete: true;
 }
 
+export type CommitmentFactCitation = CommitmentFactInput & {
+  fact_id: number | null;
+  state: Exclude<ActivePriorityState, "to_confirm">;
+  last_confirmed_at: string;
+  valid_until: string | null;
+  can_correct: true;
+  can_delete: true;
+};
+
 export type DeclaredFactCitation =
   | ActivePriorityCitation
-  | EmergencyFundFactCitation;
+  | EmergencyFundFactCitation
+  | CommitmentFactCitation;
 
 export interface DecisionTrace {
   summary: string;

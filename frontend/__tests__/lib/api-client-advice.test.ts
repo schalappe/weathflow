@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   deleteActivePriority,
+  deleteCommitmentFact,
   deleteEmergencyFundFact,
   generateAdvice,
+  getCommitmentContext,
   getActivePriority,
   getEmergencyFundContext,
   getAdvice,
   putActivePriority,
+  putCommitmentFact,
   putEmergencyFundFact,
 } from "@/lib/api-client";
 import { createMockAdviceData } from "@/__tests__/utils/test-factories";
@@ -408,6 +411,55 @@ describe("API Client - Advice Functions", () => {
         expect.stringContaining(
           "/api/advice/context/emergency-fund/liquid_reserve",
         ),
+        { method: "DELETE" },
+      );
+    });
+  });
+
+  describe("commitment context", () => {
+    it("reads, corrects, and deletes facts by id", async () => {
+      const input = {
+        fact_type: "debt_terms" as const,
+        label: "Prêt auto",
+        minimum_payment: 250,
+        annual_rate: 4.2,
+        cost: null,
+        end_date: null,
+      };
+      const fact = {
+        ...input,
+        fact_id: 7,
+        state: "active" as const,
+        last_confirmed_at: "2026-08-02T12:00:00Z",
+        valid_until: "2026-10-31T12:00:00Z",
+      };
+      global.fetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ facts: [fact] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ fact }),
+        })
+        .mockResolvedValueOnce({ ok: true });
+
+      await expect(getCommitmentContext()).resolves.toEqual({ facts: [fact] });
+      await expect(putCommitmentFact(7, input)).resolves.toEqual({ fact });
+      await expect(deleteCommitmentFact(7)).resolves.toBeUndefined();
+
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining("/api/advice/context/commitments/7"),
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify(input),
+        }),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining("/api/advice/context/commitments/7"),
         { method: "DELETE" },
       );
     });

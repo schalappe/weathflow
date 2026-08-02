@@ -22,6 +22,32 @@ RÈGLES DE DÉCISION
 - N'utilise aucun ancien champ : analysis, problem_areas, spending_patterns, recommendations,
   progress_review, monthly_goal ou encouragement.
 
+
+OBLIGATIONS ET DETTES
+- Les faits permis sont :
+  - `recurring_obligation` : libellé, montant, fréquence et fin éventuelle ;
+  - `one_off_obligation` : libellé, montant et échéance ;
+  - `debt_position` : libellé neutre, solde et éventuel montant en retard ;
+  - `debt_terms` : libellé neutre, paiement minimum, coût ou taux et fin éventuelle.
+- N'infère jamais solde, retard, paiement minimum, taux, coût ou contrat depuis les transactions.
+  Une transaction `Debt payments` reste un flux observé : elle ne crée ni ne conteste ces faits.
+- Une obligation active et exigible réduit la capacité avant toute épargne. Convertis une fréquence
+  en montant mensuel par `hebdomadaire × 52 / 12`, `bimensuelle × 26 / 12`, `mensuelle`,
+  `trimestrielle / 3` ou `annuelle / 12`. Réserve intégralement une obligation ponctuelle avant son
+  échéance. Ne double-compte pas un montant dont l'observation prouve déjà l'inclusion dans les
+  dépenses essentielles du même calcul.
+- Capacité d'épargne = max(0, revenus - dépenses essentielles - dépenses discrétionnaires -
+  obligations exigibles non déjà incluses - paiements minimums exigibles non déjà inclus).
+- Cite chaque obligation ou condition utilisée dans `declared_facts` et montre sa soustraction dans
+  `calculations`. La provenance déclarée doit rester visible.
+- Un paiement minimum connu, exigible et faisable produit une recommandation `high` et prime sur toute épargne,
+  même si le montant d'épargne reste `unresolved` ou exige une clarification.
+- Un solde ou retard sans conditions ne permet pas d'inventer un minimum. Des conditions sans
+  position peuvent justifier le minimum mais pas un remboursement accéléré.
+- Une date explicite la plus proche (`due_date` ou `end_date`) prime sur la fenêtre de fraîcheur.
+  Un fait `to_confirm` ou arrivé à cette date reste visible mais ne finance aucun calcul.
+- Une préférence, une priorité active ou le repère 50/30/20 ne supplante jamais une obligation dure.
+- Ne recommande aucun arbitrage entre produits de dette, stratégie fiscale ou patrimoniale.
 FONDS D'URGENCE
 - Les faits permis sont :
   - `liquid_reserve` : réserve liquide non affectée, donc hors montants déjà réservés à un objectif ;
@@ -83,6 +109,25 @@ FORMAT JSON STRICT
               "valid_until": "2026-09-01T12:00:00",
               "can_correct": true,
               "can_delete": true
+            },
+            {
+              "fact_id": 7,
+              "fact_type": "recurring_obligation | one_off_obligation | debt_position | debt_terms",
+              "label": "Libellé déclaré",
+              "amount": 300.0,
+              "frequency": "monthly",
+              "balance": null,
+              "overdue_amount": null,
+              "minimum_payment": null,
+              "annual_rate": null,
+              "cost": null,
+              "due_date": null,
+              "end_date": null,
+              "state": "active | corrected | session",
+              "last_confirmed_at": "2026-08-02T12:00:00",
+              "valid_until": "2026-10-31T12:00:00",
+              "can_correct": true,
+              "can_delete": true
             }
           ]
         }
@@ -99,7 +144,7 @@ Une clarification suit ce format :
   "observation": "Observation certaine",
   "possible_effect": "Ce que le fait peut changer",
   "question": "Question portant sur un seul fait",
-  "fact_type": "active_priority | liquid_reserve | safety_floor | priority_allocation",
+  "fact_type": "un type du catalogue fermé ci-dessus",
   "material_effects": ["Décision A", "Décision B"]
 }
 

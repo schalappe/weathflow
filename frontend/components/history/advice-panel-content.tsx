@@ -26,12 +26,15 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   deleteActivePriority,
+  deleteCommitmentFact,
   deleteEmergencyFundFact,
   generateAdvice,
+  getCommitmentContext,
   getEmergencyFundContext,
   getActivePriority,
   getAdvice,
   putActivePriority,
+  putCommitmentFact,
   putEmergencyFundFact,
 } from "@/lib/api-client";
 import { t } from "@/lib/translations";
@@ -45,12 +48,18 @@ import type {
   ActivePriority,
   ActivePriorityInput,
   AdviceData,
+  CommitmentFact,
+  CommitmentFactCitation,
+  CommitmentFactInput,
+  CommitmentFactType,
+  CommitmentFrequency,
   EmergencyFundFact,
   EmergencyFundFactInput,
   EmergencyFundFactType,
   ClarificationOutput,
   DecisionOutput,
   DecisionPriority,
+  DeclaredFactCitation,
   DecisionTrace,
   EligibilityInfo,
   RecommendationOutput,
@@ -101,6 +110,94 @@ const emergencyFundInputLabels: Record<EmergencyFundFactType, string> = {
   safety_floor: "Montant du plancher de sécurité",
   priority_allocation: "Montant déjà affecté à la priorité",
 };
+
+const commitmentFactLabels: Record<CommitmentFactType, string> = {
+  recurring_obligation: "Obligation récurrente",
+  one_off_obligation: "Obligation ponctuelle",
+  debt_position: "Position de dette",
+  debt_terms: "Conditions de dette",
+};
+
+const commitmentFactTypes: Record<CommitmentFactType, true> = {
+  recurring_obligation: true,
+  one_off_obligation: true,
+  debt_position: true,
+  debt_terms: true,
+};
+
+function isCommitmentFactType(
+  factType: string,
+): factType is CommitmentFactType {
+  return factType in commitmentFactTypes;
+}
+
+function isCommitmentFact(
+  fact: DeclaredFactCitation,
+): fact is CommitmentFactCitation {
+  return isCommitmentFactType(fact.fact_type);
+}
+
+function optionalNumber(value: FormDataEntryValue | null): number | null {
+  return value == null || value === "" ? null : Number(value);
+}
+
+/**
+ * Build typed commitment answer from native form values.
+ * @param factType - Closed-catalog fact type.
+ * @param data - Submitted fields.
+ * @returns Valid API input shape.
+ */
+function commitmentInputFromForm(
+  factType: CommitmentFactType,
+  data: FormData,
+): CommitmentFactInput {
+  const label = String(data.get("label"));
+  switch (factType) {
+    case "recurring_obligation":
+      return {
+        fact_type: factType,
+        label,
+        amount: Number(data.get("amount")),
+        frequency: String(data.get("frequency")) as CommitmentFrequency,
+        end_date: String(data.get("end_date")) || null,
+      };
+    case "one_off_obligation":
+      return {
+        fact_type: factType,
+        label,
+        amount: Number(data.get("amount")),
+        due_date: String(data.get("due_date")),
+      };
+    case "debt_position":
+      return {
+        fact_type: factType,
+        label,
+        balance: Number(data.get("balance")),
+        overdue_amount: optionalNumber(data.get("overdue_amount")),
+      };
+    case "debt_terms":
+      return {
+        fact_type: factType,
+        label,
+        minimum_payment: Number(data.get("minimum_payment")),
+        annual_rate: optionalNumber(data.get("annual_rate")),
+        cost: optionalNumber(data.get("cost")),
+        end_date: String(data.get("end_date")) || null,
+      };
+  }
+}
+
+function commitmentFactSummary(fact: CommitmentFactInput): string {
+  switch (fact.fact_type) {
+    case "recurring_obligation":
+    case "one_off_obligation":
+      return `${fact.label} — ${formatCurrency(fact.amount)}`;
+    case "debt_position":
+      return `${fact.label} — solde ${formatCurrency(fact.balance)}`;
+    case "debt_terms":
+      return `${fact.label} — minimum ${formatCurrency(fact.minimum_payment)}`;
+  }
+}
 
 function adviceReducer(state: AdviceState, action: AdviceAction): AdviceState {
   switch (action.type) {
@@ -162,17 +259,23 @@ export function AdvicePanelContent({
   const [emergencyFundFacts, setEmergencyFundFacts] = useState<
     EmergencyFundFact[]
   >([]);
+  const [commitmentFacts, setCommitmentFacts] = useState<CommitmentFact[]>([]);
   const [contextError, setContextError] = useState<string | null>(null);
   const canGenerate = state.eligibility?.can_generate ?? false;
 
   useEffect(() => {
     let active = true;
     dispatch({ type: "FETCH_START" });
-    Promise.all([getActivePriority(), getEmergencyFundContext()])
-      .then(([{ priority }, { facts }]) => {
+    Promise.all([
+      getActivePriority(),
+      getEmergencyFundContext(),
+      getCommitmentContext(),
+    ])
+      .then(([{ priority }, emergencyFundContext, commitmentContext]) => {
         if (active) {
           setActivePriority(priority);
-          setEmergencyFundFacts(facts);
+          setEmergencyFundFacts(emergencyFundContext.facts);
+          setCommitmentFacts(commitmentContext.facts);
           setContextError(null);
         }
       })
@@ -280,6 +383,32 @@ export function AdvicePanelContent({
     [year, month],
   );
 
+  const handleCommitmentAnswer = useCallback(
+    async (fact: CommitmentFactInput, rememberFact: boolean) => {
+      dispatch({ type: "REGENERATE_START" });
+      try {
+        const response = await generateAdvice(year, month, {
+          regenerate: true,
+          commitmentFact: fact,
+          rememberFact,
+        });
+        dispatch({
+          type: "REGENERATE_SUCCESS",
+          advice: response.advice,
+          generatedAt: response.generated_at,
+        });
+        const context = await getCommitmentContext();
+        setCommitmentFacts(context.facts);
+      } catch (error) {
+        dispatch({
+          type: "REGENERATE_ERROR",
+          error: getErrorMessage(error, t.advice.generateError),
+        });
+      }
+    },
+    [year, month],
+  );
+
   const handleClarificationAbstention = useCallback(
     async (clarificationAction: "skip" | "unknown") => {
       dispatch({ type: "REGENERATE_START" });
@@ -359,6 +488,35 @@ export function AdvicePanelContent({
     [],
   );
 
+  const handleCommitmentCorrection = useCallback(
+    async (factId: number, input: CommitmentFactInput) => {
+      try {
+        const { fact } = await putCommitmentFact(factId, input);
+        setCommitmentFacts((facts) =>
+          facts.map((item) => (item.fact_id === factId ? fact : item)),
+        );
+        reload();
+      } catch (error) {
+        setContextError(getErrorMessage(error, "Correction impossible."));
+      }
+    },
+    [],
+  );
+
+  const handleCommitmentDeletion = useCallback(async (factId: number) => {
+    if (!window.confirm("Supprimer cette obligation ou dette mémorisée ?"))
+      return;
+    try {
+      await deleteCommitmentFact(factId);
+      setCommitmentFacts((facts) =>
+        facts.filter((fact) => fact.fact_id !== factId),
+      );
+      reload();
+    } catch (error) {
+      setContextError(getErrorMessage(error, "Suppression impossible."));
+    }
+  }, []);
+
   return (
     <div className={cn("space-y-6", className)}>
       <ActivePriorityPanel
@@ -371,6 +529,11 @@ export function AdvicePanelContent({
         facts={emergencyFundFacts}
         onCorrect={handleEmergencyFundCorrection}
         onDelete={handleEmergencyFundDeletion}
+      />
+      <CommitmentFactsPanel
+        facts={commitmentFacts}
+        onCorrect={handleCommitmentCorrection}
+        onDelete={handleCommitmentDeletion}
       />
       {state.panelState === "loading" && <AdviceSkeletonLoader />}
       {state.panelState === "empty" && (
@@ -395,6 +558,7 @@ export function AdvicePanelContent({
           canRegenerate={canGenerate}
           onPriorityAnswer={handlePriorityAnswer}
           onEmergencyFundAnswer={handleEmergencyFundAnswer}
+          onCommitmentAnswer={handleCommitmentAnswer}
           onClarificationAbstention={handleClarificationAbstention}
           onCorrectSession={reload}
         />
@@ -684,6 +848,340 @@ function EmergencyFundFactCard({
   );
 }
 
+interface CommitmentFactsPanelProps {
+  facts: CommitmentFact[];
+  onCorrect: (factId: number, fact: CommitmentFactInput) => Promise<void>;
+  onDelete: (factId: number) => Promise<void>;
+}
+
+function CommitmentFactsPanel({
+  facts,
+  onCorrect,
+  onDelete,
+}: CommitmentFactsPanelProps) {
+  return (
+    <section className="space-y-4 rounded-xl border bg-muted/20 p-5">
+      <h4 className="font-semibold">Obligations et dettes déclarées</h4>
+      {facts.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Aucune obligation ou dette mémorisée.
+        </p>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {facts.map((fact) => (
+            <CommitmentFactCard
+              key={fact.fact_id}
+              fact={fact}
+              onCorrect={onCorrect}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CommitmentFactCard({
+  fact,
+  onCorrect,
+  onDelete,
+}: {
+  fact: CommitmentFact;
+  onCorrect: (factId: number, fact: CommitmentFactInput) => Promise<void>;
+  onDelete: (factId: number) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onCorrect(
+      fact.fact_id,
+      commitmentInputFromForm(
+        fact.fact_type,
+        new FormData(event.currentTarget),
+      ),
+    );
+    setEditing(false);
+  }
+
+  return (
+    <article
+      id={`commitment-context-${fact.fact_id}`}
+      className="space-y-3 rounded-lg border bg-background/50 p-4"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h5 className="text-sm font-medium">
+            {commitmentFactLabels[fact.fact_type]}
+          </h5>
+          <p>{commitmentFactSummary(fact)}</p>
+        </div>
+        <Badge variant={fact.state === "to_confirm" ? "secondary" : "outline"}>
+          {fact.state === "active"
+            ? "Actif"
+            : fact.state === "corrected"
+              ? "Corrigé"
+              : "À confirmer"}
+        </Badge>
+      </div>
+      {editing ? (
+        <form className="space-y-3" onSubmit={handleSubmit}>
+          <CommitmentFields
+            factType={fact.fact_type}
+            defaultValue={fact}
+            idPrefix={`context-commitment-${fact.fact_id}`}
+          />
+          <div className="flex gap-2">
+            <Button type="submit" size="sm">
+              Enregistrer
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setEditing(false)}
+            >
+              Annuler
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">
+            Confirmé le {formatAdviceTimestamp(fact.last_confirmed_at)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Valide jusqu’au{" "}
+            {new Date(fact.valid_until).toLocaleDateString("fr-FR")}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="h-4 w-4" />
+              Corriger
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => onDelete(fact.fact_id)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Supprimer
+            </Button>
+          </div>
+        </>
+      )}
+    </article>
+  );
+}
+
+function CommitmentFields({
+  factType,
+  defaultValue,
+  idPrefix,
+}: {
+  factType: CommitmentFactType;
+  defaultValue?: CommitmentFactInput;
+  idPrefix: string;
+}) {
+  const amount =
+    defaultValue?.fact_type === "recurring_obligation" ||
+    defaultValue?.fact_type === "one_off_obligation"
+      ? defaultValue.amount
+      : undefined;
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-2">
+        <Label htmlFor={`${idPrefix}-label`}>Libellé</Label>
+        <Input
+          id={`${idPrefix}-label`}
+          name="label"
+          defaultValue={defaultValue?.label}
+          required
+        />
+      </div>
+      {(factType === "recurring_obligation" ||
+        factType === "one_off_obligation") && (
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-amount`}>Montant</Label>
+          <Input
+            id={`${idPrefix}-amount`}
+            name="amount"
+            type="number"
+            min="0.01"
+            step="0.01"
+            defaultValue={amount}
+            required
+          />
+        </div>
+      )}
+      {factType === "recurring_obligation" && (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-frequency`}>Fréquence</Label>
+            <select
+              id={`${idPrefix}-frequency`}
+              name="frequency"
+              defaultValue={
+                defaultValue?.fact_type === "recurring_obligation"
+                  ? defaultValue.frequency
+                  : "monthly"
+              }
+              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+            >
+              <option value="weekly">Hebdomadaire</option>
+              <option value="biweekly">Toutes les deux semaines</option>
+              <option value="monthly">Mensuelle</option>
+              <option value="quarterly">Trimestrielle</option>
+              <option value="yearly">Annuelle</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-end-date`}>
+              Date de fin éventuelle
+            </Label>
+            <Input
+              id={`${idPrefix}-end-date`}
+              name="end_date"
+              type="date"
+              defaultValue={
+                defaultValue?.fact_type === "recurring_obligation"
+                  ? (defaultValue.end_date ?? "")
+                  : ""
+              }
+            />
+          </div>
+        </>
+      )}
+      {factType === "one_off_obligation" && (
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-due-date`}>Échéance</Label>
+          <Input
+            id={`${idPrefix}-due-date`}
+            name="due_date"
+            type="date"
+            defaultValue={
+              defaultValue?.fact_type === "one_off_obligation"
+                ? defaultValue.due_date
+                : ""
+            }
+            required
+          />
+        </div>
+      )}
+      {factType === "debt_position" && (
+        <>
+          <NumberField
+            id={`${idPrefix}-balance`}
+            name="balance"
+            label="Solde"
+            defaultValue={
+              defaultValue?.fact_type === "debt_position"
+                ? defaultValue.balance
+                : undefined
+            }
+            required
+          />
+          <NumberField
+            id={`${idPrefix}-overdue`}
+            name="overdue_amount"
+            label="Montant en retard éventuel"
+            defaultValue={
+              defaultValue?.fact_type === "debt_position"
+                ? (defaultValue.overdue_amount ?? undefined)
+                : undefined
+            }
+          />
+        </>
+      )}
+      {factType === "debt_terms" && (
+        <>
+          <NumberField
+            id={`${idPrefix}-minimum`}
+            name="minimum_payment"
+            label="Paiement minimum"
+            defaultValue={
+              defaultValue?.fact_type === "debt_terms"
+                ? defaultValue.minimum_payment
+                : undefined
+            }
+            required
+          />
+          <NumberField
+            id={`${idPrefix}-rate`}
+            name="annual_rate"
+            label="Taux annuel (%)"
+            defaultValue={
+              defaultValue?.fact_type === "debt_terms"
+                ? (defaultValue.annual_rate ?? undefined)
+                : undefined
+            }
+          />
+          <NumberField
+            id={`${idPrefix}-cost`}
+            name="cost"
+            label="Coût éventuel"
+            defaultValue={
+              defaultValue?.fact_type === "debt_terms"
+                ? (defaultValue.cost ?? undefined)
+                : undefined
+            }
+          />
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-end-date`}>
+              Date de fin éventuelle
+            </Label>
+            <Input
+              id={`${idPrefix}-end-date`}
+              name="end_date"
+              type="date"
+              defaultValue={
+                defaultValue?.fact_type === "debt_terms"
+                  ? (defaultValue.end_date ?? "")
+                  : ""
+              }
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function NumberField({
+  id,
+  name,
+  label,
+  defaultValue,
+  required = false,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  defaultValue?: number;
+  required?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        name={name}
+        type="number"
+        min="0"
+        step="0.01"
+        defaultValue={defaultValue}
+        required={required}
+      />
+    </div>
+  );
+}
 function AdviceSkeletonLoader() {
   return (
     <div className="space-y-4">
@@ -912,6 +1410,8 @@ function DecisionTraceDetails({
                         </p>
                       )}
                     </>
+                  ) : isCommitmentFact(fact) ? (
+                    <p className="font-medium">{commitmentFactSummary(fact)}</p>
                   ) : (
                     <p className="font-medium">
                       {emergencyFundFactLabels[fact.fact_type]} —{" "}
@@ -956,7 +1456,9 @@ function DecisionTraceDetails({
                       href={
                         fact.fact_type === "active_priority"
                           ? "#active-priority-context"
-                          : `#emergency-fund-context-${fact.fact_type}`
+                          : isCommitmentFact(fact)
+                            ? `#commitment-context-${fact.fact_id}`
+                            : `#emergency-fund-context-${fact.fact_type}`
                       }
                       className="inline-block font-medium text-primary underline-offset-4 hover:underline"
                     >
@@ -1001,6 +1503,10 @@ interface ClarificationCardProps {
     fact: EmergencyFundFactInput,
     rememberFact: boolean,
   ) => Promise<void>;
+  onCommitmentAnswer: (
+    fact: CommitmentFactInput,
+    rememberFact: boolean,
+  ) => Promise<void>;
   onAbstain: (action: "skip" | "unknown") => Promise<void>;
 }
 
@@ -1009,6 +1515,7 @@ function ClarificationCard({
   isSubmitting,
   onPriorityAnswer,
   onEmergencyFundAnswer,
+  onCommitmentAnswer,
   onAbstain,
 }: ClarificationCardProps) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -1024,6 +1531,11 @@ function ClarificationCard({
           target: String(data.get("target")),
           deadline: String(data.get("deadline")) || null,
         },
+        remember,
+      );
+    } else if (isCommitmentFactType(output.fact_type)) {
+      await onCommitmentAnswer(
+        commitmentInputFromForm(output.fact_type, data),
         remember,
       );
     } else {
@@ -1077,6 +1589,11 @@ function ClarificationCard({
               <Input id="priority-deadline" name="deadline" type="date" />
             </div>
           </>
+        ) : isCommitmentFactType(output.fact_type) ? (
+          <CommitmentFields
+            factType={output.fact_type}
+            idPrefix={`clarification-${output.fact_type}`}
+          />
         ) : (
           <div className="space-y-2">
             <Label htmlFor={`clarification-${output.fact_type}-amount`}>
@@ -1179,6 +1696,10 @@ interface AdviceContentProps {
     fact: EmergencyFundFactInput,
     rememberFact: boolean,
   ) => Promise<void>;
+  onCommitmentAnswer: (
+    fact: CommitmentFactInput,
+    rememberFact: boolean,
+  ) => Promise<void>;
   onClarificationAbstention: (action: "skip" | "unknown") => Promise<void>;
   onCorrectSession: () => void;
 }
@@ -1192,6 +1713,7 @@ function AdviceContent({
   canRegenerate,
   onPriorityAnswer,
   onEmergencyFundAnswer,
+  onCommitmentAnswer,
   onClarificationAbstention,
   onCorrectSession,
 }: AdviceContentProps) {
@@ -1207,6 +1729,7 @@ function AdviceContent({
               isSubmitting={isRegenerating}
               onPriorityAnswer={onPriorityAnswer}
               onEmergencyFundAnswer={onEmergencyFundAnswer}
+              onCommitmentAnswer={onCommitmentAnswer}
               onAbstain={onClarificationAbstention}
             />
           ) : (
