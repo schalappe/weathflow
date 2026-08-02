@@ -43,3 +43,27 @@ _Avoid_: Conseil prudent, conseil par défaut
 **Réponse sélective**:
 Réponse qui ne présente que les recommandations robustes et rend explicites les sujets sur lesquels aucune conclusion n’est étayée.
 _Avoid_: Réponse partielle, conseil incomplet
+
+**Réponse de session**:
+Fait fourni pour le conseil en cours que l’utilisateur choisit de ne pas réutiliser.
+_Avoid_: Fait temporaire, contexte mémorisé
+
+**Fait mémorisé**:
+Fait du contexte déclaré conservé pour de futurs conseils avec l’accord annoncé de l’utilisateur.
+_Avoid_: Profil utilisateur, souvenir
+
+**Fait durable**:
+Fait mémorisé sans échéance prévisible, actif jusqu’à sa correction ou sa suppression.
+_Avoid_: Fait permanent
+
+**Fait daté**:
+Fait mémorisé dont la validité se termine à une date connue.
+_Avoid_: Fait temporaire
+
+**Fait volatil**:
+Fait mémorisé susceptible de changer, valide pendant une fenêtre de fraîcheur propre à sa nature.
+_Avoid_: Fait daté, donnée observée
+
+**Fait expiré**:
+Fait mémorisé dont la validité a pris fin, visible mais exclu du conseil jusqu’à sa reconfirmation.
+_Avoid_: Fait supprimé, fait actif
