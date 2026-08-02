@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { getAdvice, generateAdvice } from "@/lib/api-client";
+import { createMockAdviceData } from "@/__tests__/utils/test-factories";
 
 describe("API Client - Advice Functions", () => {
   const originalFetch = global.fetch;
@@ -16,13 +17,9 @@ describe("API Client - Advice Functions", () => {
     it("returns typed GetAdviceResponse on success", async () => {
       const mockResponse = {
         success: true,
-        advice: {
-          analysis: "Test analysis",
-          problem_areas: [],
-          recommendations: ["Test recommendation"],
-          encouragement: "Keep it up!",
-        },
+        advice: createMockAdviceData(),
         generated_at: "2025-12-11T10:00:00Z",
+        is_valid: true,
         exists: true,
       };
 
@@ -38,7 +35,7 @@ describe("API Client - Advice Functions", () => {
       );
       expect(result).toEqual(mockResponse);
       expect(result.exists).toBe(true);
-      expect(result.advice?.analysis).toBe("Test analysis");
+      expect(result.advice?.outputs[0].type).toBe("recommendation");
     });
 
     it("returns exists=false when no advice exists", async () => {
@@ -46,6 +43,7 @@ describe("API Client - Advice Functions", () => {
         success: true,
         advice: null,
         generated_at: null,
+        is_valid: false,
         exists: false,
       };
 
@@ -94,13 +92,9 @@ describe("API Client - Advice Functions", () => {
     it("sends correct payload with regenerate=false", async () => {
       const mockResponse = {
         success: true,
-        advice: {
-          analysis: "Generated analysis",
-          problem_areas: [],
-          recommendations: [],
-          encouragement: "Good job!",
-        },
+        advice: createMockAdviceData(),
         generated_at: "2025-12-11T10:00:00Z",
+        is_valid: true,
         was_cached: false,
       };
 
@@ -124,13 +118,9 @@ describe("API Client - Advice Functions", () => {
     it("sends correct payload with regenerate=true", async () => {
       const mockResponse = {
         success: true,
-        advice: {
-          analysis: "Regenerated analysis",
-          problem_areas: [],
-          recommendations: [],
-          encouragement: "Excellent!",
-        },
+        advice: createMockAdviceData(),
         generated_at: "2025-12-11T11:00:00Z",
+        is_valid: true,
         was_cached: false,
       };
 
@@ -152,13 +142,9 @@ describe("API Client - Advice Functions", () => {
     it("returns typed GenerateAdviceResponse on success", async () => {
       const mockResponse = {
         success: true,
-        advice: {
-          analysis: "New analysis",
-          problem_areas: [{ category: "Test", amount: 100, trend: "+10%" }],
-          recommendations: ["Do this"],
-          encouragement: "Nice!",
-        },
+        advice: createMockAdviceData(),
         generated_at: "2025-12-11T10:00:00Z",
+        is_valid: true,
         was_cached: true,
       };
 
@@ -171,7 +157,7 @@ describe("API Client - Advice Functions", () => {
 
       expect(result.success).toBe(true);
       expect(result.was_cached).toBe(true);
-      expect(result.advice.problem_areas).toHaveLength(1);
+      expect(result.advice.outputs).toHaveLength(1);
     });
 
     it("throws error on network failure", async () => {

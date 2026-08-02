@@ -5,7 +5,7 @@
 from fastapi import File, HTTPException, Query, UploadFile
 from loguru import logger
 
-from app.api.deps import MonthRepo, TransactionRepo, UploadSvc, create_router
+from app.api.deps import AdviceRepo, MonthRepo, TransactionRepo, UploadSvc, create_router
 from app.responses.upload import CategorizeResponse, ImportMode, UploadResponse
 from app.services.exceptions import (
     APIConnectionError,
@@ -60,6 +60,7 @@ async def upload_file(
 
 @router.post("/categorize", response_model=CategorizeResponse)
 async def categorize_file(
+    advice_repo: AdviceRepo,
     month_repo: MonthRepo,
     transaction_repo: TransactionRepo,
     service: UploadSvc,
@@ -106,6 +107,7 @@ async def categorize_file(
     try:
         content = await file.read()
         result = service.process_categorization(
+            advice_repo=advice_repo,
             file_content=content,
             months_to_process=months_list,
             import_mode=import_mode,

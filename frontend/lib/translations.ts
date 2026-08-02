@@ -328,14 +328,13 @@ export const t = {
     deficit: "Déficit",
   },
 
-  // Advice Panel
   advice: {
-    title: "Conseils personnalisés",
-    subtitle: "Recommandations IA basées sur vos habitudes de dépenses",
+    title: "Décisions financières",
+    subtitle: "Sorties justifiées par vos transactions observées",
     empty: {
       title: "Aucun conseil disponible",
       description:
-        "Générez des conseils personnalisés basés sur vos 3 derniers mois de transactions.",
+        "Générez des décisions financières basées sur vos derniers mois de transactions.",
       button: "Générer des conseils",
     },
     notAvailable: {
@@ -343,28 +342,24 @@ export const t = {
       description:
         "Les conseils ne peuvent être générés que pour le mois actuel et le mois précédent.",
     },
+    outputTypes: {
+      recommendation: "Recommandation",
+      noAction: "Conclusion sans action",
+      unresolved: "Sujet non conclu",
+    },
+    priorities: {
+      high: "Priorité haute",
+      medium: "Priorité moyenne",
+      low: "Priorité basse",
+    },
+    traceDetails: "Consulter la trace de décision",
+    observedFacts: "Faits observés",
+    calculations: "Calculs",
+    conventions: "Conventions",
+    limits: "Limites",
+    amount: "Montant",
+    deadline: "Échéance",
     generating: "Génération...",
-    sections: {
-      analysis: "Analyse des tendances",
-      spendingPatterns: "Habitudes de dépenses",
-      problems: "Points de vigilance",
-      recommendations: "Recommandations",
-      progressReview: "Suivi des progrès",
-      monthlyGoal: "Objectif du mois",
-      encouragement: "Encouragements",
-    },
-    difficulty: {
-      easy: "Facile",
-      moderate: "Modéré",
-      hard: "Exigeant",
-    },
-    quickWin: "Gain rapide",
-    expectedSavings: "Économie potentielle",
-    noPatterns: "Aucun pattern de dépenses identifié",
-    noProgress: "Premier mois d'analyse",
-    wins: "Victoires",
-    areasForGrowth: "Axes d'amélioration",
-    targetAmount: "Objectif",
     generated: "Généré",
     regenerate: "Régénérer",
     regenerating: "Régénération...",

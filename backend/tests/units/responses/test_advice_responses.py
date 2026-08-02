@@ -1,188 +1,149 @@
-"""Unit tests for advice response models."""
+"""Unit tests for advice API contracts."""
 
 import json
-import unittest
 
+import pytest
 from pydantic import ValidationError
 
 from app.responses.advice import AdviceData, GenerateAdviceRequest
-from app.services.advice.models import AdviceResponse as ServiceAdviceResponse
-from app.services.advice.models import ProblemArea as ServiceProblemArea
-from app.services.advice.models import Recommendation as ServiceRecommendation
 
 
-class TestAdviceDataFromJson(unittest.TestCase):
-    """Tests for AdviceData.from_json factory method."""
+def _trace(calculations: list[str] | None = None) -> dict[str, object]:
+    """Build auditable decision trace."""
+    return {
+        "summary": "Les dépenses de restauration dépassent la moyenne récente.",
+        "details": {
+            "observations": [
+                {
+                    "fact": "240 € dépensés en restauration contre 120 € en moyenne.",
+                    "period": "2025-10 à 2025-12",
+                    "scope": "Transactions CHOICE / Dining out",
+                    "source": "observed_data",
+                }
+            ],
+            "calculations": (calculations if calculations is not None else ["240 € - 120 € = 120 € d'écart mensuel."]),
+            "conventions": ["Écart matériel retenu au-delà de 20 %."],
+            "limits": ["Trois mois observés seulement."],
+        },
+    }
 
-    def test_parses_valid_json_string_legacy_format(self) -> None:
-        """From JSON parses valid JSON string with legacy string recommendations."""
-        json_str = json.dumps(
+
+def test_parses_recommendation_with_auditable_trace() -> None:
+    """Recommendation exposes fact, period, scope, calculation, amount, deadline."""
+    advice = AdviceData.model_validate_json(
+        json.dumps(
             {
-                "analysis": "Votre gestion financière est excellente.",
-                "problem_areas": [
-                    {"category": "Subscriptions", "amount": 85.0, "trend": "+20%"},
-                    {"category": "Dining", "amount": 150.0, "trend": "+15%"},
-                    {"category": "Entertainment", "amount": 120.0, "trend": "N/A"},
-                ],
-                "recommendations": [
-                    "Réduire les abonnements.",
-                    "Limiter les repas au restaurant.",
-                    "Maintenir votre épargne.",
-                ],
-                "encouragement": "Continuez comme ça!",
+                "outputs": [
+                    {
+                        "type": "recommendation",
+                        "priority": "high",
+                        "action": "Réduire les repas au restaurant à la moyenne récente.",
+                        "amount": 120,
+                        "deadline": "2026-01-31",
+                        "trace": _trace(),
+                    }
+                ]
+            }
+        )
+    )
+
+    output = advice.outputs[0]
+    assert output.type == "recommendation"
+    assert output.trace.details.observations[0].source == "observed_data"
+    assert output.trace.details.observations[0].period == "2025-10 à 2025-12"
+    assert output.trace.details.observations[0].scope == "Transactions CHOICE / Dining out"
+    assert output.trace.details.calculations == ["240 € - 120 € = 120 € d'écart mensuel."]
+    assert output.amount == 120
+    assert output.deadline.isoformat() == "2026-01-31"
+
+
+def test_accepts_no_action_without_invented_recommendation() -> None:
+    """Stable month yields one no-action conclusion and no historical fields."""
+    advice = AdviceData.model_validate(
+        {
+            "outputs": [
+                {
+                    "type": "no_action",
+                    "priority": "low",
+                    "conclusion": "Aucune action n'est justifiée par les écarts observés.",
+                    "trace": _trace([]),
+                }
+            ]
+        }
+    )
+
+    payload = advice.model_dump(mode="json")
+    assert payload["outputs"][0]["type"] == "no_action"
+    assert set(payload) == {"outputs"}
+    assert (
+        not {
+            "problem_areas",
+            "spending_patterns",
+            "progress_review",
+            "monthly_goal",
+            "encouragement",
+        }
+        & payload.keys()
+    )
+
+
+def test_omits_underived_recommendation_amount_and_deadline() -> None:
+    """Recommendation JSON omits optional values without derivation."""
+    advice = AdviceData.model_validate(
+        {
+            "outputs": [
+                {
+                    "type": "recommendation",
+                    "priority": "low",
+                    "action": "Maintenir la trajectoire actuelle.",
+                    "trace": _trace([]),
+                }
+            ]
+        }
+    )
+
+    output = advice.model_dump(mode="json")["outputs"][0]
+    assert "amount" not in output
+    assert "deadline" not in output
+
+
+def test_rejects_amount_without_deriving_calculation() -> None:
+    """Recommendation amount requires supporting calculation."""
+    with pytest.raises(ValidationError):
+        AdviceData.model_validate(
+            {
+                "outputs": [
+                    {
+                        "type": "recommendation",
+                        "priority": "high",
+                        "action": "Réduire les repas au restaurant.",
+                        "amount": 120,
+                        "trace": _trace([]),
+                    }
+                ]
             }
         )
 
-        result = AdviceData.from_json(json_str)
 
-        self.assertEqual(result.analysis, "Votre gestion financière est excellente.")
-        self.assertEqual(len(result.problem_areas), 3)
-        self.assertEqual(result.problem_areas[0].category, "Subscriptions")
-        self.assertEqual(result.problem_areas[0].amount, 85.0)
-        self.assertEqual(result.problem_areas[0].trend, "+20%")
-        self.assertEqual(len(result.recommendations), 3)
-        self.assertEqual(result.recommendations[0].action, "Réduire les abonnements.")
-        self.assertEqual(result.encouragement, "Continuez comme ça!")
-
-    def test_parses_valid_json_string_new_format(self) -> None:
-        """From JSON parses valid JSON string with new enriched format."""
-        json_str = json.dumps(
+def test_rejects_historical_advice_contract() -> None:
+    """Historical quota contract has no compatibility path."""
+    with pytest.raises(ValidationError):
+        AdviceData.model_validate(
             {
-                "analysis": "Votre gestion financière est excellente.",
-                "spending_patterns": [
-                    {
-                        "pattern_type": "Abonnements",
-                        "description": "Netflix, Spotify",
-                        "monthly_cost": 25.0,
-                        "occurrences": 2,
-                        "insight": "Deux abonnements streaming.",
-                    }
-                ],
-                "problem_areas": [
-                    {
-                        "category": "Subscriptions",
-                        "amount": 85.0,
-                        "trend": "+20%",
-                        "root_cause": "Accumulation d'abonnements.",
-                        "impact": "Dépasse budget CHOICE.",
-                    }
-                ],
-                "recommendations": [
-                    {
-                        "priority": 1,
-                        "action": "Réduire les abonnements.",
-                        "details": "Netflix + Spotify = 25€.",
-                        "expected_savings": "120€/an",
-                        "difficulty": "Facile",
-                        "quick_win": True,
-                    }
-                ],
-                "progress_review": {
-                    "previous_advice_followed": "Premier mois.",
-                    "wins": ["Score 3/3"],
-                    "areas_for_growth": ["CHOICE"],
-                },
-                "monthly_goal": {
-                    "objective": "Réduire CHOICE de 10%",
-                    "target_amount": 90.0,
-                    "strategy": "Cuisiner plus.",
-                },
-                "encouragement": "Continuez comme ça!",
+                "analysis": "Ancienne analyse",
+                "problem_areas": [],
+                "recommendations": [],
+                "encouragement": "Ancien encouragement",
             }
         )
 
-        result = AdviceData.from_json(json_str)
 
-        self.assertEqual(len(result.spending_patterns), 1)
-        self.assertEqual(result.spending_patterns[0].pattern_type, "Abonnements")
-        self.assertEqual(result.problem_areas[0].root_cause, "Accumulation d'abonnements.")
-        self.assertEqual(result.recommendations[0].priority, 1)
-        self.assertTrue(result.recommendations[0].quick_win)
-        self.assertIsNotNone(result.progress_review)
-        assert result.progress_review is not None
-        self.assertEqual(result.progress_review.wins, ["Score 3/3"])
-        self.assertIsNotNone(result.monthly_goal)
-        assert result.monthly_goal is not None
-        self.assertEqual(result.monthly_goal.target_amount, 90.0)
+def test_generate_request_validates_period_and_defaults_cache_use() -> None:
+    """Generation request validates period and defaults to cached advice."""
+    with pytest.raises(ValidationError):
+        GenerateAdviceRequest(year=1999, month=1)
+    with pytest.raises(ValidationError):
+        GenerateAdviceRequest(year=2025, month=13)
 
-
-class TestAdviceDataFromServiceResponse(unittest.TestCase):
-    """Tests for AdviceData.from_service_response factory method."""
-
-    def test_converts_service_response_correctly(self) -> None:
-        """From service response converts DTO to API model."""
-        service_response = ServiceAdviceResponse(
-            analysis="Test analysis",
-            problem_areas=[
-                ServiceProblemArea(category="Test", amount=100.0, trend="+10%"),
-            ],
-            recommendations=[
-                ServiceRecommendation(
-                    priority=1,
-                    action="Recommendation 1",
-                    details="Details 1",
-                    expected_savings="50€",
-                    difficulty="Facile",
-                    quick_win=True,
-                ),
-                ServiceRecommendation(
-                    priority=2,
-                    action="Recommendation 2",
-                    details="Details 2",
-                    expected_savings="30€",
-                    difficulty="Modéré",
-                    quick_win=False,
-                ),
-            ],
-            encouragement="Keep going!",
-        )
-
-        result = AdviceData.from_service_response(service_response)
-
-        self.assertEqual(result.analysis, "Test analysis")
-        self.assertEqual(len(result.problem_areas), 1)
-        self.assertEqual(result.problem_areas[0].category, "Test")
-        self.assertEqual(result.problem_areas[0].amount, 100.0)
-        self.assertEqual(result.problem_areas[0].trend, "+10%")
-        self.assertEqual(len(result.recommendations), 2)
-        self.assertEqual(result.recommendations[0].action, "Recommendation 1")
-        self.assertEqual(result.recommendations[1].action, "Recommendation 2")
-        self.assertEqual(result.encouragement, "Keep going!")
-
-
-class TestGenerateAdviceRequestValidation(unittest.TestCase):
-    """Tests for GenerateAdviceRequest field validation."""
-
-    def test_validates_year_constraints(self) -> None:
-        """Request validates year is between 2000 and 2100."""
-        with self.assertRaises(ValidationError):
-            GenerateAdviceRequest(year=1999, month=1)
-
-        with self.assertRaises(ValidationError):
-            GenerateAdviceRequest(year=2101, month=1)
-
-        request = GenerateAdviceRequest(year=2000, month=1)
-        self.assertEqual(request.year, 2000)
-
-        request = GenerateAdviceRequest(year=2100, month=12)
-        self.assertEqual(request.year, 2100)
-
-    def test_validates_month_constraints(self) -> None:
-        """Request validates month is between 1 and 12."""
-        with self.assertRaises(ValidationError):
-            GenerateAdviceRequest(year=2025, month=0)
-
-        with self.assertRaises(ValidationError):
-            GenerateAdviceRequest(year=2025, month=13)
-
-        request = GenerateAdviceRequest(year=2025, month=1)
-        self.assertEqual(request.month, 1)
-
-        request = GenerateAdviceRequest(year=2025, month=12)
-        self.assertEqual(request.month, 12)
-
-    def test_regenerate_defaults_to_false(self) -> None:
-        """Request regenerate flag defaults to False."""
-        request = GenerateAdviceRequest(year=2025, month=1)
-
-        self.assertFalse(request.regenerate)
+    request = GenerateAdviceRequest(year=2025, month=12)
+    assert request.regenerate is False

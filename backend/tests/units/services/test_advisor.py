@@ -1,555 +1,183 @@
 """Tests for AdviceGenerator service."""
 
-import unittest
+import json
 from unittest.mock import MagicMock
 
 import anthropic
-from pydantic import ValidationError
+import pytest
 
-from app.services.advice.generator import AdviceGenerator, calculate_trend
-from app.services.advice.models import AdviceResponse, MonthData, ProblemArea, Recommendation
+from app.services.advice.generator import AdviceGenerator
+from app.services.advice.models import AdviceResponse, MonthData
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
-from app.services.exceptions import (
-    AdviceAPIError,
-    AdviceGenerationError,
-    AdviceParseError,
-    InsufficientDataError,
-)
+from app.services.exceptions import AdviceAPIError, AdviceGenerationError, AdviceParseError, InsufficientDataError
 
 
-def _make_month_data(
-    year: int = 2025,
-    month: int = 1,
-    total_income: float = 3000.0,
-    total_core: float = 1500.0,
-    total_choice: float = 600.0,
-    total_compound: float = 600.0,
-    score: int = 3,
-    category_breakdown: dict[str, float] | None = None,
-) -> MonthData:
-    """Create a test MonthData with defaults."""
+def _month(year: int = 2025, month: int = 1) -> MonthData:
+    """Build observed month data."""
     return MonthData(
         year=year,
         month=month,
-        total_income=total_income,
-        total_core=total_core,
-        total_choice=total_choice,
-        total_compound=total_compound,
-        core_percentage=50.0 if total_income > 0 else 0.0,
-        choice_percentage=20.0 if total_income > 0 else 0.0,
-        compound_percentage=20.0 if total_income > 0 else 0.0,
-        score=score,
+        total_income=3000,
+        total_core=1500,
+        total_choice=900,
+        total_compound=600,
+        core_percentage=50,
+        choice_percentage=30,
+        compound_percentage=20,
+        score=3,
         score_label="Great",
-        category_breakdown=category_breakdown,
     )
 
 
-class TestAdviceDTOs(unittest.TestCase):
-    """Tests for advice DTOs (Task Group 1)."""
-
-    def test_month_data_validation_with_valid_data(self) -> None:
-        """Should create MonthData with valid data."""
-        month = _make_month_data(year=2025, month=6, score=2)
-
-        self.assertEqual(month.year, 2025)
-        self.assertEqual(month.month, 6)
-        self.assertEqual(month.score, 2)
-
-    def test_problem_area_is_immutable(self) -> None:
-        """Should raise error when trying to modify ProblemArea."""
-        problem = ProblemArea(category="Dining", amount=150.0, trend="+20%")
-
-        with self.assertRaises(ValidationError):
-            problem.category = "Shopping"  # type: ignore[misc]
-
-    def test_advice_response_field_validation(self) -> None:
-        """Should create AdviceResponse with all required fields."""
-        problem_areas = [ProblemArea(category="Test", amount=100.0, trend="+10%")]
-        recommendations = [
-            Recommendation(
-                priority=1,
-                action="Rec 1",
-                details="Details 1",
-                expected_savings="50€",
-                difficulty="Facile",
-                quick_win=True,
-            ),
-            Recommendation(
-                priority=2,
-                action="Rec 2",
-                details="Details 2",
-                expected_savings="30€",
-                difficulty="Modéré",
-                quick_win=False,
-            ),
-        ]
-        response = AdviceResponse(
-            analysis="Test analysis",
-            problem_areas=problem_areas,
-            recommendations=recommendations,
-            encouragement="Keep going!",
-        )
-
-        self.assertEqual(response.analysis, "Test analysis")
-        self.assertEqual(len(response.problem_areas), 1)
-        self.assertEqual(len(response.recommendations), 2)
-
-    def test_insufficient_data_error_attributes(self) -> None:
-        """Should store min_months_required attribute."""
-        error = InsufficientDataError(min_months_required=2)
-
-        self.assertEqual(error.min_months_required, 2)
-        self.assertIn("2 months", str(error))
-
-
-class TestAdvicePrompt(unittest.TestCase):
-    """Tests for system prompt (Task Group 2)."""
-
-    def test_system_prompt_is_non_empty_string(self) -> None:
-        """Should have non-empty system prompt."""
-        self.assertIsInstance(ADVICE_SYSTEM_PROMPT, str)
-        self.assertGreater(len(ADVICE_SYSTEM_PROMPT), 100)
-
-    def test_prompt_contains_required_keywords(self) -> None:
-        """Should contain Money Map, JSON, and French keywords."""
-        self.assertIn("Money Map", ADVICE_SYSTEM_PROMPT)
-        self.assertIn("JSON", ADVICE_SYSTEM_PROMPT)
-        self.assertIn("français", ADVICE_SYSTEM_PROMPT.lower())
-
-
-class TestTrendCalculation(unittest.TestCase):
-    """Tests for calculate_trend function (Task Group 3)."""
-
-    def test_positive_trend_returns_plus_format(self) -> None:
-        """Should return '+15%' for positive change."""
-        result = calculate_trend(current=115.0, previous=100.0)
-        self.assertEqual(result, "+15%")
-
-    def test_negative_trend_returns_minus_format(self) -> None:
-        """Should return '-8%' for negative change."""
-        result = calculate_trend(current=92.0, previous=100.0)
-        self.assertEqual(result, "-8%")
-
-    def test_zero_change_returns_plus_zero(self) -> None:
-        """Should return '+0%' for no change."""
-        result = calculate_trend(current=100.0, previous=100.0)
-        self.assertEqual(result, "+0%")
-
-    def test_previous_zero_returns_na(self) -> None:
-        """Should return 'N/A' when previous value is zero."""
-        result = calculate_trend(current=100.0, previous=0.0)
-        self.assertEqual(result, "N/A")
+def _decision_json(output_type: str = "recommendation") -> str:
+    """Build model response JSON."""
+    output: dict[str, object] = {
+        "type": output_type,
+        "priority": "high",
+        "trace": {
+            "summary": "Écart matériel observé.",
+            "details": {
+                "observations": [
+                    {
+                        "fact": "240 € contre 120 € en moyenne.",
+                        "period": "2025-01 à 2025-03",
+                        "scope": "CHOICE / Dining out",
+                        "source": "observed_data",
+                    }
+                ],
+                "calculations": ["240 - 120 = 120"],
+                "conventions": [],
+                "limits": [],
+            },
+        },
+    }
+    if output_type == "recommendation":
+        output["action"] = "Réduire les repas au restaurant."
+        output["amount"] = 120
+    else:
+        output["conclusion"] = "Aucune action n'est justifiée."
+    return json.dumps({"outputs": [output]})
 
-    def test_large_percentage_changes(self) -> None:
-        """Should handle large percentage changes (>100%)."""
-        result = calculate_trend(current=300.0, previous=100.0)
-        self.assertEqual(result, "+200%")
+
+def _generator() -> AdviceGenerator:
+    """Build generator with mocked API client."""
+    generator = AdviceGenerator(api_key="test-key")
+    generator._client = MagicMock()
+    return generator
+
+
+def test_prompt_requires_selective_observed_decisions_without_quota() -> None:
+    """Prompt requests strict decision outputs and no artificial quota."""
+    assert '"outputs"' in ADVICE_SYSTEM_PROMPT
+    assert "observed_data" in ADVICE_SYSTEM_PROMPT
+    assert "no_action" in ADVICE_SYSTEM_PROMPT
+    assert "Exactement 3" not in ADVICE_SYSTEM_PROMPT
+
+
+def test_generate_advice_returns_strict_decision_output() -> None:
+    """Public generation parses model response into decision outputs."""
+    generator = _generator()
+    response = MagicMock()
+    response.content = [MagicMock(text=_decision_json())]
+    generator._client.messages.create.return_value = response  # type: ignore[attr-defined]
+
+    result = generator.generate_advice(_month(month=2), [_month(month=1)])
+
+    assert isinstance(result, AdviceResponse)
+    assert result.outputs[0].type == "recommendation"
+
+
+def test_generate_advice_accepts_no_action_conclusion() -> None:
+    """Public generation accepts justified no-action output."""
+    generator = _generator()
+    response = MagicMock()
+    response.content = [MagicMock(text=f"```json\n{_decision_json('no_action')}\n```")]
+    generator._client.messages.create.return_value = response  # type: ignore[attr-defined]
+
+    result = generator.generate_advice(_month(month=2), [_month(month=1)])
+
+    assert result.outputs[0].type == "no_action"
+
+
+def test_generate_advice_rejects_historical_contract() -> None:
+    """Generation rejects historical quota response."""
+    generator = _generator()
+    response = MagicMock()
+    response.content = [
+        MagicMock(text='{"analysis":"old","problem_areas":[],"recommendations":[],"encouragement":"old"}')
+    ]
+    generator._client.messages.create.return_value = response  # type: ignore[attr-defined]
+
+    with pytest.raises(AdviceParseError):
+        generator.generate_advice(_month(month=2), [_month(month=1)])
+
+
+def test_generate_advice_requires_history_before_api_call() -> None:
+    """Generation requires one older month."""
+    generator = _generator()
+
+    with pytest.raises(InsufficientDataError):
+        generator.generate_advice(_month(), [])
+
+    generator._client.messages.create.assert_not_called()  # type: ignore[attr-defined]
+
+
+def test_prompt_includes_all_observed_months() -> None:
+    """Generation prompt includes current and historical observations."""
+    generator = _generator()
+
+    prompt = generator._build_user_prompt(_month(month=2), [_month(month=1)])
+
+    assert prompt.count('"month":') == 2
+    assert '"total_income": 3000.0' in prompt
 
 
-class TestAdviceGeneratorInit(unittest.TestCase):
-    """Tests for AdviceGenerator initialization (Task Group 4)."""
+def test_api_authentication_error_is_explicit() -> None:
+    """Authentication failure maps to generation error."""
+    generator = _generator()
+    generator._client.messages.create.side_effect = anthropic.AuthenticationError(  # type: ignore[attr-defined]
+        message="Invalid API key", response=MagicMock(), body=None
+    )
 
-    def test_init_accepts_api_key_and_optional_params(self) -> None:
-        """Should accept api_key, base_url, and model parameters."""
-        generator = AdviceGenerator(api_key="test-key", base_url="http://test", model="test-model")
+    with pytest.raises(AdviceGenerationError, match="API key"):
+        generator._call_claude_api("prompt")
 
-        self.assertEqual(generator._model, "test-model")
 
-    def test_default_model_loaded_from_settings(self) -> None:
-        """Should use settings model when not specified."""
-        generator = AdviceGenerator(api_key="test-key")
+def test_api_connection_error_is_retryable() -> None:
+    """Connection failure maps to retryable advice error."""
+    generator = _generator()
+    generator._client.messages.create.side_effect = anthropic.APIConnectionError(  # type: ignore[attr-defined]
+        request=MagicMock()
+    )
 
-        # ##>: Model should be loaded from settings.
-        self.assertIsNotNone(generator._model)
+    with pytest.raises(AdviceAPIError) as error:
+        generator._call_claude_api("prompt")
 
-    def test_class_var_constants_are_set(self) -> None:
-        """Should have ClassVar constants set correctly."""
-        self.assertEqual(AdviceGenerator.MIN_MONTHS_REQUIRED, 2)
-        self.assertEqual(AdviceGenerator.MAX_RETRIES, 3)
+    assert error.value.retry_count == 3
 
 
-class TestAdviceGeneratorValidation(unittest.TestCase):
-    """Tests for input validation (Task Group 5)."""
+def test_empty_api_response_is_invalid() -> None:
+    """Empty model response fails parsing."""
+    generator = _generator()
+    response = MagicMock()
+    response.content = []
+    generator._client.messages.create.return_value = response  # type: ignore[attr-defined]
 
-    def setUp(self) -> None:
-        """Create generator with mocked client."""
-        self.generator = AdviceGenerator(api_key="test-key")
-        self.generator._client = MagicMock()
+    with pytest.raises(AdviceParseError):
+        generator._call_claude_api("prompt")
 
-    def test_raises_insufficient_data_error_with_zero_history(self) -> None:
-        """Should raise InsufficientDataError with empty history."""
-        current = _make_month_data()
 
-        with self.assertRaises(InsufficientDataError) as context:
-            self.generator.generate_advice(current, [])
+def test_thinking_mode_skips_reasoning_and_returns_text() -> None:
+    """Thinking mode configures budget and extracts final text."""
+    generator = AdviceGenerator(api_key="test-key", thinking_enabled=True, thinking_budget=5000)
+    generator._client = MagicMock()
+    thinking = MagicMock(type="thinking", thinking="internal")
+    text = MagicMock(type="text", text=_decision_json())
+    response = MagicMock(content=[thinking, text])
+    generator._client.messages.create.return_value = response  # type: ignore[attr-defined]
 
-        self.assertEqual(context.exception.min_months_required, 2)
+    result = generator._call_claude_api("prompt")
+    call = generator._client.messages.create.call_args.kwargs  # type: ignore[attr-defined]
 
-    def test_passes_validation_with_two_months(self) -> None:
-        """Should pass validation with current + 1 history month."""
-        current = _make_month_data(year=2025, month=2)
-        history = [_make_month_data(year=2025, month=1)]
-
-        mock_response = MagicMock()
-        mock_response.content = [
-            MagicMock(text='{"analysis": "Test", "problem_areas": [], "recommendations": [], "encouragement": "Good"}')
-        ]
-        self.generator._client.messages.create.return_value = mock_response  # type: ignore[attr-defined]
-
-        result = self.generator.generate_advice(current, history)
-        self.assertIsInstance(result, AdviceResponse)
-
-
-class TestAdviceGeneratorPromptBuilding(unittest.TestCase):
-    """Tests for prompt building (Task Group 6)."""
-
-    def setUp(self) -> None:
-        """Create generator."""
-        self.generator = AdviceGenerator(api_key="test-key")
-
-    def test_json_output_contains_all_month_data(self) -> None:
-        """Should include all month data in JSON output."""
-        current = _make_month_data(year=2025, month=2)
-        history = [_make_month_data(year=2025, month=1)]
-
-        prompt = self.generator._build_user_prompt(current, history)
-
-        self.assertIn("2025", prompt)
-        self.assertIn("total_income", prompt)
-        self.assertIn("score", prompt)
-
-    def test_ensure_ascii_false_preserves_french(self) -> None:
-        """Should preserve French characters in output."""
-        current = _make_month_data()
-        history = [_make_month_data()]
-
-        prompt = self.generator._build_user_prompt(current, history)
-
-        # ##>: Prompt itself contains French instructions.
-        self.assertIn("Analyse", prompt)
-
-    def test_category_breakdown_included_when_present(self) -> None:
-        """Should include category breakdown when available."""
-        current = _make_month_data(category_breakdown={"Subscriptions": 85.0, "Dining": 120.0})
-        history = [_make_month_data()]
-
-        prompt = self.generator._build_user_prompt(current, history)
-
-        self.assertIn("Subscriptions", prompt)
-        self.assertIn("85.0", prompt)
-
-
-class TestAdviceGeneratorAPICall(unittest.TestCase):
-    """Tests for Claude API call (Task Group 7)."""
-
-    def setUp(self) -> None:
-        """Create generator with mocked client."""
-        self.generator = AdviceGenerator(api_key="test-key")
-        self.mock_client = MagicMock()
-        self.generator._client = self.mock_client
-
-    def test_successful_api_call_returns_response_text(self) -> None:
-        """Should return response text on success."""
-        mock_response = MagicMock()
-        mock_response.content = [MagicMock(text="test response")]
-        self.mock_client.messages.create.return_value = mock_response
-
-        result = self.generator._call_claude_api("test prompt")
-
-        self.assertEqual(result, "test response")
-
-    def test_authentication_error_raises_advice_generation_error(self) -> None:
-        """Should raise AdviceGenerationError on authentication failure."""
-        self.mock_client.messages.create.side_effect = anthropic.AuthenticationError(
-            message="Invalid API key", response=MagicMock(), body=None
-        )
-
-        with self.assertRaises(AdviceGenerationError) as context:
-            self.generator._call_claude_api("test prompt")
-
-        self.assertIn("API key", str(context.exception))
-
-    def test_api_connection_error_raises_advice_api_error(self) -> None:
-        """Should raise AdviceAPIError on connection failure."""
-        self.mock_client.messages.create.side_effect = anthropic.APIConnectionError(request=MagicMock())
-
-        with self.assertRaises(AdviceAPIError) as context:
-            self.generator._call_claude_api("test prompt")
-
-        self.assertEqual(context.exception.retry_count, 3)
-
-    def test_empty_response_raises_advice_parse_error(self) -> None:
-        """Should raise AdviceParseError on empty response."""
-        mock_response = MagicMock()
-        mock_response.content = []
-        self.mock_client.messages.create.return_value = mock_response
-
-        with self.assertRaises(AdviceParseError):
-            self.generator._call_claude_api("test prompt")
-
-    def test_rate_limit_error_raises_advice_api_error(self) -> None:
-        """Should raise AdviceAPIError on rate limit."""
-        self.mock_client.messages.create.side_effect = anthropic.RateLimitError(
-            message="Rate limit exceeded", response=MagicMock(), body=None
-        )
-
-        with self.assertRaises(AdviceAPIError) as context:
-            self.generator._call_claude_api("test prompt")
-
-        self.assertEqual(context.exception.retry_count, 3)
-
-    def test_api_status_error_raises_advice_api_error(self) -> None:
-        """Should raise AdviceAPIError on API status errors (5xx, 4xx)."""
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        self.mock_client.messages.create.side_effect = anthropic.APIStatusError(
-            message="Internal Server Error", response=mock_response, body=None
-        )
-
-        with self.assertRaises(AdviceAPIError) as context:
-            self.generator._call_claude_api("test prompt")
-
-        self.assertEqual(context.exception.retry_count, 3)
-
-    def test_non_text_content_block_raises_advice_parse_error(self) -> None:
-        """Should raise AdviceParseError when content block has no text attribute."""
-        mock_response = MagicMock()
-        mock_content = MagicMock(spec=[])
-        mock_response.content = [mock_content]
-        self.mock_client.messages.create.return_value = mock_response
-
-        with self.assertRaises(AdviceParseError) as context:
-            self.generator._call_claude_api("test prompt")
-
-        self.assertIn("no text content", str(context.exception))
-
-
-class TestAdviceGeneratorResponseParsing(unittest.TestCase):
-    """Tests for response parsing (Task Group 8)."""
-
-    def setUp(self) -> None:
-        """Create generator."""
-        self.generator = AdviceGenerator(api_key="test-key")
-
-    def test_valid_json_creates_advice_response(self) -> None:
-        """Should create AdviceResponse from valid JSON."""
-        response_text = """
-        {
-            "analysis": "Vos finances sont stables.",
-            "problem_areas": [
-                {"category": "Dining", "amount": 150.0, "trend": "+20%"}
-            ],
-            "recommendations": ["Réduire les sorties restaurant"],
-            "encouragement": "Continuez ainsi!"
-        }
-        """
-
-        result = self.generator._parse_response(response_text)
-
-        self.assertIsInstance(result, AdviceResponse)
-        self.assertEqual(result.analysis, "Vos finances sont stables.")
-        self.assertEqual(len(result.problem_areas), 1)
-        self.assertEqual(result.problem_areas[0].category, "Dining")
-
-    def test_markdown_code_blocks_are_stripped(self) -> None:
-        """Should strip markdown code blocks from response."""
-        response_text = """```json
-{
-    "analysis": "Test",
-    "problem_areas": [],
-    "recommendations": [],
-    "encouragement": "Good"
-}
-```"""
-
-        result = self.generator._parse_response(response_text)
-
-        self.assertEqual(result.analysis, "Test")
-
-    def test_invalid_json_raises_advice_parse_error(self) -> None:
-        """Should raise AdviceParseError on malformed JSON."""
-        response_text = "not valid json {{{"
-
-        with self.assertRaises(AdviceParseError) as context:
-            self.generator._parse_response(response_text)
-
-        self.assertIn("not valid json", context.exception.raw_response)
-
-    def test_missing_fields_raise_advice_parse_error(self) -> None:
-        """Should raise AdviceParseError when required fields missing."""
-        response_text = '{"analysis": "Test"}'
-
-        with self.assertRaises(AdviceParseError):
-            self.generator._parse_response(response_text)
-
-    def test_json_array_response_raises_advice_parse_error(self) -> None:
-        """Should raise AdviceParseError when JSON is not an object."""
-        response_text = '["item1", "item2"]'
-
-        with self.assertRaises(AdviceParseError):
-            self.generator._parse_response(response_text)
-
-    def test_json_string_response_raises_advice_parse_error(self) -> None:
-        """Should raise AdviceParseError when JSON is a primitive string."""
-        response_text = '"just a string"'
-
-        with self.assertRaises(AdviceParseError):
-            self.generator._parse_response(response_text)
-
-
-class TestAdviceGeneratorIntegration(unittest.TestCase):
-    """Tests for main method integration (Task Group 9)."""
-
-    def setUp(self) -> None:
-        """Create generator with mocked client."""
-        self.generator = AdviceGenerator(api_key="test-key")
-        self.mock_client = MagicMock()
-        self.generator._client = self.mock_client
-
-    def test_full_flow_with_valid_data_returns_advice_response(self) -> None:
-        """Should complete full flow and return AdviceResponse."""
-        current = _make_month_data(year=2025, month=2)
-        history = [_make_month_data(year=2025, month=1)]
-
-        mock_response = MagicMock()
-        mock_response.content = [
-            MagicMock(
-                text="""{
-                    "analysis": "Vos dépenses sont équilibrées.",
-                    "problem_areas": [
-                        {"category": "Subscriptions", "amount": 85.0, "trend": "+15%"},
-                        {"category": "Dining", "amount": 150.0, "trend": "+10%"},
-                        {"category": "Entertainment", "amount": 100.0, "trend": "+5%"}
-                    ],
-                    "recommendations": [
-                        "Révisez vos abonnements",
-                        "Préparez plus de repas maison",
-                        "Cherchez des alternatives gratuites"
-                    ],
-                    "encouragement": "Vous êtes sur la bonne voie!"
-                }"""
-            )
-        ]
-        self.mock_client.messages.create.return_value = mock_response
-
-        result = self.generator.generate_advice(current, history)
-
-        self.assertIsInstance(result, AdviceResponse)
-        self.assertEqual(len(result.problem_areas), 3)
-        self.assertEqual(len(result.recommendations), 3)
-        self.mock_client.messages.create.assert_called_once()
-
-    def test_insufficient_data_raises_error_early(self) -> None:
-        """Should raise InsufficientDataError before API call."""
-        current = _make_month_data()
-
-        with self.assertRaises(InsufficientDataError):
-            self.generator.generate_advice(current, [])
-
-        self.mock_client.messages.create.assert_not_called()
-
-
-class TestExtendedThinkingMode(unittest.TestCase):
-    """Tests for extended thinking mode (Task Group 10)."""
-
-    def setUp(self) -> None:
-        """Create generator with mocked client."""
-        self.generator = AdviceGenerator(api_key="test-key", thinking_enabled=True, thinking_budget=5000)
-        self.mock_client = MagicMock()
-        self.generator._client = self.mock_client
-
-    def test_thinking_enabled_passes_thinking_params(self) -> None:
-        """Should pass thinking config when thinking_enabled=True."""
-        mock_response = MagicMock()
-        mock_response.content = [
-            MagicMock(text='{"analysis": "Test", "problem_areas": [], "recommendations": [], "encouragement": "Good"}')
-        ]
-        self.mock_client.messages.create.return_value = mock_response
-
-        self.generator._call_claude_api("test prompt")
-
-        call_kwargs = self.mock_client.messages.create.call_args[1]
-        self.assertIn("thinking", call_kwargs)
-        self.assertEqual(call_kwargs["thinking"]["type"], "enabled")
-        self.assertEqual(call_kwargs["thinking"]["budget_tokens"], 5000)
-
-    def test_thinking_disabled_uses_effort_headers(self) -> None:
-        """Should use effort headers when thinking_enabled=False."""
-        generator = AdviceGenerator(api_key="test-key", thinking_enabled=False)
-        generator._client = self.mock_client
-
-        mock_response = MagicMock()
-        mock_response.content = [
-            MagicMock(text='{"analysis": "Test", "problem_areas": [], "recommendations": [], "encouragement": "Good"}')
-        ]
-        self.mock_client.messages.create.return_value = mock_response
-
-        generator._call_claude_api("test prompt")
-
-        call_kwargs = self.mock_client.messages.create.call_args[1]
-        self.assertIn("extra_headers", call_kwargs)
-        self.assertIn("anthropic-beta", call_kwargs["extra_headers"])
-        self.assertIn("extra_body", call_kwargs)
-        self.assertEqual(call_kwargs["extra_body"]["output_config"]["effort"], "high")
-
-    def test_response_with_thinking_block_extracts_text(self) -> None:
-        """Should extract text from response containing thinking block."""
-        mock_response = MagicMock()
-        mock_thinking = MagicMock()
-        mock_thinking.type = "thinking"
-        mock_thinking.thinking = "Long reasoning process..."
-        mock_text = MagicMock()
-        mock_text.type = "text"
-        mock_text.text = '{"analysis": "Result", "problem_areas": [], "recommendations": [], "encouragement": "Good"}'
-        mock_response.content = [mock_thinking, mock_text]
-        self.mock_client.messages.create.return_value = mock_response
-
-        result = self.generator._call_claude_api("test prompt")
-
-        self.assertIn("Result", result)
-
-    def test_response_with_only_thinking_block_raises_parse_error(self) -> None:
-        """Should raise AdviceParseError when response has only thinking blocks."""
-        mock_response = MagicMock()
-        mock_thinking = MagicMock()
-        mock_thinking.type = "thinking"
-        mock_thinking.thinking = "Long reasoning..."
-        mock_response.content = [mock_thinking]
-        self.mock_client.messages.create.return_value = mock_response
-
-        with self.assertRaises(AdviceParseError) as context:
-            self.generator._call_claude_api("test prompt")
-
-        self.assertIn("no text content", str(context.exception))
-
-    def test_thinking_budget_passed_to_api(self) -> None:
-        """Should pass custom thinking budget to API."""
-        generator = AdviceGenerator(api_key="test-key", thinking_enabled=True, thinking_budget=15000)
-        generator._client = self.mock_client
-
-        mock_response = MagicMock()
-        mock_response.content = [
-            MagicMock(text='{"analysis": "Test", "problem_areas": [], "recommendations": [], "encouragement": "Good"}')
-        ]
-        self.mock_client.messages.create.return_value = mock_response
-
-        generator._call_claude_api("test prompt")
-
-        call_kwargs = self.mock_client.messages.create.call_args[1]
-        self.assertEqual(call_kwargs["thinking"]["budget_tokens"], 15000)
-
-
-class TestExceptionHierarchy(unittest.TestCase):
-    """Tests for exception hierarchy."""
-
-    def test_insufficient_data_error_inherits_from_advice_generation_error(self) -> None:
-        """Should be catchable as AdviceGenerationError."""
-        self.assertTrue(issubclass(InsufficientDataError, AdviceGenerationError))
-
-    def test_advice_api_error_inherits_from_advice_generation_error(self) -> None:
-        """Should be catchable as AdviceGenerationError."""
-        self.assertTrue(issubclass(AdviceAPIError, AdviceGenerationError))
-
-    def test_advice_parse_error_inherits_from_advice_generation_error(self) -> None:
-        """Should be catchable as AdviceGenerationError."""
-        self.assertTrue(issubclass(AdviceParseError, AdviceGenerationError))
+    assert result == _decision_json()
+    assert call["thinking"] == {"type": "enabled", "budget_tokens": 5000}

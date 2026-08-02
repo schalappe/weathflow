@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.config.settings import get_settings
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
+from app.repositories.advice import AdviceRepository
 from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
 from app.services.calculation.service import calculate_and_update_month
@@ -115,6 +116,7 @@ class UploadService:
 
     def process_categorization(
         self,
+        advice_repo: AdviceRepository,
         file_content: bytes,
         months_to_process: list[str],
         import_mode: Literal["replace", "merge"],
@@ -126,6 +128,8 @@ class UploadService:
 
         Parameters
         ----------
+        advice_repo : AdviceRepository
+            Advice storage.
         file_content : bytes
             Raw CSV file content.
         months_to_process : list[str]
@@ -182,6 +186,7 @@ class UploadService:
 
             month_data = result.months[month_key]
             month_result, api_calls = self._process_single_month(
+                advice_repo=advice_repo,
                 month_repo=month_repo,
                 transaction_repo=transaction_repo,
                 month_data=month_data,
@@ -199,6 +204,7 @@ class UploadService:
 
     def _process_single_month(
         self,
+        advice_repo: AdviceRepository,
         month_repo: MonthRepository,
         transaction_repo: TransactionRepository,
         month_data: MonthData,
@@ -255,7 +261,8 @@ class UploadService:
             logger.error("Database error during transaction persistence for {}-{:02d}: {}", year, month, error)
             raise UploadPersistenceError(year, month, str(error)) from error
 
-        # ##>: Let calculate_and_update_month handle the final commit for atomicity.
+        # ##>: ponytail: global invalidation; narrow by stored evidence if advice volume matters.
+        advice_repo.delete_all()
         updated_month = calculate_and_update_month(month_repo, transaction_repo, month_record.id)
 
         low_confidence_count = self._count_low_confidence(results)

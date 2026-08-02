@@ -43,17 +43,6 @@ class AdviceRepository:
         """
         return self._db.query(Advice).filter(Advice.month_id == month_id).first()
 
-    def has_any(self) -> bool:
-        """
-        Check if any advice records exist in the database.
-
-        Returns
-        -------
-        bool
-            True if at least one advice record exists.
-        """
-        return self._db.query(Advice.id).first() is not None
-
     def count(self) -> int:
         """
         Count total advice records in the database.
@@ -65,27 +54,6 @@ class AdviceRepository:
         """
         result = self._db.query(func.count(Advice.id)).scalar()
         return result or 0
-
-    def get_by_month_ids(self, month_ids: list[int]) -> dict[int, Advice]:
-        """
-        Get advice for multiple months in a single query.
-
-        Eliminates N+1 queries when fetching advice for multiple months.
-
-        Parameters
-        ----------
-        month_ids : list[int]
-            List of month IDs to look up.
-
-        Returns
-        -------
-        dict[int, Advice]
-            Mapping of month_id to Advice record. Missing months are not included.
-        """
-        if not month_ids:
-            return {}
-        results = self._db.query(Advice).filter(Advice.month_id.in_(month_ids)).all()
-        return {advice.month_id: advice for advice in results}
 
     def upsert(self, month_id: int, advice_text: str) -> Advice:
         """
@@ -138,6 +106,22 @@ class AdviceRepository:
         """
         self._db.delete(advice)
         self._db.flush()
+
+    def delete_all(self) -> int:
+        """Delete all advice.
+
+        Returns
+        -------
+        int
+            Deleted record count.
+
+        Notes
+        -----
+        Caller commits.
+        """
+        count = self._db.query(Advice).delete(synchronize_session=False)
+        self._db.flush()
+        return count
 
     def commit(self) -> None:
         """Commit the current transaction."""

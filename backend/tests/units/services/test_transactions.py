@@ -5,6 +5,7 @@ from datetime import date
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
+from app.repositories.advice import AdviceRepository
 from app.services.exceptions import InvalidSubcategoryError, TransactionNotFoundError
 from tests.conftest import DatabaseTestCase
 
@@ -57,6 +58,7 @@ class TestUpdateTransactionCategory(DatabaseTestCase):
         transaction_repo = TransactionRepository(self.session)
         updated_tx, _ = update_transaction_category(
             month_repo=month_repo,
+            advice_repo=AdviceRepository(self.session),
             transaction_repo=transaction_repo,
             transaction_id=transaction.id,
             money_map_type=MoneyMapType.CORE,
@@ -79,6 +81,7 @@ class TestUpdateTransactionCategory(DatabaseTestCase):
         transaction_repo = TransactionRepository(self.session)
         updated_tx, _ = update_transaction_category(
             month_repo=month_repo,
+            advice_repo=AdviceRepository(self.session),
             transaction_repo=transaction_repo,
             transaction_id=transaction.id,
             money_map_type=MoneyMapType.CORE,
@@ -102,6 +105,7 @@ class TestUpdateTransactionCategory(DatabaseTestCase):
         transaction_repo = TransactionRepository(self.session)
         _, updated_month = update_transaction_category(
             month_repo=month_repo,
+            advice_repo=AdviceRepository(self.session),
             transaction_repo=transaction_repo,
             transaction_id=transaction.id,
             money_map_type=MoneyMapType.CORE,
@@ -125,6 +129,7 @@ class TestUpdateTransactionCategory(DatabaseTestCase):
         with self.assertRaises(TransactionNotFoundError) as context:
             update_transaction_category(
                 month_repo=month_repo,
+                advice_repo=AdviceRepository(self.session),
                 transaction_repo=transaction_repo,
                 transaction_id=99999,
                 money_map_type=MoneyMapType.CORE,
@@ -182,6 +187,7 @@ class TestSubcategoryValidation(DatabaseTestCase):
         with self.assertRaises(InvalidSubcategoryError) as context:
             update_transaction_category(
                 month_repo=month_repo,
+                advice_repo=AdviceRepository(self.session),
                 transaction_repo=transaction_repo,
                 transaction_id=transaction.id,
                 money_map_type=MoneyMapType.CORE,
@@ -203,6 +209,7 @@ class TestSubcategoryValidation(DatabaseTestCase):
         transaction_repo = TransactionRepository(self.session)
         updated_tx, _ = update_transaction_category(
             month_repo=month_repo,
+            advice_repo=AdviceRepository(self.session),
             transaction_repo=transaction_repo,
             transaction_id=transaction.id,
             money_map_type=MoneyMapType.EXCLUDED,

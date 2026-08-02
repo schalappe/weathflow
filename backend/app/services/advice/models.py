@@ -1,25 +1,24 @@
-"""Pydantic models for advice generation operations."""
+"""Pydantic models for advice generation."""
 
-from pydantic import Field
+from datetime import date
+from typing import Annotated, Literal, Self
+
+from pydantic import ConfigDict, Field, model_validator
 
 from app.services.models import FrozenModel
 
 
 class TransactionSample(FrozenModel):
-    """
-    A sample transaction for context in advice generation.
-
-    Provides Claude with specific transaction details to generate
-    actionable, personalized recommendations.
+    """Observed transaction.
 
     Attributes
     ----------
     description : str
-        Merchant or transaction description (e.g., "Netflix", "Uber Eats").
+        Transaction label.
     amount : float
-        Transaction amount (absolute value).
+        Absolute amount.
     subcategory : str | None
-        Money Map subcategory if assigned.
+        Money Map subcategory.
     """
 
     description: str
@@ -28,43 +27,36 @@ class TransactionSample(FrozenModel):
 
 
 class MonthData(FrozenModel):
-    """
-    Monthly financial data to be analyzed for advice generation.
-
-    This model represents a single month's financial summary including
-    totals, percentages, and category breakdowns.
+    """Observed monthly generation input.
 
     Attributes
     ----------
     year : int
-        Year of the month (2000-2100).
+        Calendar year.
     month : int
-        Month number (1-12).
+        Calendar month.
     total_income : float
-        Total income for the month.
+        Observed income.
     total_core : float
-        Total core (necessities) spending.
+        Core spending.
     total_choice : float
-        Total choice (discretionary) spending.
+        Choice spending.
     total_compound : float
-        Total compound (savings/investments).
+        Compound amount.
     core_percentage : float
-        Core spending as percentage of income.
+        Core income share.
     choice_percentage : float
-        Choice spending as percentage of income.
+        Choice income share.
     compound_percentage : float
-        Compound as percentage of income.
+        Compound income share.
     score : int
-        Money Map score (0-3).
+        Money Map score.
     score_label : str | None
-        Human-readable score label.
+        Score label.
     category_breakdown : dict[str, float] | None
-        Optional breakdown by subcategory (e.g., {'Subscriptions': 85.0}).
+        Optional subcategory totals.
     transactions : dict[str, list[TransactionSample]] | None
-        All transactions per category for pattern analysis.
-        Keys are category types ('CORE', 'CHOICE', 'COMPOUND').
-    past_advice : list[str] | None
-        Previous recommendations given for this month to track follow-through.
+        Transactions grouped by category.
     """
 
     year: int = Field(ge=2000, le=2100)
@@ -80,157 +72,176 @@ class MonthData(FrozenModel):
     score_label: str | None = None
     category_breakdown: dict[str, float] | None = None
     transactions: dict[str, list[TransactionSample]] | None = None
-    past_advice: list[str] | None = None
 
 
-class SpendingPattern(FrozenModel):
+class DecisionModel(FrozenModel):
+    """Strict decision model.
+
+    Notes
+    -----
+    Unknown fields fail validation.
     """
-    A recurring spending pattern identified in transaction data.
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ObservedFact(DecisionModel):
+    """Fact calculated from imported transactions.
 
     Attributes
     ----------
-    pattern_type : str
-        Type of pattern (e.g., 'Abonnements récurrents', 'Livraisons repas').
-    description : str
-        Detailed description of the pattern with merchants/services.
-    monthly_cost : float
-        Total monthly cost of this pattern (must be non-negative).
-    occurrences : int
-        Number of times this pattern occurs per month (must be at least 1).
-    insight : str
-        Analysis of what this pattern reveals about financial habits.
+    fact : str
+        Observed statement.
+    period : str
+        Observation window.
+    scope : str
+        Covered transactions or category.
+    source : Literal["observed_data"]
+        Fixed provenance marker.
     """
 
-    pattern_type: str
-    description: str
-    monthly_cost: float = Field(ge=0)
-    occurrences: int = Field(ge=1)
-    insight: str
+    fact: str = Field(min_length=1)
+    period: str = Field(min_length=1)
+    scope: str = Field(min_length=1)
+    source: Literal["observed_data"]
 
 
-class ProblemArea(FrozenModel):
-    """
-    A spending category identified as a problem area.
-
-    Represents a category where spending is increasing or exceeding targets,
-    requiring the user's attention.
+class DecisionTraceDetails(DecisionModel):
+    """Auditable decision detail.
 
     Attributes
     ----------
-    category : str
-        Name of the spending category.
-    amount : float
-        Amount in this category (can be negative for deficit scenarios like negative savings).
-    trend : str
-        Trend indicator (e.g., '+20%', '-5%', 'N/A').
-    root_cause : str | None
-        Explanation of the underlying cause of the problem.
-    impact : str | None
-        Impact on achieving Money Map objectives.
+    observations : list[ObservedFact]
+        Source facts.
+    calculations : list[str]
+        Reproducible derivations.
+    conventions : list[str]
+        Contestable rules.
+    limits : list[str]
+        Data limits.
     """
 
-    category: str
-    amount: float
-    trend: str
-    root_cause: str | None = None
-    impact: str | None = None
+    observations: list[ObservedFact] = Field(min_length=1)
+    calculations: list[str] = Field(default_factory=list)
+    conventions: list[str] = Field(default_factory=list)
+    limits: list[str] = Field(default_factory=list)
 
 
-class Recommendation(FrozenModel):
-    """
-    A prioritized actionable recommendation.
+class DecisionTrace(DecisionModel):
+    """Two-level decision trace.
 
     Attributes
     ----------
-    priority : int
-        Priority ranking (1 = highest priority).
+    summary : str
+        Visible explanation.
+    details : DecisionTraceDetails
+        Auditable evidence.
+    """
+
+    summary: str = Field(min_length=1)
+    details: DecisionTraceDetails
+
+
+class RecommendationOutput(DecisionModel):
+    """Action supported by observed facts.
+
+    Attributes
+    ----------
+    type : Literal["recommendation"]
+        Output discriminator.
+    priority : Literal["high", "medium", "low"]
+        Decision priority.
     action : str
-        Main action to undertake.
-    details : str
-        Full explanation with context and specific transactions.
-    expected_savings : str
-        Estimated savings (monthly and annual).
-    difficulty : str
-        Difficulty level (Facile / Modéré / Exigeant).
-    quick_win : bool
-        Whether this is a quick win that can be implemented immediately.
+        Supported action.
+    amount : float | None
+        Derived amount only.
+    deadline : date | None
+        Derived deadline only.
+    trace : DecisionTrace
+        Supporting decision trace.
     """
 
-    priority: int = Field(ge=1, le=3)
-    action: str
-    details: str
-    expected_savings: str
-    difficulty: str
-    quick_win: bool = False
+    type: Literal["recommendation"]
+    priority: Literal["high", "medium", "low"]
+    action: str = Field(min_length=1)
+    amount: float | None = Field(default=None, gt=0, exclude_if=lambda value: value is None)
+    deadline: date | None = Field(default=None, exclude_if=lambda value: value is None)
+    trace: DecisionTrace
+
+    @model_validator(mode="after")
+    def require_derived_optional_values(self) -> Self:
+        """Validate optional decision values.
+
+        Returns
+        -------
+        Self
+            Valid recommendation.
+
+        Raises
+        ------
+        ValueError
+            Amount or deadline lacks calculation.
+        """
+        if (self.amount is not None or self.deadline is not None) and not self.trace.details.calculations:
+            raise ValueError("amount and deadline require a supporting calculation")
+        return self
 
 
-class ProgressReview(FrozenModel):
-    """
-    Review of progress on previous advice.
+class NoActionOutput(DecisionModel):
+    """Conclusion that observed facts justify no action.
 
     Attributes
     ----------
-    previous_advice_followed : str
-        Evaluation of how well previous advice was followed.
-    wins : list[str]
-        List of victories and progress to celebrate.
-    areas_for_growth : list[str]
-        Areas that still need work.
+    type : Literal["no_action"]
+        Output discriminator.
+    priority : Literal["high", "medium", "low"]
+        Decision priority.
+    conclusion : str
+        No-action conclusion.
+    trace : DecisionTrace
+        Supporting decision trace.
     """
 
-    previous_advice_followed: str
-    wins: list[str] = Field(default_factory=list)
-    areas_for_growth: list[str] = Field(default_factory=list)
+    type: Literal["no_action"]
+    priority: Literal["high", "medium", "low"]
+    conclusion: str = Field(min_length=1)
+    trace: DecisionTrace
 
 
-class MonthlyGoal(FrozenModel):
-    """
-    A specific measurable goal for the next month.
+class UnresolvedOutput(DecisionModel):
+    """Subject that observed facts cannot resolve.
 
     Attributes
     ----------
-    objective : str
-        Precise and measurable objective.
-    target_amount : float
-        Target amount to save or reduce (must be positive).
-    strategy : str
-        Concrete strategy to achieve the objective.
+    type : Literal["unresolved"]
+        Output discriminator.
+    priority : Literal["high", "medium", "low"]
+        Decision priority.
+    conclusion : str
+        Unresolved subject.
+    trace : DecisionTrace
+        Supporting decision trace.
     """
 
-    objective: str
-    target_amount: float = Field(gt=0)
-    strategy: str
+    type: Literal["unresolved"]
+    priority: Literal["high", "medium", "low"]
+    conclusion: str = Field(min_length=1)
+    trace: DecisionTrace
 
 
-class AdviceResponse(FrozenModel):
-    """
-    Complete advice response from Claude API.
+DecisionOutput = Annotated[
+    RecommendationOutput | NoActionOutput | UnresolvedOutput,
+    Field(discriminator="type"),
+]
 
-    Contains comprehensive analysis, spending patterns, problem areas,
-    actionable recommendations, progress review, and encouragement.
+
+class AdviceResponse(DecisionModel):
+    """Monthly decision contract.
 
     Attributes
     ----------
-    analysis : str
-        4-6 sentence in-depth analysis of financial trends.
-    spending_patterns : list[SpendingPattern]
-        Top 3 spending patterns identified.
-    problem_areas : list[ProblemArea]
-        Top 3 spending categories requiring attention with root cause analysis.
-    recommendations : list[Recommendation]
-        3 prioritized actionable recommendations.
-    progress_review : ProgressReview
-        Review of progress on previous advice.
-    monthly_goal : MonthlyGoal
-        Specific goal for the next month.
-    encouragement : str
-        Personalized 3-4 sentence encouragement message.
+    outputs : list[DecisionOutput]
+        One or more outputs. No type quota.
     """
 
-    analysis: str
-    spending_patterns: list[SpendingPattern] = Field(default_factory=list)
-    problem_areas: list[ProblemArea]
-    recommendations: list[Recommendation] = Field(default_factory=list)
-    progress_review: ProgressReview | None = None
-    monthly_goal: MonthlyGoal | None = None
-    encouragement: str
+    outputs: list[DecisionOutput] = Field(min_length=1)

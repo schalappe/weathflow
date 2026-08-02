@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models.advice import Advice
 from app.db.models.month import Month
-from app.services.advice.models import AdviceResponse, ProblemArea, Recommendation
+from app.services.advice.models import AdviceResponse
 
 
 def _create_month(db: Session, year: int, month: int, score: int = 2) -> Month:
@@ -32,23 +32,33 @@ def _create_month(db: Session, year: int, month: int, score: int = 2) -> Month:
 
 
 def _create_mock_advice_response() -> AdviceResponse:
-    """Create a mock AdviceResponse from AdviceGenerator."""
-    return AdviceResponse(
-        analysis="Votre gestion financière montre des progrès.",
-        problem_areas=[
-            ProblemArea(category="Subscriptions", amount=85.0, trend="+20%"),
-        ],
-        recommendations=[
-            Recommendation(
-                priority=1,
-                action="Réduire les abonnements non utilisés.",
-                details="Netflix, Spotify, Disney+ totalisant 35€/mois.",
-                expected_savings="120€/an",
-                difficulty="Facile",
-                quick_win=True,
-            ),
-        ],
-        encouragement="Continuez sur cette lancée!",
+    """Create generated no-action advice."""
+    return AdviceResponse.model_validate(
+        {
+            "outputs": [
+                {
+                    "type": "no_action",
+                    "priority": "low",
+                    "conclusion": "Aucune action n'est justifiée.",
+                    "trace": {
+                        "summary": "Aucun écart matériel observé.",
+                        "details": {
+                            "observations": [
+                                {
+                                    "fact": "Répartition stable.",
+                                    "period": "2025-08 à 2025-10",
+                                    "scope": "Transactions importées",
+                                    "source": "observed_data",
+                                }
+                            ],
+                            "calculations": [],
+                            "conventions": [],
+                            "limits": [],
+                        },
+                    },
+                }
+            ]
+        }
     )
 
 

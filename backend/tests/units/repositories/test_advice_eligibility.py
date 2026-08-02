@@ -9,28 +9,6 @@ from tests.conftest import DatabaseTestCase
 class TestAdviceRepositoryEligibility(DatabaseTestCase):
     """Test cases for AdviceRepository eligibility-related methods."""
 
-    def test_has_any_returns_true_when_advice_exists(self) -> None:
-        """has_any returns True when at least one advice record exists."""
-        month = Month(year=2025, month=1)
-        self.session.add(month)
-        self.session.commit()
-
-        advice = Advice(month_id=month.id, advice_text='{"test": "data"}')
-        self.session.add(advice)
-        self.session.commit()
-
-        repo = AdviceRepository(self.session)
-        result = repo.has_any()
-
-        assert result is True
-
-    def test_has_any_returns_false_when_empty(self) -> None:
-        """has_any returns False when no advice records exist."""
-        repo = AdviceRepository(self.session)
-        result = repo.has_any()
-
-        assert result is False
-
     def test_count_returns_correct_count(self) -> None:
         """count returns the total number of advice records."""
         month1 = Month(year=2025, month=1)

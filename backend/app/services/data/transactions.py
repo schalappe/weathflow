@@ -6,6 +6,7 @@ from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.domain.categories import ALLOWED_SUBCATEGORIES
+from app.repositories.advice import AdviceRepository
 from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
 from app.services.calculation.service import calculate_and_update_month
@@ -51,6 +52,7 @@ def validate_subcategory(money_map_type: MoneyMapType, subcategory: str | None) 
 
 def update_transaction_category(
     month_repo: MonthRepository,
+    advice_repo: AdviceRepository,
     transaction_repo: TransactionRepository,
     transaction_id: int,
     money_map_type: MoneyMapType,
@@ -65,6 +67,8 @@ def update_transaction_category(
         Repository for month data access.
     transaction_repo : TransactionRepository
         Repository for transaction data access.
+    advice_repo : AdviceRepository
+        Advice storage.
     transaction_id : int
         ID of the transaction to update.
     money_map_type : MoneyMapType
@@ -96,10 +100,10 @@ def update_transaction_category(
         transaction.money_map_subcategory = validated_subcategory
         transaction.is_manually_corrected = True
 
-        # ##>: Flush transaction changes so aggregation query sees updated values.
         transaction_repo.flush()
 
-        # ##>: Recalculate month stats using existing service.
+        # ##>: ponytail: global invalidation; narrow by stored evidence if advice volume matters.
+        advice_repo.delete_all()
         updated_month = calculate_and_update_month(month_repo, transaction_repo, transaction.month_id)
 
         logger.info(

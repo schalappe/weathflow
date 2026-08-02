@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.db.enums import MoneyMapType
+from app.db.models.advice import Advice
 from app.db.models.month import Month
 from app.services.categorization.models import CategorizationResult
 from app.services.exceptions import CategorizationError
@@ -220,6 +221,33 @@ class TestCategorizeMergeMode:
         assert len(month.transactions) == 2
         assert month.total_income == 3000.0
         assert month.total_core == 120.0
+
+    @patch("app.services.upload.service.TransactionCategorizer")
+    def test_merge_invalidates_advice_using_reimported_data(
+        self, mock_categorizer_class: MagicMock, client: TestClient, db_session: Session
+    ) -> None:
+        """Reimport removes advice before changed evidence can be shown."""
+        mock_categorizer_class.return_value = _create_mock_categorizer([MoneyMapType.INCOME])
+        first = CSVBuilder("2025-04").add_income("Salary", 3000).build()
+        client.post(
+            "/api/categorize",
+            files={"file": ("first.csv", first, "text/csv")},
+            params={"months_to_process": "2025-04", "import_mode": "replace"},
+        )
+        month = db_session.query(Month).filter_by(year=2025, month=4).one()
+        db_session.add(Advice(month_id=month.id, advice_text='{"outputs":[]}'))
+        db_session.commit()
+        mock_categorizer_class.return_value = _create_mock_categorizer([MoneyMapType.CORE])
+        second = CSVBuilder("2025-04").add_grocery("LIDL", 120).build()
+
+        response = client.post(
+            "/api/categorize",
+            files={"file": ("second.csv", second, "text/csv")},
+            params={"months_to_process": "2025-04", "import_mode": "merge"},
+        )
+
+        assert response.status_code == 200
+        assert db_session.query(Advice).count() == 0
 
 
 @patch.dict(os.environ, MOCK_API_KEY_ENV)

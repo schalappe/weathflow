@@ -6,16 +6,9 @@ from typing import Any, ClassVar
 import anthropic
 from anthropic import Anthropic
 from loguru import logger
+from pydantic import ValidationError
 
-from app.services.advice.models import (
-    AdviceResponse,
-    MonthData,
-    MonthlyGoal,
-    ProblemArea,
-    ProgressReview,
-    Recommendation,
-    SpendingPattern,
-)
+from app.services.advice.models import AdviceResponse, MonthData
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
 from app.services.exceptions import (
     AdviceAPIError,
@@ -25,45 +18,12 @@ from app.services.exceptions import (
 )
 
 
-def calculate_trend(current: float, previous: float) -> str:
-    """
-    Calculate percentage trend between two values.
-
-    Parameters
-    ----------
-    current : float
-        Current period value.
-    previous : float
-        Previous period value.
-
-    Returns
-    -------
-    str
-        Formatted trend string (e.g., '+15%', '-8%', 'N/A').
-    """
-    if previous == 0:
-        return "N/A"
-
-    change = ((current - previous) / previous) * 100
-    sign = "+" if change >= 0 else ""
-    return f"{sign}{round(change)}%"
-
-
 class AdviceGenerator:
-    """
-    Generate personalized financial advice using Claude API.
+    """Generate decisions from observed finances.
 
-    Analyzes historical financial data and generates recommendations
-    based on the Money Map (50/30/20) framework.
-
-    Examples
-    --------
-    >>> generator = AdviceGenerator(api_key="sk-ant-...")
-    >>> current = MonthData(year=2025, month=1, ...)
-    >>> history = [MonthData(year=2024, month=12, ...)]
-    >>> advice = generator.generate_advice(current, history)
-    >>> advice.recommendations
-    ['Réduire les dépenses en restauration', ...]
+    Notes
+    -----
+    Model output must satisfy strict AdviceResponse contract.
     """
 
     MIN_MONTHS_REQUIRED: ClassVar[int] = 2
@@ -133,7 +93,7 @@ class AdviceGenerator:
         Returns
         -------
         AdviceResponse
-            Generated advice with analysis, problem areas, and recommendations.
+            Decision outputs backed by observed facts.
 
         Raises
         ------
@@ -226,19 +186,13 @@ class AdviceGenerator:
                     category: [tx.model_dump() for tx in txs] for category, txs in month.transactions.items()
                 }
 
-            # ##>: Include past advice to track if recommendations were followed.
-            if month.past_advice:
-                month_dict["past_advice"] = month.past_advice
-
             months_data.append(month_dict)
 
-        # ##>: Embed system instructions in user message for Claude Pro compatibility.
         return (
             f"{ADVICE_SYSTEM_PROMPT}\n\n"
             "---\n\n"
-            "Analyse les données financières suivantes et génère des conseils personnalisés. "
-            "Analyse TOUTES les transactions pour identifier des patterns et recommandations SPÉCIFIQUES.\n"
-            "Retourne UNIQUEMENT un objet JSON, sans markdown ni texte additionnel.\n\n"
+            "Analyse les données financières observées ci-dessous. "
+            "Retourne uniquement l'objet JSON demandé, sans markdown ni texte additionnel.\n\n"
             f"{json.dumps(months_data, ensure_ascii=False, indent=2)}"
         )
 
@@ -326,125 +280,30 @@ class AdviceGenerator:
         return response_text
 
     def _parse_response(self, response_text: str) -> AdviceResponse:
-        """
-        Parse Claude's JSON response into AdviceResponse.
-
-        Handles both the new enriched format and legacy format for backward compatibility.
+        """Parse strict decision JSON.
 
         Parameters
         ----------
         response_text : str
-            Raw response text from Claude.
+            Raw model response.
 
         Returns
         -------
         AdviceResponse
-            Parsed advice response.
+            Validated decision outputs.
 
         Raises
         ------
         AdviceParseError
-            If JSON is malformed or missing required fields.
+            Malformed or contract-invalid response.
         """
         cleaned = response_text.strip()
-
-        # ##>: Strip markdown code blocks if present.
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
             cleaned = "\n".join(lines[1:]).rsplit("```", 1)[0].strip()
 
         try:
-            data = json.loads(cleaned)
-        except json.JSONDecodeError as e:
-            logger.error("JSON parse error: {}. Response text: {}", e, response_text[:1000])
-            raise AdviceParseError(response_text) from e
-
-        if not isinstance(data, dict):
-            logger.error("Claude API returned non-object JSON type: {}", type(data).__name__)
-            raise AdviceParseError(response_text)
-
-        try:
-            # ##>: Parse spending patterns (new format).
-            spending_patterns = [
-                SpendingPattern(
-                    pattern_type=item["pattern_type"],
-                    description=item["description"],
-                    monthly_cost=item["monthly_cost"],
-                    occurrences=item["occurrences"],
-                    insight=item["insight"],
-                )
-                for item in data.get("spending_patterns", [])
-            ]
-
-            # ##>: Parse problem areas with optional new fields.
-            problem_areas = [
-                ProblemArea(
-                    category=item["category"],
-                    amount=item["amount"],
-                    trend=item["trend"],
-                    root_cause=item.get("root_cause"),
-                    impact=item.get("impact"),
-                )
-                for item in data["problem_areas"]
-            ]
-
-            # ##>: Parse recommendations - handle both new dict format and legacy string format.
-            raw_recommendations = data.get("recommendations", [])
-            if raw_recommendations and isinstance(raw_recommendations[0], dict):
-                recommendations = [
-                    Recommendation(
-                        priority=item["priority"],
-                        action=item["action"],
-                        details=item["details"],
-                        expected_savings=item["expected_savings"],
-                        difficulty=item["difficulty"],
-                        quick_win=item.get("quick_win", False),
-                    )
-                    for item in raw_recommendations
-                ]
-            else:
-                # ##>: Legacy format: recommendations as list of strings.
-                recommendations = [
-                    Recommendation(
-                        priority=idx + 1,
-                        action=rec,
-                        details=rec,
-                        expected_savings="Non spécifié",
-                        difficulty="Modéré",
-                        quick_win=False,
-                    )
-                    for idx, rec in enumerate(raw_recommendations)
-                ]
-
-            # ##>: Parse progress review (new format).
-            progress_review = None
-            if "progress_review" in data:
-                pr = data["progress_review"]
-                progress_review = ProgressReview(
-                    previous_advice_followed=pr["previous_advice_followed"],
-                    wins=pr.get("wins", []),
-                    areas_for_growth=pr.get("areas_for_growth", []),
-                )
-
-            # ##>: Parse monthly goal (new format).
-            monthly_goal = None
-            if "monthly_goal" in data:
-                mg = data["monthly_goal"]
-                monthly_goal = MonthlyGoal(
-                    objective=mg["objective"],
-                    target_amount=mg["target_amount"],
-                    strategy=mg["strategy"],
-                )
-
-            return AdviceResponse(
-                analysis=data["analysis"],
-                spending_patterns=spending_patterns,
-                problem_areas=problem_areas,
-                recommendations=recommendations,
-                progress_review=progress_review,
-                monthly_goal=monthly_goal,
-                encouragement=data["encouragement"],
-            )
-        except (KeyError, TypeError, ValueError) as e:
-            logger.error("Failed to parse advice response: {}", e)
-            raise AdviceParseError(response_text) from e
+            return AdviceResponse.model_validate_json(cleaned)
+        except ValidationError as error:
+            logger.error("Invalid advice response: {}", error)
+            raise AdviceParseError(response_text) from error

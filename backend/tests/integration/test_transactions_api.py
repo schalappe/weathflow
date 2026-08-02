@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.db.enums import MoneyMapType
+from app.db.models.advice import Advice
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 
@@ -65,6 +66,31 @@ class TestUpdateTransactionEndpoint:
         assert data["transaction"]["money_map_type"] == "CORE"
         assert data["transaction"]["money_map_subcategory"] == "Groceries"
         assert data["transaction"]["is_manually_corrected"] is True
+
+    def test_update_invalidates_advice_using_changed_source(self, client: TestClient, db_session: Session) -> None:
+        """Transaction correction removes advice that may use changed evidence."""
+        month, transaction = _create_month_with_transaction(db_session)
+        later_month = Month(year=2025, month=2)
+        db_session.add(later_month)
+        db_session.flush()
+        db_session.add_all(
+            [
+                Advice(month_id=month.id, advice_text='{"outputs":[]}'),
+                Advice(month_id=later_month.id, advice_text='{"outputs":[]}'),
+            ]
+        )
+        db_session.commit()
+
+        response = client.patch(
+            f"/api/transactions/{transaction.id}",
+            json={
+                "money_map_type": "CORE",
+                "money_map_subcategory": "Groceries",
+            },
+        )
+
+        assert response.status_code == 200
+        assert db_session.query(Advice).count() == 0
 
     def test_nonexistent_transaction_returns_404(self, client: TestClient, db_session: Session) -> None:
         """Non-existent transaction ID returns 404 error."""

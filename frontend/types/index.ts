@@ -238,71 +238,69 @@ export interface HistoryResponse {
   summary: HistorySummary;
 }
 
-// [>]: Advice API response types based on backend/app/responses/advice.py.
-// [>]: Uses discriminated union for type-safe null handling (safer than backend's optional fields).
+export type DecisionPriority = "high" | "medium" | "low";
 
-export interface SpendingPattern {
-  pattern_type: string;
-  description: string;
-  monthly_cost: number;
-  occurrences: number;
-  insight: string;
+export interface ObservedFact {
+  fact: string;
+  period: string;
+  scope: string;
+  source: "observed_data";
 }
 
-export interface ProblemArea {
-  category: string;
-  amount: number;
-  trend: string;
-  root_cause: string | null;
-  impact: string | null;
+export interface DecisionTrace {
+  summary: string;
+  details: {
+    observations: ObservedFact[];
+    calculations: string[];
+    conventions: string[];
+    limits: string[];
+  };
 }
 
-export interface Recommendation {
-  priority: number;
+interface DecisionOutputBase {
+  priority: DecisionPriority;
+  trace: DecisionTrace;
+}
+
+export interface RecommendationOutput extends DecisionOutputBase {
+  type: "recommendation";
   action: string;
-  details: string;
-  expected_savings: string;
-  difficulty: string;
-  quick_win: boolean;
+  amount?: number;
+  deadline?: string;
 }
 
-export interface ProgressReview {
-  previous_advice_followed: string;
-  wins: string[];
-  areas_for_growth: string[];
+export interface NoActionOutput extends DecisionOutputBase {
+  type: "no_action";
+  conclusion: string;
 }
 
-export interface MonthlyGoal {
-  objective: string;
-  target_amount: number;
-  strategy: string;
+export interface UnresolvedOutput extends DecisionOutputBase {
+  type: "unresolved";
+  conclusion: string;
 }
+
+export type DecisionOutput =
+  | RecommendationOutput
+  | NoActionOutput
+  | UnresolvedOutput;
 
 export interface AdviceData {
-  analysis: string;
-  spending_patterns: SpendingPattern[];
-  problem_areas: ProblemArea[];
-  recommendations: Recommendation[];
-  progress_review: ProgressReview | null;
-  monthly_goal: MonthlyGoal | null;
-  encouragement: string;
+  outputs: DecisionOutput[];
 }
 
-// [>]: Eligibility info provided by backend to control UI behavior.
 export interface EligibilityInfo {
   can_generate: boolean;
   is_first_advice: boolean;
   reason: string | null;
 }
 
-// [>]: Discriminated union for type-safe advice response handling.
-// When exists=true, advice and generated_at are guaranteed non-null.
 export type GetAdviceResponse =
   | {
       success: boolean;
       exists: false;
       advice: null;
       generated_at: null;
+      is_valid: false;
       eligibility: EligibilityInfo;
     }
   | {
@@ -310,6 +308,7 @@ export type GetAdviceResponse =
       exists: true;
       advice: AdviceData;
       generated_at: string;
+      is_valid: true;
       eligibility: EligibilityInfo;
     };
 
@@ -317,6 +316,7 @@ export interface GenerateAdviceResponse {
   success: boolean;
   advice: AdviceData;
   generated_at: string;
+  is_valid: true;
   was_cached: boolean;
 }
 

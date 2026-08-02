@@ -4,7 +4,7 @@ from fastapi import HTTPException, Path
 from loguru import logger
 from sqlalchemy import func
 
-from app.api.deps import DbSession, MonthRepo, TransactionRepo, create_router
+from app.api.deps import AdviceRepo, DbSession, MonthRepo, TransactionRepo, create_router
 from app.db.models.transaction import Transaction
 from app.responses.months import MonthSummary, TransactionResponse
 from app.responses.transactions import UpdateTransactionRequest, UpdateTransactionResponse
@@ -24,6 +24,7 @@ def update_transaction(
     request: UpdateTransactionRequest,
     db: DbSession,
     month_repo: MonthRepo,
+    advice_repo: AdviceRepo,
     transaction_repo: TransactionRepo,
     transaction_id: int = Path(..., ge=1, description="Transaction ID"),
 ) -> UpdateTransactionResponse:
@@ -57,6 +58,7 @@ def update_transaction(
     try:
         transaction, month = transactions_service.update_transaction_category(
             month_repo=month_repo,
+            advice_repo=advice_repo,
             transaction_repo=transaction_repo,
             transaction_id=transaction_id,
             money_map_type=request.money_map_type,

@@ -7,6 +7,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 from app.db.enums import MoneyMapType
+from app.repositories.advice import AdviceRepository
 from app.services.categorization.models import CategorizationResult
 from app.services.exceptions import InvalidMonthFormatError, NoTransactionsFoundError
 from app.services.upload.models import MonthData, ParsedMonthSummary, ParsedTransaction, ParseResult
@@ -190,6 +191,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
 
         service = UploadService()
         result = service.process_categorization(
+            advice_repo=AdviceRepository(self.session),
             file_content=b"csv",
             months_to_process=["2025-03"],
             import_mode="replace",
@@ -275,6 +277,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
 
         service = UploadService()
         result = service.process_categorization(
+            advice_repo=AdviceRepository(self.session),
             file_content=b"csv",
             months_to_process=["all"],
             import_mode="replace",
@@ -335,6 +338,7 @@ class TestUploadServiceCategorization(DatabaseTestCase):
 
         service = UploadService()
         result = service.process_categorization(
+            advice_repo=AdviceRepository(self.session),
             file_content=b"csv",
             months_to_process=["2025-04"],
             import_mode="replace",
@@ -418,6 +422,7 @@ class TestUploadServiceImportModes(DatabaseTestCase):
 
         service = UploadService()
         service.process_categorization(
+            advice_repo=AdviceRepository(self.session),
             file_content=b"csv",
             months_to_process=["2025-05"],
             import_mode="replace",
@@ -521,6 +526,7 @@ class TestUploadServiceImportModes(DatabaseTestCase):
 
         service = UploadService()
         result = service.process_categorization(
+            advice_repo=AdviceRepository(self.session),
             file_content=b"csv",
             months_to_process=["2025-06"],
             import_mode="merge",
@@ -594,6 +600,7 @@ class TestUploadServiceImportModes(DatabaseTestCase):
 
         service = UploadService()
         result = service.process_categorization(
+            advice_repo=AdviceRepository(self.session),
             file_content=b"csv",
             months_to_process=["2025-07"],
             import_mode="merge",
@@ -642,6 +649,7 @@ class TestUploadServiceValidation(TestCase):
         service = UploadService()
         with self.assertRaises(InvalidMonthFormatError) as context:
             service.process_categorization(
+                advice_repo=MagicMock(),
                 file_content=b"csv",
                 months_to_process=["invalid-format"],
                 import_mode="replace",

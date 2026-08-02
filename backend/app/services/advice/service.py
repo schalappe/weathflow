@@ -1,6 +1,4 @@
-"""Service functions for advice storage and retrieval."""
-
-import json
+"""Advice storage and generation-data services."""
 
 from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
@@ -14,98 +12,58 @@ from app.services.exceptions import AdviceQueryError
 
 
 def get_advice_by_month_id(advice_repo: AdviceRepository, month_id: int) -> Advice | None:
-    """
-    Retrieve stored advice for a month.
+    """Retrieve stored advice.
 
     Parameters
     ----------
     advice_repo : AdviceRepository
-        Repository for advice data access.
+        Advice storage.
     month_id : int
-        Month ID to look up.
+        Month id.
 
     Returns
     -------
     Advice | None
-        Advice record or None if not found.
+        Stored record.
 
     Raises
     ------
     AdviceQueryError
-        If database query fails.
+        Query failed.
     """
     try:
-        result = advice_repo.get_by_month_id(month_id)
-        if result:
-            logger.info("Found advice for month_id={}", month_id)
-        else:
-            logger.info("No advice found for month_id={}", month_id)
-        return result
+        return advice_repo.get_by_month_id(month_id)
     except SQLAlchemyError as error:
         logger.exception("Database error retrieving advice for month_id={}", month_id)
         raise AdviceQueryError(month_id, str(error)) from error
 
 
-def get_advice_by_month_ids(advice_repo: AdviceRepository, month_ids: list[int]) -> dict[int, Advice]:
-    """
-    Retrieve stored advice for multiple months in a single query.
-
-    Eliminates N+1 queries when fetching advice for multiple months.
-
-    Parameters
-    ----------
-    advice_repo : AdviceRepository
-        Repository for advice data access.
-    month_ids : list[int]
-        List of month IDs to look up.
-
-    Returns
-    -------
-    dict[int, Advice]
-        Mapping of month_id to Advice record. Missing months are not included.
-
-    Raises
-    ------
-    AdviceQueryError
-        If database query fails.
-    """
-    try:
-        result = advice_repo.get_by_month_ids(month_ids)
-        logger.info("Retrieved {} advice records for {} month_ids", len(result), len(month_ids))
-        return result
-    except SQLAlchemyError as error:
-        logger.exception("Database error retrieving advice for month_ids={}", month_ids)
-        raise AdviceQueryError(0, str(error)) from error
-
-
 def create_or_update_advice(advice_repo: AdviceRepository, month_id: int, advice_text: str) -> Advice:
-    """
-    Create or update advice for a month (upsert pattern).
+    """Persist current monthly advice.
 
     Parameters
     ----------
     advice_repo : AdviceRepository
-        Repository for advice data access.
+        Advice storage.
     month_id : int
-        Month ID for the advice.
+        Month id.
     advice_text : str
-        JSON-serialized AdviceResponse.
+        Decision JSON.
 
     Returns
     -------
     Advice
-        Created or updated advice record.
+        Persisted record.
 
     Raises
     ------
     AdviceQueryError
-        If database operation fails.
+        Write failed.
     """
     try:
         result = advice_repo.upsert(month_id, advice_text)
         advice_repo.commit()
         advice_repo.refresh(result)
-        logger.info("Saved advice for month_id={}", month_id)
         return result
     except SQLAlchemyError as error:
         advice_repo.rollback()
@@ -114,67 +72,50 @@ def create_or_update_advice(advice_repo: AdviceRepository, month_id: int, advice
 
 
 def _extract_all_transactions(transactions: list[Transaction]) -> dict[str, list[TransactionSample]]:
-    """
-    Extract all transactions per category for pattern analysis.
-
-    Groups transactions by money_map_type so Claude can identify patterns,
-    recurring expenses, and opportunities for savings.
+    """Group observed expenses.
 
     Parameters
     ----------
     transactions : list[Transaction]
-        All transactions for the month.
+        Month transactions.
 
     Returns
     -------
     dict[str, list[TransactionSample]]
-        All transactions per category (CORE, CHOICE, COMPOUND).
+        Expenses grouped by Money Map category.
     """
-    # ##>: Group transactions by category, excluding INCOME and EXCLUDED.
-    categories_to_include = {"CORE", "CHOICE", "COMPOUND"}
-    grouped: dict[str, list[Transaction]] = {cat: [] for cat in categories_to_include}
+    categories = {"CORE", "CHOICE", "COMPOUND"}
+    grouped: dict[str, list[Transaction]] = {category: [] for category in categories}
+    for transaction in transactions:
+        if transaction.money_map_type in categories:
+            grouped[transaction.money_map_type].append(transaction)
 
-    for tx in transactions:
-        if tx.money_map_type in categories_to_include:
-            grouped[tx.money_map_type].append(tx)
-
-    result: dict[str, list[TransactionSample]] = {}
-    for category, category_transactions in grouped.items():
-        # ##>: Sort by absolute amount (largest first) for readability.
-        sorted_txs = sorted(category_transactions, key=lambda t: abs(t.amount), reverse=True)
-
-        result[category] = [
+    return {
+        category: [
             TransactionSample(
-                description=tx.description,
-                amount=abs(tx.amount),
-                subcategory=tx.money_map_subcategory,
+                description=transaction.description,
+                amount=abs(transaction.amount),
+                subcategory=transaction.money_map_subcategory,
             )
-            for tx in sorted_txs
+            for transaction in sorted(items, key=lambda item: abs(item.amount), reverse=True)
         ]
+        for category, items in grouped.items()
+    }
 
-    return result
 
-
-def month_to_month_data(month: Month, past_advice: list[str] | None = None) -> MonthData:
-    """
-    Convert Month model to MonthData DTO for advice generation.
-
-    Includes all transactions per category for pattern analysis and personalized recommendations.
+def month_to_month_data(month: Month) -> MonthData:
+    """Convert persisted month to observed generation data.
 
     Parameters
     ----------
     month : Month
-        Database month record with transactions loaded.
-    past_advice : list[str] | None
-        Previous recommendations given for this month (if any).
+        Month with transactions loaded.
 
     Returns
     -------
     MonthData
-        DTO suitable for AdviceGenerator.
+        Generator input.
     """
-    all_transactions = _extract_all_transactions(month.transactions)
-
     return MonthData(
         year=month.year,
         month=month.month,
@@ -187,66 +128,21 @@ def month_to_month_data(month: Month, past_advice: list[str] | None = None) -> M
         compound_percentage=month.compound_percentage,
         score=month.score,
         score_label=month.score_label,
-        category_breakdown=None,
-        transactions=all_transactions,
-        past_advice=past_advice,
+        transactions=_extract_all_transactions(month.transactions),
     )
 
 
-def extract_recommendations_from_advice(advice_text: str) -> list[str]:
-    """
-    Extract recommendations list from stored advice JSON.
-
-    Handles both new dictionary format and legacy string format.
-
-    Parameters
-    ----------
-    advice_text : str
-        JSON-serialized advice stored in database.
-
-    Returns
-    -------
-    list[str]
-        List of recommendation action strings, or empty list if parsing fails.
-    """
-    try:
-        data = json.loads(advice_text)
-        recommendations = data.get("recommendations", [])
-        if not isinstance(recommendations, list):
-            logger.warning("Advice JSON has non-list recommendations field: type={}", type(recommendations).__name__)
-            return []
-
-        result = []
-        for rec in recommendations:
-            if isinstance(rec, dict):
-                # ##>: New format: extract action text from structured recommendation.
-                action = rec.get("action", "")
-                if action:
-                    result.append(action)
-            else:
-                # ##>: Legacy format: recommendation is already a string.
-                result.append(str(rec))
-        return result
-    except json.JSONDecodeError as error:
-        logger.warning("Failed to parse advice JSON for recommendations extraction: {}", error)
-        return []
-    except (TypeError, AttributeError) as error:
-        logger.warning("Unexpected error extracting recommendations: {}: {}", type(error).__name__, error)
-        return []
-
-
 def advice_response_to_json(advice: AdviceResponse) -> str:
-    """
-    Serialize AdviceResponse to JSON string for storage.
+    """Serialize decision outputs.
 
     Parameters
     ----------
     advice : AdviceResponse
-        Advice response from generator.
+        Valid decision outputs.
 
     Returns
     -------
     str
-        JSON string representation.
+        Storage JSON.
     """
     return advice.model_dump_json()

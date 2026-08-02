@@ -1,8 +1,9 @@
+/** @module test-factories Typed fixtures shared by frontend tests. */
+
 import type {
   AdviceData,
   MonthHistory,
-  ProblemArea,
-  Recommendation,
+  RecommendationOutput,
   Score,
 } from "@/types";
 import { vi } from "vitest";
@@ -74,87 +75,50 @@ export function createMonthHistory(
   };
 }
 
-// [>]: Factory for creating test ProblemArea with sensible defaults.
-export function createMockProblemArea(
-  overrides: Partial<ProblemArea> = {},
-): ProblemArea {
+/**
+ * Build recommendation fixture.
+ * @param overrides - Fields to replace.
+ * @returns Recommendation output.
+ */
+export function createMockRecommendationOutput(
+  overrides: Partial<RecommendationOutput> = {},
+): RecommendationOutput {
   return {
-    category: "Abonnements",
-    amount: 85,
-    trend: "+20%",
-    root_cause: null,
-    impact: null,
+    type: "recommendation",
+    priority: "high",
+    action: "Réduire les repas au restaurant à la moyenne récente.",
+    amount: 120,
+    deadline: "2026-01-31",
+    trace: {
+      summary: "Les dépenses de restauration dépassent la moyenne récente.",
+      details: {
+        observations: [
+          {
+            fact: "240 € dépensés contre 120 € en moyenne.",
+            period: "octobre à décembre 2025",
+            scope: "Transactions CHOICE / Dining out",
+            source: "observed_data",
+          },
+        ],
+        calculations: ["240 € - 120 € = 120 € d'écart mensuel."],
+        conventions: ["Écart supérieur à 20 % considéré matériel."],
+        limits: ["Trois mois observés seulement."],
+      },
+    },
     ...overrides,
   };
 }
 
-// [>]: Factory for creating test Recommendation with sensible defaults.
-export function createMockRecommendation(
-  overrides: Partial<Recommendation> = {},
-): Recommendation {
-  return {
-    priority: 1,
-    action: "Audite tes abonnements",
-    details: "Certains ne sont peut-etre plus utilises.",
-    expected_savings: "30€/mois",
-    difficulty: "Facile",
-    quick_win: true,
-    ...overrides,
-  };
-}
-
-// [>]: Factory for creating test AdviceData with sensible defaults.
+/**
+ * Build advice fixture.
+ * @param overrides - Fields to replace.
+ * @returns Monthly advice.
+ */
 export function createMockAdviceData(
   overrides: Partial<AdviceData> = {},
 ): AdviceData {
   return {
-    analysis:
-      "Tes depenses 'Choice' ont augmente de 15% sur les 3 derniers mois, principalement dans les abonnements.",
-    spending_patterns: [],
-    problem_areas: [
-      createMockProblemArea({
-        category: "Abonnements",
-        amount: 85,
-        trend: "+20%",
-      }),
-      createMockProblemArea({
-        category: "Restaurants",
-        amount: 120,
-        trend: "+10%",
-      }),
-    ],
-    recommendations: [
-      createMockRecommendation({
-        priority: 1,
-        action:
-          "Audite tes abonnements: certains ne sont peut-etre plus utilises.",
-        details: "Netflix, Spotify, Disney+ totalisant 35€/mois.",
-        expected_savings: "10€/mois",
-        difficulty: "Facile",
-        quick_win: true,
-      }),
-      createMockRecommendation({
-        priority: 2,
-        action:
-          "Prepare tes repas le dimanche pour reduire les sorties au restaurant.",
-        details: "6 commandes Uber Eats ce mois.",
-        expected_savings: "45€/mois",
-        difficulty: "Modéré",
-        quick_win: false,
-      }),
-      createMockRecommendation({
-        priority: 3,
-        action: "Tu es proche du score 'Great'! Continue ainsi.",
-        details: "Maintiens ton taux d'epargne actuel.",
-        expected_savings: "0€",
-        difficulty: "Facile",
-        quick_win: false,
-      }),
-    ],
-    progress_review: null,
-    monthly_goal: null,
-    encouragement:
-      "Tu as fait des progres ce mois-ci! Continue sur cette lancee.",
+    outputs: [createMockRecommendationOutput()],
     ...overrides,
   };
 }

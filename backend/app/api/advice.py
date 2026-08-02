@@ -105,11 +105,11 @@ def generate_advice(
         if not request.regenerate:
             existing_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
             if existing_advice:
-                logger.info("Returning cached advice for {}-{:02d}", request.year, request.month)
                 return GenerateAdviceResponse(
                     success=True,
-                    advice=AdviceData.from_json(existing_advice.advice_text),
+                    advice=AdviceData.model_validate_json(existing_advice.advice_text),
                     generated_at=existing_advice.generated_at,
+                    is_valid=True,
                     was_cached=True,
                 )
 
@@ -119,46 +119,20 @@ def generate_advice(
             month_repo, limit=eligibility.history_limit
         )
 
-        # ##>: Filter to only include strictly older months (exclude current and future months).
         filtered_history = [m for m in history_months if (m.year, m.month) < (request.year, request.month)]
-        all_month_ids = [m.id for m in filtered_history] + [month_record.id]
-
-        # ##>: Batch fetch all advice records in single query to eliminate N+1.
-        advice_by_month_id = advice_service.get_advice_by_month_ids(advice_repo, all_month_ids)
-
-        # ##>: Build history data with past advice for each month.
-        history_data = []
-        for m in filtered_history:
-            past_advice_record = advice_by_month_id.get(m.id)
-            past_recommendations = (
-                advice_service.extract_recommendations_from_advice(past_advice_record.advice_text)
-                if past_advice_record
-                else None
-            )
-            history_data.append(advice_service.month_to_month_data(m, past_recommendations))
-
-        # ##>: Only include current month's past advice if NOT regenerating.
-        # ##>: When regenerating, exclude old advice to avoid biasing the AI toward similar recommendations.
-        current_recommendations = None
-        if not request.regenerate:
-            current_past_advice = advice_by_month_id.get(month_record.id)
-            current_recommendations = (
-                advice_service.extract_recommendations_from_advice(current_past_advice.advice_text)
-                if current_past_advice
-                else None
-            )
-        current_data = advice_service.month_to_month_data(month_record, current_recommendations)
+        history_data = [advice_service.month_to_month_data(month) for month in filtered_history]
+        current_data = advice_service.month_to_month_data(month_record)
 
         advice_response = generator.generate_advice(current_data, history_data)
 
         advice_json = advice_service.advice_response_to_json(advice_response)
         stored_advice = advice_service.create_or_update_advice(advice_repo, month_record.id, advice_json)
 
-        logger.info("Generated new advice for {}-{:02d}", request.year, request.month)
         return GenerateAdviceResponse(
             success=True,
-            advice=AdviceData.from_service_response(advice_response),
+            advice=advice_response,
             generated_at=stored_advice.generated_at,
+            is_valid=True,
             was_cached=False,
         )
 
@@ -237,14 +211,16 @@ def get_advice(
                 success=True,
                 advice=None,
                 generated_at=None,
+                is_valid=False,
                 exists=False,
                 eligibility=eligibility_info,
             )
 
         return GetAdviceResponse(
             success=True,
-            advice=AdviceData.from_json(advice.advice_text),
+            advice=AdviceData.model_validate_json(advice.advice_text),
             generated_at=advice.generated_at,
+            is_valid=True,
             exists=True,
             eligibility=eligibility_info,
         )
