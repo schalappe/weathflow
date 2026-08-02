@@ -12,10 +12,16 @@ import type { AdviceData, EligibilityInfo } from "@/types";
 vi.mock("@/lib/api-client", () => ({
   getAdvice: vi.fn(),
   generateAdvice: vi.fn(),
+  getActivePriority: vi.fn(),
+  putActivePriority: vi.fn(),
+  deleteActivePriority: vi.fn(),
 }));
 
 const mockGetAdvice = vi.mocked(apiClient.getAdvice);
 const mockGenerateAdvice = vi.mocked(apiClient.generateAdvice);
+const mockGetActivePriority = vi.mocked(apiClient.getActivePriority);
+const mockPutActivePriority = vi.mocked(apiClient.putActivePriority);
+const mockDeleteActivePriority = vi.mocked(apiClient.deleteActivePriority);
 const eligibility: EligibilityInfo = {
   can_generate: true,
   is_first_advice: false,
@@ -36,6 +42,7 @@ function loaded(advice: AdviceData = createMockAdviceData()) {
 describe("AdvicePanel decision outputs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetActivePriority.mockResolvedValue({ priority: null });
   });
 
   it("renders recommendation, no-action, unresolved, and auditable trace", async () => {
@@ -79,6 +86,227 @@ describe("AdvicePanel decision outputs", () => {
     expect(
       screen.getAllByText("240 € - 120 € = 120 € d'écart mensuel."),
     ).toHaveLength(3);
+  });
+
+  it("shows declared priority status, validity, and correction link in its output", async () => {
+    const recommendation = createMockRecommendationOutput();
+    recommendation.trace.details.declared_facts = [
+      {
+        fact_type: "active_priority",
+        goal: "Fonds d'urgence",
+        target: "6 000 €",
+        deadline: null,
+        state: "active",
+        last_confirmed_at: "2026-08-02T12:00:00Z",
+        valid_until: "2027-01-29T12:00:00Z",
+        can_correct: true,
+        can_delete: true,
+      },
+    ];
+    mockGetAdvice.mockResolvedValue(
+      loaded(createMockAdviceData({ outputs: [recommendation] })),
+    );
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    expect(await screen.findByText("Faits déclarés")).toBeInTheDocument();
+    expect(screen.getByText("Fonds d'urgence — 6 000 €")).toBeInTheDocument();
+    expect(screen.getByText("Statut : active")).toBeInTheDocument();
+    expect(screen.getByText(/Valide jusqu’au/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Corriger ou supprimer" }),
+    ).toHaveAttribute("href", "#active-priority-context");
+  });
+
+  it("keeps robust advice visible while answering one material priority question", async () => {
+    const user = userEvent.setup();
+    const recommendation = createMockRecommendationOutput();
+    const clarification = {
+      type: "clarification" as const,
+      priority: "high" as const,
+      subject: "Trajectoire d'épargne",
+      observation: "600 € sont disponibles pour l'épargne.",
+      possible_effect: "La destination de l'épargne change.",
+      question: "Quelle est votre priorité financière active ?",
+      fact_type: "active_priority" as const,
+      material_effects: [
+        "Affecter 600 € au fonds d'urgence.",
+        "Affecter 600 € au prêt auto.",
+      ],
+    };
+    mockGetAdvice.mockResolvedValue(
+      loaded(
+        createMockAdviceData({ outputs: [recommendation, clarification] }),
+      ),
+    );
+    const sessionRecommendation = createMockRecommendationOutput({
+      action: "Affecter 600 € au fonds d'urgence.",
+    });
+    sessionRecommendation.trace.details.declared_facts = [
+      {
+        fact_type: "active_priority",
+        goal: "Fonds d'urgence",
+        target: "6 000 €",
+        deadline: null,
+        state: "session",
+        last_confirmed_at: "2026-08-02T12:00:00Z",
+        valid_until: null,
+        can_correct: true,
+        can_delete: true,
+      },
+    ];
+    mockGenerateAdvice.mockResolvedValue({
+      success: true,
+      advice: createMockAdviceData({
+        outputs: [sessionRecommendation],
+      }),
+      generated_at: "2026-08-02T12:00:00Z",
+      is_valid: true,
+      was_cached: false,
+    });
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    expect(await screen.findByText(recommendation.action)).toBeInTheDocument();
+    expect(screen.getAllByText("Clarification")).toHaveLength(1);
+    expect(screen.getByText(clarification.question)).toBeInTheDocument();
+    expect(
+      screen.getByText(/réutilisée pour vos prochains conseils/i),
+    ).toBeInTheDocument();
+    await user.type(
+      screen.getByLabelText("Objectif courant"),
+      "Fonds d'urgence",
+    );
+    await user.type(screen.getByLabelText("Cible"), "6 000 €");
+    await user.click(
+      screen.getByRole("button", { name: "Cette fois seulement" }),
+    );
+
+    expect(mockGenerateAdvice).toHaveBeenCalledWith(2025, 12, {
+      regenerate: true,
+      activePriority: {
+        goal: "Fonds d'urgence",
+        target: "6 000 €",
+        deadline: null,
+      },
+      rememberPriority: false,
+    });
+    expect(
+      await screen.findByText("Affecter 600 € au fonds d'urgence."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(clarification.question)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Corriger cette réponse de session",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Supprimer cette réponse de session",
+      }),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Corriger cette réponse de session",
+      }),
+    );
+    expect(await screen.findByText(clarification.question)).toBeInTheDocument();
+  });
+
+  it("skip and unknown close the question without storing context", async () => {
+    const user = userEvent.setup();
+    const recommendation = createMockRecommendationOutput();
+    mockGetAdvice.mockResolvedValue(
+      loaded(
+        createMockAdviceData({
+          outputs: [
+            recommendation,
+            {
+              type: "clarification",
+              priority: "medium",
+              subject: "Trajectoire d'épargne",
+              observation: "Une capacité d'épargne est observée.",
+              possible_effect: "Sa destination dépend de la priorité.",
+              question: "Quelle est votre priorité financière active ?",
+              fact_type: "active_priority",
+              material_effects: ["Fonds d'urgence", "Dette"],
+            },
+          ],
+        }),
+      ),
+    );
+    mockGenerateAdvice.mockResolvedValue({
+      success: true,
+      advice: createMockAdviceData({
+        outputs: [
+          recommendation,
+          {
+            type: "unresolved",
+            priority: "medium",
+            conclusion: "Trajectoire d'épargne : aucune action robuste.",
+            trace: recommendation.trace,
+          },
+        ],
+      }),
+      generated_at: "2026-08-02T12:00:00Z",
+      is_valid: true,
+      was_cached: false,
+    });
+
+    render(<AdvicePanel year={2025} month={12} />);
+    await user.click(
+      await screen.findByRole("button", { name: "Je ne sais pas" }),
+    );
+
+    expect(mockGenerateAdvice).toHaveBeenCalledWith(2025, 12, {
+      regenerate: true,
+      clarificationAction: "unknown",
+    });
+    expect(mockPutActivePriority).not.toHaveBeenCalled();
+    expect(mockDeleteActivePriority).not.toHaveBeenCalled();
+    expect(screen.getByText("Sujet non conclu")).toBeInTheDocument();
+    expect(screen.getByText(recommendation.action)).toBeInTheDocument();
+    expect(
+      screen.getByText("Trajectoire d'épargne : aucune action robuste."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows remembered priority and exposes correction and deletion", async () => {
+    const user = userEvent.setup();
+    const priority = {
+      goal: "Fonds d'urgence",
+      target: "6 000 €",
+      deadline: "2027-06-30",
+      state: "corrected" as const,
+      last_confirmed_at: "2026-08-02T12:00:00Z",
+      valid_until: "2027-01-29T12:00:00Z",
+    };
+    mockGetAdvice.mockResolvedValue(loaded());
+    mockGetActivePriority.mockResolvedValue({ priority });
+    mockPutActivePriority.mockResolvedValue({
+      priority: { ...priority, goal: "Rembourser le prêt auto" },
+    });
+    mockDeleteActivePriority.mockResolvedValue();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    expect(await screen.findByText("Fonds d'urgence")).toBeInTheDocument();
+    expect(screen.getByText("Corrigé")).toBeInTheDocument();
+    expect(screen.getByText("Dernière confirmation")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Corriger" }));
+    const goal = screen.getByLabelText("Objectif courant");
+    await user.clear(goal);
+    await user.type(goal, "Rembourser le prêt auto");
+    await user.click(screen.getByRole("button", { name: "Enregistrer" }));
+
+    expect(mockPutActivePriority).toHaveBeenCalledWith({
+      goal: "Rembourser le prêt auto",
+      target: "6 000 €",
+      deadline: "2027-06-30",
+    });
+    await user.click(await screen.findByRole("button", { name: "Supprimer" }));
+    expect(mockDeleteActivePriority).toHaveBeenCalledOnce();
   });
 
   it("shows derived amount and deadline only when present", async () => {
@@ -139,7 +367,9 @@ describe("AdvicePanel decision outputs", () => {
       await screen.findByRole("button", { name: /Générer des conseils/i }),
     );
 
-    expect(mockGenerateAdvice).toHaveBeenCalledWith(2025, 12, false);
+    expect(mockGenerateAdvice).toHaveBeenCalledWith(2025, 12, {
+      regenerate: false,
+    });
     expect(await screen.findByText("Recommandation")).toBeInTheDocument();
   });
 
@@ -156,7 +386,7 @@ describe("AdvicePanel decision outputs", () => {
       await screen.findByText("AI service unavailable"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(advice.outputs[0].trace.summary),
+      screen.getByText(createMockRecommendationOutput().trace.summary),
     ).toBeInTheDocument();
   });
 

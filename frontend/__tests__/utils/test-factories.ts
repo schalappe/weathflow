@@ -103,6 +103,7 @@ export function createMockRecommendationOutput(
         calculations: ["240 € - 120 € = 120 € d'écart mensuel."],
         conventions: ["Écart supérieur à 20 % considéré matériel."],
         limits: ["Trois mois observés seulement."],
+        declared_facts: [],
       },
     },
     ...overrides,

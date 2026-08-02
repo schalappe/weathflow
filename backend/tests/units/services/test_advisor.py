@@ -1,13 +1,14 @@
 """Tests for AdviceGenerator service."""
 
 import json
+from datetime import datetime
 from unittest.mock import MagicMock
 
 import anthropic
 import pytest
 
 from app.services.advice.generator import AdviceGenerator
-from app.services.advice.models import AdviceResponse, MonthData
+from app.services.advice.models import ActivePriorityContext, AdviceResponse, MonthData
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
 from app.services.exceptions import AdviceAPIError, AdviceGenerationError, AdviceParseError, InsufficientDataError
 
@@ -74,6 +75,29 @@ def test_prompt_requires_selective_observed_decisions_without_quota() -> None:
     assert "Exactement 3" not in ADVICE_SYSTEM_PROMPT
 
 
+def test_clarification_requires_distinct_material_effects() -> None:
+    """Wording-only alternatives cannot create a priority question."""
+    response = json.dumps(
+        {
+            "outputs": [
+                {
+                    "type": "clarification",
+                    "priority": "high",
+                    "subject": "Épargne",
+                    "observation": "600 € sont disponibles.",
+                    "possible_effect": "La destination peut changer.",
+                    "question": "Quelle est votre priorité active ?",
+                    "fact_type": "active_priority",
+                    "material_effects": ["Même action", "Même action"],
+                }
+            ]
+        }
+    )
+
+    with pytest.raises(AdviceParseError):
+        _generator()._parse_response(response)
+
+
 def test_generate_advice_returns_strict_decision_output() -> None:
     """Public generation parses model response into decision outputs."""
     generator = _generator()
@@ -130,6 +154,28 @@ def test_prompt_includes_all_observed_months() -> None:
 
     assert prompt.count('"month":') == 2
     assert '"total_income": 3000.0' in prompt
+
+
+def test_prompt_keeps_expired_priority_visible_but_inactive() -> None:
+    """Expired priority reaches materiality check without becoming proof."""
+    priority = ActivePriorityContext(
+        goal="Fonds d'urgence",
+        target="6 000 €",
+        deadline=None,
+        state="to_confirm",
+        last_confirmed_at=datetime(2026, 1, 1),
+        valid_until=datetime(2026, 6, 30),
+    )
+
+    prompt = _generator()._build_user_prompt(
+        _month(month=2),
+        [_month(month=1)],
+        priority,
+    )
+
+    assert '"state": "to_confirm"' in prompt
+    assert "uniquement si au moins deux priorités plausibles changent" in prompt
+    assert "Ne la cite jamais comme preuve active" in prompt
 
 
 def test_api_authentication_error_is_explicit() -> None:

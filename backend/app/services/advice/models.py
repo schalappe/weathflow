@@ -1,6 +1,6 @@
 """Pydantic models for advice generation."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Literal, Self
 
 from pydantic import ConfigDict, Field, model_validator
@@ -106,6 +106,52 @@ class ObservedFact(DecisionModel):
     source: Literal["observed_data"]
 
 
+class ActivePriorityContext(DecisionModel):
+    """Declared priority available to generation.
+
+    Attributes
+    ----------
+    goal : str
+        Current objective.
+    target : str
+        Objective target.
+    deadline : date | None
+        Optional objective date.
+    state : Literal["active", "corrected", "to_confirm", "session"]
+        Lifecycle state.
+    last_confirmed_at : datetime
+        Explicit answer time.
+    valid_until : datetime | None
+        Reuse cutoff; None for session.
+    """
+
+    goal: str = Field(min_length=1)
+    target: str = Field(min_length=1)
+    deadline: date | None = None
+    state: Literal["active", "corrected", "to_confirm", "session"]
+    last_confirmed_at: datetime
+    valid_until: datetime | None
+
+
+class DeclaredFactCitation(ActivePriorityContext):
+    """Active priority cited by decision.
+
+    Attributes
+    ----------
+    fact_type : Literal["active_priority"]
+        Closed-catalog fact.
+    can_correct : Literal[True]
+        Correction control.
+    can_delete : Literal[True]
+        Deletion control.
+    """
+
+    fact_type: Literal["active_priority"]
+    state: Literal["active", "corrected", "session"]
+    can_correct: Literal[True]
+    can_delete: Literal[True]
+
+
 class DecisionTraceDetails(DecisionModel):
     """Auditable decision detail.
 
@@ -125,6 +171,7 @@ class DecisionTraceDetails(DecisionModel):
     calculations: list[str] = Field(default_factory=list)
     conventions: list[str] = Field(default_factory=list)
     limits: list[str] = Field(default_factory=list)
+    declared_facts: list[DeclaredFactCitation] = Field(default_factory=list)
 
 
 class DecisionTrace(DecisionModel):
@@ -229,8 +276,59 @@ class UnresolvedOutput(DecisionModel):
     trace: DecisionTrace
 
 
+class ClarificationOutput(DecisionModel):
+    """Material active-priority question.
+
+    Attributes
+    ----------
+    type : Literal["clarification"]
+        Output discriminator.
+    priority : Literal["high", "medium", "low"]
+        Blocked subject priority.
+    subject : str
+        Blocked subject.
+    observation : str
+        Known situation.
+    possible_effect : str
+        Decision impact.
+    question : str
+        Single requested fact.
+    fact_type : Literal["active_priority"]
+        Closed-catalog fact.
+    material_effects : list[str]
+        At least two distinct decision outcomes.
+    """
+
+    type: Literal["clarification"]
+    priority: Literal["high", "medium", "low"]
+    subject: str = Field(min_length=1)
+    observation: str = Field(min_length=1)
+    possible_effect: str = Field(min_length=1)
+    question: str = Field(min_length=1)
+    fact_type: Literal["active_priority"]
+    material_effects: list[str] = Field(min_length=2)
+
+    @model_validator(mode="after")
+    def require_distinct_effects(self) -> Self:
+        """Reject wording-only clarification.
+
+        Returns
+        -------
+        Self
+            Material clarification.
+
+        Raises
+        ------
+        ValueError
+            Fewer than two distinct effects.
+        """
+        if len(set(self.material_effects)) < 2:
+            raise ValueError("clarification requires distinct decision effects")
+        return self
+
+
 DecisionOutput = Annotated[
-    RecommendationOutput | NoActionOutput | UnresolvedOutput,
+    RecommendationOutput | NoActionOutput | UnresolvedOutput | ClarificationOutput,
     Field(discriminator="type"),
 ]
 
@@ -245,3 +343,21 @@ class AdviceResponse(DecisionModel):
     """
 
     outputs: list[DecisionOutput] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def allow_one_clarification(self) -> Self:
+        """Enforce progressive single-card flow.
+
+        Returns
+        -------
+        Self
+            Advice with zero or one clarification.
+
+        Raises
+        ------
+        ValueError
+            Multiple clarification cards.
+        """
+        if sum(output.type == "clarification" for output in self.outputs) > 1:
+            raise ValueError("advice allows one clarification at a time")
+        return self

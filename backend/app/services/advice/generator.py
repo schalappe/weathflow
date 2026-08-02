@@ -8,7 +8,7 @@ from anthropic import Anthropic
 from loguru import logger
 from pydantic import ValidationError
 
-from app.services.advice.models import AdviceResponse, MonthData
+from app.services.advice.models import ActivePriorityContext, AdviceResponse, MonthData
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
 from app.services.exceptions import (
     AdviceAPIError,
@@ -79,7 +79,12 @@ class AdviceGenerator:
         else:
             self._thinking_budget = raw_budget
 
-    def generate_advice(self, current_month: MonthData, history: list[MonthData]) -> AdviceResponse:
+    def generate_advice(
+        self,
+        current_month: MonthData,
+        history: list[MonthData],
+        active_priority: ActivePriorityContext | None = None,
+    ) -> AdviceResponse:
         """
         Generate personalized financial advice based on historical data.
 
@@ -89,11 +94,13 @@ class AdviceGenerator:
             Current month's financial data.
         history : list[MonthData]
             Historical months (at least 1 required).
+        active_priority : ActivePriorityContext | None
+            Declared or expired active priority.
 
         Returns
         -------
         AdviceResponse
-            Decision outputs backed by observed facts.
+            Decision outputs backed by traced facts.
 
         Raises
         ------
@@ -109,7 +116,7 @@ class AdviceGenerator:
         self._validate_data(current_month, history)
         logger.debug("Data validation passed with {} history months", len(history))
 
-        prompt = self._build_user_prompt(current_month, history)
+        prompt = self._build_user_prompt(current_month, history, active_priority)
         logger.debug("User prompt built ({} characters)", len(prompt))
 
         response_text = self._call_claude_api(prompt)
@@ -140,7 +147,12 @@ class AdviceGenerator:
         if len(history) < 1:
             raise InsufficientDataError(min_months_required=self.MIN_MONTHS_REQUIRED)
 
-    def _build_user_prompt(self, current_month: MonthData, history: list[MonthData]) -> str:
+    def _build_user_prompt(
+        self,
+        current_month: MonthData,
+        history: list[MonthData],
+        active_priority: ActivePriorityContext | None = None,
+    ) -> str:
         """
         Build user prompt with financial data for Claude.
 
@@ -153,11 +165,13 @@ class AdviceGenerator:
             Current month's data.
         history : list[MonthData]
             Historical months.
+        active_priority : ActivePriorityContext | None
+            Declared or expired active priority.
 
         Returns
         -------
         str
-            Formatted user prompt with embedded instructions.
+            Prompt with observed and declared facts separated.
         """
         all_months = [*history, current_month]
 
@@ -188,12 +202,14 @@ class AdviceGenerator:
 
             months_data.append(month_dict)
 
+        priority_data = active_priority.model_dump(mode="json") if active_priority is not None else None
         return (
             f"{ADVICE_SYSTEM_PROMPT}\n\n"
             "---\n\n"
-            "Analyse les données financières observées ci-dessous. "
+            "Analyse les données financières observées et le contexte déclaré séparément. "
             "Retourne uniquement l'objet JSON demandé, sans markdown ni texte additionnel.\n\n"
-            f"{json.dumps(months_data, ensure_ascii=False, indent=2)}"
+            f"Données observées :\n{json.dumps(months_data, ensure_ascii=False, indent=2)}\n\n"
+            f"Contexte déclaré :\n{json.dumps({'active_priority': priority_data}, ensure_ascii=False, indent=2)}"
         )
 
     def _call_claude_api(self, user_prompt: str) -> str:

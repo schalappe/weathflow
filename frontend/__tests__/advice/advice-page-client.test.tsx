@@ -7,9 +7,12 @@ import type { MonthSummary } from "@/types";
 
 // [>]: Mock the API client module.
 vi.mock("@/lib/api-client", () => ({
-  getMonthsList: vi.fn(),
-  getAdvice: vi.fn(),
+  deleteActivePriority: vi.fn(),
   generateAdvice: vi.fn(),
+  getActivePriority: vi.fn().mockResolvedValue({ priority: null }),
+  getAdvice: vi.fn(),
+  getMonthsList: vi.fn(),
+  putActivePriority: vi.fn(),
 }));
 
 // [>]: Cast mocked functions directly to avoid vi.mocked() compatibility issues.

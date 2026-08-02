@@ -123,6 +123,25 @@ class AdviceRepository:
         self._db.flush()
         return count
 
+    def delete_depending_on_active_priority(self) -> int:
+        """Delete outputs blocked by or citing active priority.
+
+        Returns
+        -------
+        int
+            Deleted advice count.
+        """
+        count = (
+            self._db.query(Advice)
+            .filter(
+                Advice.advice_text.contains('"fact_type"'),
+                Advice.advice_text.contains('"active_priority"'),
+            )
+            .delete(synchronize_session=False)
+        )
+        self._db.commit()
+        return count
+
     def commit(self) -> None:
         """Commit the current transaction."""
         self._db.commit()

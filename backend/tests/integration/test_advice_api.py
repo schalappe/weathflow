@@ -105,6 +105,204 @@ def test_generate_cache_and_retrieve_decision_outputs(
 
 
 @patch.dict("os.environ", MOCK_API_KEY_ENV)
+@patch("app.services.advice.service.advice_response_to_json")
+@patch("app.api.deps.AdviceGenerator")
+def test_generation_keeps_robust_output_beside_one_material_priority_question(
+    mock_generator_class: MagicMock,
+    mock_serialize: MagicMock,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Material priority uncertainty adds one question without hiding robust advice."""
+    _create_month(db_session, 2025, 9)
+    _create_month(db_session, 2025, 10)
+    robust_output = _advice().model_dump(mode="json")["outputs"][0]
+    clarification = {
+        "type": "clarification",
+        "priority": "high",
+        "subject": "Trajectoire d'épargne",
+        "observation": "600 € sont disponibles pour l'épargne ce mois-ci.",
+        "possible_effect": "La destination, le montant affecté et l'échéance changent selon la priorité.",
+        "question": "Quelle est votre priorité financière active ?",
+        "fact_type": "active_priority",
+        "material_effects": [
+            "Fonds d'urgence : affecter les 600 € à la réserve.",
+            "Dette auto : affecter les 600 € au remboursement anticipé.",
+        ],
+    }
+    generated_advice = {"outputs": [robust_output, clarification]}
+    mock_generator = MagicMock()
+    mock_generator.generate_advice.return_value = generated_advice
+    mock_generator_class.return_value = mock_generator
+    mock_serialize.return_value = json.dumps(generated_advice)
+
+    response = client.post("/api/advice/generate", json={"year": 2025, "month": 10})
+
+    assert response.status_code == 200
+    outputs = response.json()["advice"]["outputs"]
+    assert [output["type"] for output in outputs] == ["recommendation", "clarification"]
+    assert sum(output["type"] == "clarification" for output in outputs) == 1
+    assert len(set(outputs[1]["material_effects"])) == 2
+
+
+@patch.dict("os.environ", MOCK_API_KEY_ENV)
+@patch("app.api.deps.AdviceGenerator")
+def test_skip_replaces_persisted_question_with_unresolved_output(
+    mock_generator_class: MagicMock,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Skipped clarification stays resolved after reload without memory."""
+    _create_month(db_session, 2025, 9)
+    _create_month(db_session, 2025, 10)
+    robust_output = _advice().model_dump(mode="json")["outputs"][0]
+    clarification = {
+        "type": "clarification",
+        "priority": "medium",
+        "subject": "Trajectoire d'épargne",
+        "observation": "600 € sont disponibles pour l'épargne.",
+        "possible_effect": "La destination dépend de la priorité active.",
+        "question": "Quelle est votre priorité financière active ?",
+        "fact_type": "active_priority",
+        "material_effects": ["Fonds d'urgence", "Dette"],
+    }
+    mock_generator = MagicMock()
+    mock_generator.generate_advice.return_value = AdviceResponse.model_validate(
+        {"outputs": [robust_output, clarification]}
+    )
+    mock_generator_class.return_value = mock_generator
+    client.post("/api/advice/generate", json={"year": 2025, "month": 10})
+
+    skipped = client.post(
+        "/api/advice/generate",
+        json={"year": 2025, "month": 10, "clarification_action": "skip"},
+    )
+    reloaded = client.get("/api/advice/2025/10")
+
+    assert skipped.status_code == 200
+    assert [output["type"] for output in skipped.json()["advice"]["outputs"]] == [
+        "recommendation",
+        "unresolved",
+    ]
+    assert reloaded.json()["advice"]["outputs"][1]["type"] == "unresolved"
+    assert client.get("/api/advice/context/active-priority").json() == {"priority": None}
+    assert mock_generator.generate_advice.call_count == 1
+
+
+@patch.dict("os.environ", MOCK_API_KEY_ENV)
+@patch("app.services.advice.service.advice_response_to_json")
+@patch("app.api.deps.AdviceGenerator")
+def test_priority_answer_is_remembered_and_changes_generated_output(
+    mock_generator_class: MagicMock,
+    mock_serialize: MagicMock,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Remembered answer reaches generation and its declared-fact trace."""
+    _create_month(db_session, 2025, 9)
+    _create_month(db_session, 2025, 10)
+    output = _advice().model_dump(mode="json")["outputs"][0]
+    output["trace"]["details"]["declared_facts"] = [
+        {
+            "fact_type": "active_priority",
+            "goal": "Constituer un fonds d'urgence",
+            "target": "6 000 €",
+            "deadline": "2027-06-30",
+            "state": "active",
+            "last_confirmed_at": "2026-08-02T12:00:00",
+            "valid_until": "2027-01-29T12:00:00",
+            "can_correct": True,
+            "can_delete": True,
+        }
+    ]
+    generated_advice = {"outputs": [output]}
+    mock_generator = MagicMock()
+    mock_generator.generate_advice.return_value = generated_advice
+    mock_generator_class.return_value = mock_generator
+    mock_serialize.return_value = json.dumps(generated_advice)
+
+    response = client.post(
+        "/api/advice/generate",
+        json={
+            "year": 2025,
+            "month": 10,
+            "active_priority": {
+                "goal": "Constituer un fonds d'urgence",
+                "target": "6 000 €",
+                "deadline": "2027-06-30",
+            },
+            "remember_priority": True,
+        },
+    )
+
+    assert response.status_code == 200
+    context = client.get("/api/advice/context/active-priority").json()["priority"]
+    assert context["goal"] == "Constituer un fonds d'urgence"
+    generation_context = mock_generator.generate_advice.call_args.args[2]
+    assert generation_context.goal == context["goal"]
+    assert generation_context.state == "active"
+    citation = response.json()["advice"]["outputs"][0]["trace"]["details"]["declared_facts"][0]
+    assert citation["fact_type"] == "active_priority"
+    assert citation["state"] == "active"
+    assert citation["can_correct"] is True
+    assert citation["can_delete"] is True
+
+
+@patch.dict("os.environ", MOCK_API_KEY_ENV)
+@patch("app.api.deps.AdviceGenerator")
+def test_session_priority_changes_only_current_response(
+    mock_generator_class: MagicMock,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Session answer neutralizes old memory and avoids advice cache."""
+    _create_month(db_session, 2025, 9)
+    _create_month(db_session, 2025, 10)
+    client.put(
+        "/api/advice/context/active-priority",
+        json={"goal": "Fonds d'urgence", "target": "6 000 €", "deadline": None},
+    )
+    output = _advice().model_dump(mode="json")["outputs"][0]
+    output["trace"]["details"]["declared_facts"] = [
+        {
+            "fact_type": "active_priority",
+            "goal": "Préparer un voyage",
+            "target": "2 000 €",
+            "deadline": None,
+            "state": "session",
+            "last_confirmed_at": "2026-08-02T12:00:00",
+            "valid_until": None,
+            "can_correct": True,
+            "can_delete": True,
+        }
+    ]
+    mock_generator = MagicMock()
+    mock_generator.generate_advice.return_value = {"outputs": [output]}
+    mock_generator_class.return_value = mock_generator
+
+    response = client.post(
+        "/api/advice/generate",
+        json={
+            "year": 2025,
+            "month": 10,
+            "active_priority": {
+                "goal": "Préparer un voyage",
+                "target": "2 000 €",
+                "deadline": None,
+            },
+            "remember_priority": False,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["advice"]["outputs"][0]["trace"]["details"]["declared_facts"][0]["state"] == "session"
+    context = client.get("/api/advice/context/active-priority").json()["priority"]
+    assert context["goal"] == "Fonds d'urgence"
+    assert context["state"] == "to_confirm"
+    assert db_session.query(Advice).count() == 0
+
+
+@patch.dict("os.environ", MOCK_API_KEY_ENV)
 @patch("app.api.deps.AdviceGenerator")
 def test_no_material_gap_persists_only_no_action_output(
     mock_generator_class: MagicMock,

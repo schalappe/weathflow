@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.config.settings import Settings, get_settings
 from app.db.database import get_db
+from app.repositories.active_priority import ActivePriorityRepository
 from app.repositories.advice import AdviceRepository
 from app.repositories.month import MonthRepository
 from app.repositories.transaction import TransactionRepository
@@ -68,6 +69,11 @@ def get_advice_repository(db: DbSession) -> AdviceRepository:
     return AdviceRepository(db)
 
 
+def get_active_priority_repository(db: DbSession) -> ActivePriorityRepository:
+    """Provide active-priority repository."""
+    return ActivePriorityRepository(db)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Service Providers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -93,5 +99,6 @@ def get_advice_generator(settings: SettingsDep) -> AdviceGenerator:
 MonthRepo = Annotated[MonthRepository, Depends(get_month_repository)]
 TransactionRepo = Annotated[TransactionRepository, Depends(get_transaction_repository)]
 AdviceRepo = Annotated[AdviceRepository, Depends(get_advice_repository)]
+ActivePriorityRepo = Annotated[ActivePriorityRepository, Depends(get_active_priority_repository)]
 UploadSvc = Annotated[UploadService, Depends(get_upload_service)]
 AdviceGen = Annotated[AdviceGenerator, Depends(get_advice_generator)]

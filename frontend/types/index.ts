@@ -247,6 +247,37 @@ export interface ObservedFact {
   source: "observed_data";
 }
 
+export type ActivePriorityState =
+  | "active"
+  | "corrected"
+  | "to_confirm"
+  | "session";
+
+export interface ActivePriorityInput {
+  goal: string;
+  target: string;
+  deadline: string | null;
+}
+
+export interface ActivePriority extends ActivePriorityInput {
+  state: Exclude<ActivePriorityState, "session">;
+  last_confirmed_at: string;
+  valid_until: string;
+}
+
+export interface ActivePriorityResponse {
+  priority: ActivePriority | null;
+}
+
+export interface DeclaredFactCitation extends ActivePriorityInput {
+  fact_type: "active_priority";
+  state: Exclude<ActivePriorityState, "to_confirm">;
+  last_confirmed_at: string;
+  valid_until: string | null;
+  can_correct: true;
+  can_delete: true;
+}
+
 export interface DecisionTrace {
   summary: string;
   details: {
@@ -254,6 +285,7 @@ export interface DecisionTrace {
     calculations: string[];
     conventions: string[];
     limits: string[];
+    declared_facts: DeclaredFactCitation[];
   };
 }
 
@@ -279,10 +311,22 @@ export interface UnresolvedOutput extends DecisionOutputBase {
   conclusion: string;
 }
 
+export interface ClarificationOutput {
+  type: "clarification";
+  priority: DecisionPriority;
+  subject: string;
+  observation: string;
+  possible_effect: string;
+  question: string;
+  fact_type: "active_priority";
+  material_effects: string[];
+}
+
 export type DecisionOutput =
   | RecommendationOutput
   | NoActionOutput
-  | UnresolvedOutput;
+  | UnresolvedOutput
+  | ClarificationOutput;
 
 export interface AdviceData {
   outputs: DecisionOutput[];

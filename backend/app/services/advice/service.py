@@ -1,5 +1,7 @@
 """Advice storage and generation-data services."""
 
+from typing import Literal
+
 from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -7,7 +9,16 @@ from app.db.models.advice import Advice
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.repositories.advice import AdviceRepository
-from app.services.advice.models import AdviceResponse, MonthData, TransactionSample
+from app.services.advice.models import (
+    AdviceResponse,
+    DecisionOutput,
+    DecisionTrace,
+    DecisionTraceDetails,
+    MonthData,
+    ObservedFact,
+    TransactionSample,
+    UnresolvedOutput,
+)
 from app.services.exceptions import AdviceQueryError
 
 
@@ -146,3 +157,61 @@ def advice_response_to_json(advice: AdviceResponse) -> str:
         Storage JSON.
     """
     return advice.model_dump_json()
+
+
+def resolve_priority_clarification(
+    advice: AdviceResponse,
+    year: int,
+    month: int,
+    action: Literal["skip", "unknown"],
+) -> AdviceResponse:
+    """Replace active-priority question with persisted abstention.
+
+    Parameters
+    ----------
+    advice : AdviceResponse
+        Advice containing blocked subject.
+    year : int
+        Advice year.
+    month : int
+        Advice month.
+    action : Literal["skip", "unknown"]
+        User abstention.
+
+    Returns
+    -------
+    AdviceResponse
+        Same outputs with question replaced in place.
+    """
+    outputs: list[DecisionOutput] = []
+    for output in advice.outputs:
+        if output.type != "clarification":
+            outputs.append(output)
+            continue
+        limit = (
+            "Priorité active non fournie : question passée."
+            if action == "skip"
+            else "Priorité active inconnue selon la réponse explicite."
+        )
+        outputs.append(
+            UnresolvedOutput(
+                type="unresolved",
+                priority=output.priority,
+                conclusion=f"{output.subject} : aucune action robuste sans priorité active.",
+                trace=DecisionTrace(
+                    summary=output.possible_effect,
+                    details=DecisionTraceDetails(
+                        observations=[
+                            ObservedFact(
+                                fact=output.observation,
+                                period=f"{year}-{month:02d}",
+                                scope=output.subject,
+                                source="observed_data",
+                            )
+                        ],
+                        limits=[limit],
+                    ),
+                ),
+            )
+        )
+    return AdviceResponse(outputs=outputs)

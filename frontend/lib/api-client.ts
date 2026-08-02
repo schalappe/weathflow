@@ -1,4 +1,8 @@
+/** @module api-client Typed backend HTTP boundary. */
+
 import type {
+  ActivePriorityInput,
+  ActivePriorityResponse,
   CashFlowResponse,
   CategorizeResponse,
   GenerateAdviceResponse,
@@ -364,17 +368,99 @@ export async function getAdvice(
   return safeParseJson<GetAdviceResponse>(response);
 }
 
+/**
+ * Load declared active priority.
+ * @returns Priority lifecycle data, or null.
+ * @throws Network or API failure.
+ */
+export async function getActivePriority(): Promise<ActivePriorityResponse> {
+  const response = await fetch(
+    `${API_BASE}/api/advice/context/active-priority`,
+  );
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(response, "Failed to load active priority"),
+    );
+  }
+  return safeParseJson<ActivePriorityResponse>(response);
+}
+
+/**
+ * Create or correct active priority.
+ * @param priority - Explicit goal, target, and optional deadline.
+ * @returns Updated lifecycle data.
+ * @throws Network or API failure.
+ */
+export async function putActivePriority(
+  priority: ActivePriorityInput,
+): Promise<ActivePriorityResponse> {
+  const response = await fetch(
+    `${API_BASE}/api/advice/context/active-priority`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(priority),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(response, "Failed to save active priority"),
+    );
+  }
+  return safeParseJson<ActivePriorityResponse>(response);
+}
+
+/**
+ * Delete active priority.
+ * @returns Completion.
+ * @throws Network or API failure.
+ */
+export async function deleteActivePriority(): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/advice/context/active-priority`,
+    {
+      method: "DELETE",
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(response, "Failed to delete active priority"),
+    );
+  }
+}
+
+/**
+ * Generate advice with optional clarification answer.
+ * @param year - Advice year.
+ * @param month - Advice month.
+ * @param options - Regeneration and active-priority answer.
+ * @returns Current decision outputs.
+ * @throws Network or API failure.
+ */
+
 export async function generateAdvice(
   year: number,
   month: number,
-  regenerate: boolean = false,
+  options: {
+    regenerate?: boolean;
+    activePriority?: ActivePriorityInput;
+    rememberPriority?: boolean;
+    clarificationAction?: "skip" | "unknown";
+  } = {},
 ): Promise<GenerateAdviceResponse> {
   let response: Response;
   try {
     response = await fetch(`${API_BASE}/api/advice/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ year, month, regenerate }),
+      body: JSON.stringify({
+        year,
+        month,
+        regenerate: options.regenerate ?? false,
+        active_priority: options.activePriority,
+        remember_priority: options.rememberPriority ?? true,
+        clarification_action: options.clarificationAction,
+      }),
     });
   } catch (networkError) {
     console.error("Network error generating advice:", networkError);

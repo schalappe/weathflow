@@ -3,7 +3,7 @@
 /** @module advice-panel-content Monthly decision output loading and rendering. */
 
 import Link from "next/link";
-import { useCallback, useEffect, useReducer } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import {
   AlertCircle,
   Calculator,
@@ -11,16 +11,26 @@ import {
   Database,
   Loader2,
   RefreshCw,
+  Pencil,
   Scale,
   Sparkles,
   Upload,
+  Trash2,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { generateAdvice, getAdvice } from "@/lib/api-client";
+import {
+  deleteActivePriority,
+  generateAdvice,
+  getActivePriority,
+  getAdvice,
+  putActivePriority,
+} from "@/lib/api-client";
 import { t } from "@/lib/translations";
 import {
   cn,
@@ -29,7 +39,10 @@ import {
   getErrorMessage,
 } from "@/lib/utils";
 import type {
+  ActivePriority,
+  ActivePriorityInput,
   AdviceData,
+  ClarificationOutput,
   DecisionOutput,
   DecisionPriority,
   DecisionTrace,
@@ -125,11 +138,26 @@ export function AdvicePanelContent({
 }: AdvicePanelContentProps) {
   const [state, dispatch] = useReducer(adviceReducer, initialState);
   const [reloadKey, reload] = useReducer((value: number) => value + 1, 0);
+  const [activePriority, setActivePriority] = useState<ActivePriority | null>(
+    null,
+  );
+  const [contextError, setContextError] = useState<string | null>(null);
   const canGenerate = state.eligibility?.can_generate ?? false;
 
   useEffect(() => {
     let active = true;
     dispatch({ type: "FETCH_START" });
+    getActivePriority()
+      .then(({ priority }) => {
+        if (active) {
+          setActivePriority(priority);
+          setContextError(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (active)
+          setContextError(getErrorMessage(error, "Contexte indisponible."));
+      });
 
     getAdvice(year, month)
       .then((response) => {
@@ -163,7 +191,7 @@ export function AdvicePanelContent({
     const regenerate = state.panelState === "loaded";
     dispatch({ type: "REGENERATE_START" });
     try {
-      const response = await generateAdvice(year, month, regenerate);
+      const response = await generateAdvice(year, month, { regenerate });
       dispatch({
         type: "REGENERATE_SUCCESS",
         advice: response.advice,
@@ -178,8 +206,87 @@ export function AdvicePanelContent({
     }
   }, [year, month, state.panelState]);
 
+  const handlePriorityAnswer = useCallback(
+    async (priority: ActivePriorityInput, rememberPriority: boolean) => {
+      dispatch({ type: "REGENERATE_START" });
+      try {
+        const response = await generateAdvice(year, month, {
+          regenerate: true,
+          activePriority: priority,
+          rememberPriority,
+        });
+        dispatch({
+          type: "REGENERATE_SUCCESS",
+          advice: response.advice,
+          generatedAt: response.generated_at,
+        });
+        const context = await getActivePriority();
+        setActivePriority(context.priority);
+      } catch (error) {
+        dispatch({
+          type: "REGENERATE_ERROR",
+          error: getErrorMessage(error, t.advice.generateError),
+        });
+      }
+    },
+    [year, month],
+  );
+
+  const handleClarificationAbstention = useCallback(
+    async (clarificationAction: "skip" | "unknown") => {
+      dispatch({ type: "REGENERATE_START" });
+      try {
+        const response = await generateAdvice(year, month, {
+          regenerate: true,
+          clarificationAction,
+        });
+        dispatch({
+          type: "REGENERATE_SUCCESS",
+          advice: response.advice,
+          generatedAt: response.generated_at,
+        });
+      } catch (error) {
+        dispatch({
+          type: "REGENERATE_ERROR",
+          error: getErrorMessage(error, t.advice.generateError),
+        });
+      }
+    },
+    [year, month],
+  );
+
+  const handlePriorityCorrection = useCallback(
+    async (priority: ActivePriorityInput) => {
+      try {
+        const response = await putActivePriority(priority);
+        setActivePriority(response.priority);
+        reload();
+      } catch (error) {
+        setContextError(getErrorMessage(error, "Correction impossible."));
+      }
+    },
+    [],
+  );
+
+  const handlePriorityDeletion = useCallback(async () => {
+    if (!window.confirm("Supprimer cette priorité mémorisée ?")) return;
+    try {
+      await deleteActivePriority();
+      setActivePriority(null);
+      reload();
+    } catch (error) {
+      setContextError(getErrorMessage(error, "Suppression impossible."));
+    }
+  }, []);
+
   return (
     <div className={cn("space-y-6", className)}>
+      <ActivePriorityPanel
+        priority={activePriority}
+        error={contextError}
+        onCorrect={handlePriorityCorrection}
+        onDelete={handlePriorityDeletion}
+      />
       {state.panelState === "loading" && <AdviceSkeletonLoader />}
       {state.panelState === "empty" && (
         <EmptyState
@@ -201,9 +308,161 @@ export function AdvicePanelContent({
           isRegenerating={state.isRegenerating}
           regenerateError={state.error}
           canRegenerate={canGenerate}
+          onPriorityAnswer={handlePriorityAnswer}
+          onClarificationAbstention={handleClarificationAbstention}
+          onCorrectSession={reload}
         />
       )}
     </div>
+  );
+}
+
+interface ActivePriorityPanelProps {
+  priority: ActivePriority | null;
+  error: string | null;
+  onCorrect: (priority: ActivePriorityInput) => Promise<void>;
+  onDelete: () => Promise<void>;
+}
+
+function ActivePriorityPanel({
+  priority,
+  error,
+  onCorrect,
+  onDelete,
+}: ActivePriorityPanelProps) {
+  const [editing, setEditing] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    await onCorrect({
+      goal: String(data.get("goal")),
+      target: String(data.get("target")),
+      deadline: String(data.get("deadline")) || null,
+    });
+    setEditing(false);
+  }
+
+  return (
+    <section
+      id="active-priority-context"
+      className="space-y-4 rounded-xl border bg-muted/20 p-5"
+      aria-labelledby="active-priority-title"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h4 id="active-priority-title" className="font-semibold">
+          Contexte déclaré
+        </h4>
+        {priority && (
+          <Badge
+            variant={priority.state === "to_confirm" ? "secondary" : "outline"}
+          >
+            {priority.state === "active"
+              ? "Actif"
+              : priority.state === "corrected"
+                ? "Corrigé"
+                : "À confirmer"}
+          </Badge>
+        )}
+      </div>
+      {error && <ErrorAlert error={error} />}
+      {!priority && (
+        <p className="text-sm text-muted-foreground">
+          Aucune priorité active mémorisée.
+        </p>
+      )}
+      {priority && !editing && (
+        <>
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground">Objectif courant</dt>
+              <dd className="font-medium">{priority.goal}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Cible</dt>
+              <dd className="font-medium">{priority.target}</dd>
+            </div>
+            {priority.deadline && (
+              <div>
+                <dt className="text-muted-foreground">Échéance</dt>
+                <dd>
+                  {new Date(`${priority.deadline}T00:00:00`).toLocaleDateString(
+                    "fr-FR",
+                  )}
+                </dd>
+              </div>
+            )}
+            <div>
+              <dt className="text-muted-foreground">Dernière confirmation</dt>
+              <dd>{formatAdviceTimestamp(priority.last_confirmed_at)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Valide jusqu’au</dt>
+              <dd>
+                {new Date(priority.valid_until).toLocaleDateString("fr-FR")}
+              </dd>
+            </div>
+          </dl>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="h-4 w-4" />
+              Corriger
+            </Button>
+            <Button variant="destructive" size="sm" onClick={onDelete}>
+              <Trash2 className="h-4 w-4" />
+              Supprimer
+            </Button>
+          </div>
+        </>
+      )}
+      {priority && editing && (
+        <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
+          <div className="space-y-2">
+            <Label htmlFor="context-priority-goal">Objectif courant</Label>
+            <Input
+              id="context-priority-goal"
+              name="goal"
+              defaultValue={priority.goal}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="context-priority-target">Cible</Label>
+            <Input
+              id="context-priority-target"
+              name="target"
+              defaultValue={priority.target}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="context-priority-deadline">
+              Échéance éventuelle
+            </Label>
+            <Input
+              id="context-priority-deadline"
+              name="deadline"
+              type="date"
+              defaultValue={priority.deadline ?? ""}
+            />
+          </div>
+          <div className="flex items-end gap-2">
+            <Button type="submit">Enregistrer</Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setEditing(false)}
+            >
+              Annuler
+            </Button>
+          </div>
+        </form>
+      )}
+    </section>
   );
 }
 
@@ -318,6 +577,7 @@ const outputLabels: Record<DecisionOutput["type"], string> = {
   recommendation: t.advice.outputTypes.recommendation,
   no_action: t.advice.outputTypes.noAction,
   unresolved: t.advice.outputTypes.unresolved,
+  clarification: "Clarification",
 };
 
 const priorityLabels: Record<DecisionPriority, string> = {
@@ -378,7 +638,15 @@ function TraceList({
   );
 }
 
-function DecisionTraceDetails({ trace }: { trace: DecisionTrace }) {
+function DecisionTraceDetails({
+  trace,
+  onCorrectSession,
+  onDeleteSession,
+}: {
+  trace: DecisionTrace;
+  onCorrectSession: () => void;
+  onDeleteSession: () => Promise<void>;
+}) {
   return (
     <details className="group rounded-lg border bg-background/50 p-4">
       <summary className="cursor-pointer font-medium">
@@ -402,6 +670,75 @@ function DecisionTraceDetails({ trace }: { trace: DecisionTrace }) {
             ))}
           </ul>
         </section>
+        {trace.details.declared_facts.length > 0 && (
+          <section className="space-y-2">
+            <h6 className="flex items-center gap-2 text-sm font-medium">
+              <Sparkles className="h-4 w-4" />
+              Faits déclarés
+            </h6>
+            <ul className="space-y-3">
+              {trace.details.declared_facts.map((fact) => (
+                <li
+                  key={`${fact.fact_type}-${fact.last_confirmed_at}`}
+                  className="space-y-1 rounded-lg bg-muted/50 p-3 text-sm"
+                >
+                  <p className="font-medium">
+                    {fact.goal} — {fact.target}
+                  </p>
+                  {fact.deadline && (
+                    <p className="text-muted-foreground">
+                      Échéance :{" "}
+                      {new Date(`${fact.deadline}T00:00:00`).toLocaleDateString(
+                        "fr-FR",
+                      )}
+                    </p>
+                  )}
+                  <p className="text-muted-foreground">
+                    Statut :{" "}
+                    {fact.state === "session" ? "Cette session" : fact.state}
+                  </p>
+                  <p className="text-muted-foreground">
+                    Confirmé le {formatAdviceTimestamp(fact.last_confirmed_at)}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {fact.valid_until
+                      ? `Valide jusqu’au ${new Date(fact.valid_until).toLocaleDateString("fr-FR")}`
+                      : "Valide pour cette session"}
+                  </p>
+                  {fact.state === "session" ? (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-label="Corriger cette réponse de session"
+                        onClick={onCorrectSession}
+                      >
+                        Corriger
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        aria-label="Supprimer cette réponse de session"
+                        onClick={onDeleteSession}
+                      >
+                        Supprimer
+                      </Button>
+                    </div>
+                  ) : (
+                    <a
+                      href="#active-priority-context"
+                      className="inline-block font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      Corriger ou supprimer
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <TraceList
           title={t.advice.calculations}
           items={trace.details.calculations}
@@ -422,7 +759,127 @@ function DecisionTraceDetails({ trace }: { trace: DecisionTrace }) {
   );
 }
 
-function DecisionOutputCard({ output }: { output: DecisionOutput }) {
+type DecidedOutput = Exclude<DecisionOutput, ClarificationOutput>;
+
+interface ClarificationCardProps {
+  output: ClarificationOutput;
+  isSubmitting: boolean;
+  onAnswer: (
+    priority: ActivePriorityInput,
+    rememberPriority: boolean,
+  ) => Promise<void>;
+  onAbstain: (action: "skip" | "unknown") => Promise<void>;
+}
+
+function ClarificationCard({
+  output,
+  isSubmitting,
+  onAnswer,
+  onAbstain,
+}: ClarificationCardProps) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const submitter = (event.nativeEvent as SubmitEvent)
+      .submitter as HTMLButtonElement | null;
+    await onAnswer(
+      {
+        goal: String(data.get("goal")),
+        target: String(data.get("target")),
+        deadline: String(data.get("deadline")) || null,
+      },
+      submitter?.value === "true",
+    );
+  }
+
+  return (
+    <article className="space-y-4 rounded-xl border border-primary/30 bg-primary/5 p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge>Clarification</Badge>
+        <Badge variant="outline">{priorityLabels[output.priority]}</Badge>
+      </div>
+      <div className="space-y-2">
+        <h5 className="font-semibold">{output.question}</h5>
+        <p className="text-sm">{output.observation}</p>
+        <p className="text-sm text-muted-foreground">
+          {output.possible_effect}
+        </p>
+      </div>
+      <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+        {output.material_effects.map((effect) => (
+          <li key={effect}>{effect}</li>
+        ))}
+      </ul>
+      <Alert>
+        <AlertDescription>
+          Votre réponse sera réutilisée pour vos prochains conseils. Choisissez
+          « Cette fois seulement » pour la limiter à cette session.
+        </AlertDescription>
+      </Alert>
+      <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
+        <div className="space-y-2">
+          <Label htmlFor="priority-goal">Objectif courant</Label>
+          <Input id="priority-goal" name="goal" required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="priority-target">Cible</Label>
+          <Input id="priority-target" name="target" required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="priority-deadline">Échéance éventuelle</Label>
+          <Input id="priority-deadline" name="deadline" type="date" />
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <Button
+            type="submit"
+            name="remember"
+            value="true"
+            disabled={isSubmitting}
+          >
+            Répondre et réutiliser
+          </Button>
+          <Button
+            type="submit"
+            name="remember"
+            value="false"
+            variant="outline"
+            disabled={isSubmitting}
+          >
+            Cette fois seulement
+          </Button>
+        </div>
+      </form>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => onAbstain("unknown")}
+          disabled={isSubmitting}
+        >
+          Je ne sais pas
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => onAbstain("skip")}
+          disabled={isSubmitting}
+        >
+          Passer
+        </Button>
+      </div>
+    </article>
+  );
+}
+
+function DecisionOutputCard({
+  output,
+  onCorrectSession,
+  onDeleteSession,
+}: {
+  output: DecidedOutput;
+  onCorrectSession: () => void;
+  onDeleteSession: () => Promise<void>;
+}) {
   const title =
     output.type === "recommendation" ? output.action : output.conclusion;
   return (
@@ -438,7 +895,11 @@ function DecisionOutputCard({ output }: { output: DecisionOutput }) {
       {output.type === "recommendation" && (
         <RecommendationMetadata output={output} />
       )}
-      <DecisionTraceDetails trace={output.trace} />
+      <DecisionTraceDetails
+        trace={output.trace}
+        onCorrectSession={onCorrectSession}
+        onDeleteSession={onDeleteSession}
+      />
     </article>
   );
 }
@@ -450,6 +911,12 @@ interface AdviceContentProps {
   isRegenerating: boolean;
   regenerateError: string | null;
   canRegenerate: boolean;
+  onPriorityAnswer: (
+    priority: ActivePriorityInput,
+    rememberPriority: boolean,
+  ) => Promise<void>;
+  onClarificationAbstention: (action: "skip" | "unknown") => Promise<void>;
+  onCorrectSession: () => void;
 }
 
 function AdviceContent({
@@ -459,14 +926,32 @@ function AdviceContent({
   isRegenerating,
   regenerateError,
   canRegenerate,
+  onPriorityAnswer,
+  onClarificationAbstention,
+  onCorrectSession,
 }: AdviceContentProps) {
   return (
     <div className="space-y-6">
       {regenerateError && <ErrorAlert error={regenerateError} />}
       <div className="space-y-4">
-        {advice.outputs.map((output, index) => (
-          <DecisionOutputCard key={index} output={output} />
-        ))}
+        {advice.outputs.map((output, index) =>
+          output.type === "clarification" ? (
+            <ClarificationCard
+              key={index}
+              output={output}
+              isSubmitting={isRegenerating}
+              onAnswer={onPriorityAnswer}
+              onAbstain={onClarificationAbstention}
+            />
+          ) : (
+            <DecisionOutputCard
+              key={index}
+              output={output}
+              onCorrectSession={onCorrectSession}
+              onDeleteSession={() => onClarificationAbstention("skip")}
+            />
+          ),
+        )}
       </div>
       <Separator />
       <div className="flex items-center justify-between gap-4">
