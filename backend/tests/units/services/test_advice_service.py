@@ -42,6 +42,7 @@ def _advice() -> AdviceResponse:
             "outputs": [
                 {
                     "type": "recommendation",
+                    "income_dependent": False,
                     "priority": "high",
                     "action": "Réduire les repas au restaurant.",
                     "amount": 120,

@@ -43,6 +43,7 @@ class GenerateAdviceRequest(BaseModel):
     remember_priority: bool = True
     emergency_fund_fact: EmergencyFundFactAnswer | None = None
     commitment_fact: CommitmentFactInput | None = None
+    income_fact: IncomeFactInput | None = None
     remember_fact: bool = True
     clarification_action: Literal["skip", "unknown"] | None = None
 
@@ -162,6 +163,62 @@ class EmergencyFundContextResponse(BaseModel):
     """
 
     facts: list[EmergencyFundFactData]
+
+
+class IncomeFactLifecycle(BaseModel):
+    """Stored income lifecycle."""
+
+    state: Literal["active", "corrected", "to_confirm"]
+    last_confirmed_at: datetime
+    valid_until: datetime
+
+
+class UsualDisposableIncomeInput(BaseModel):
+    """Habitual disposable income."""
+
+    fact_type: Literal["usual_disposable_income"]
+    amount: float = Field(gt=0, allow_inf_nan=False)
+    frequency: Literal["weekly", "biweekly", "monthly", "quarterly", "yearly"]
+
+
+class ExpectedOneOffIncomeInput(BaseModel):
+    """Dated expected income."""
+
+    fact_type: Literal["expected_one_off_income"]
+    amount: float = Field(gt=0, allow_inf_nan=False)
+    expected_date: date
+
+
+IncomeFactInput = Annotated[
+    UsualDisposableIncomeInput | ExpectedOneOffIncomeInput,
+    Field(discriminator="fact_type"),
+]
+
+
+class UsualDisposableIncomeData(UsualDisposableIncomeInput, IncomeFactLifecycle):
+    """Stored habitual income."""
+
+
+class ExpectedOneOffIncomeData(ExpectedOneOffIncomeInput, IncomeFactLifecycle):
+    """Stored expected income."""
+
+
+IncomeFactData = Annotated[
+    UsualDisposableIncomeData | ExpectedOneOffIncomeData,
+    Field(discriminator="fact_type"),
+]
+
+
+class IncomeFactResponse(BaseModel):
+    """One stored income fact."""
+
+    fact: IncomeFactData
+
+
+class IncomeContextResponse(BaseModel):
+    """Stored income facts."""
+
+    facts: list[IncomeFactData]
 
 
 CommitmentFactType = Literal[

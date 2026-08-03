@@ -132,6 +132,7 @@ def test_feasible_debt_minimum_stays_prioritized_when_savings_need_clarification
         "outputs": [
             {
                 "type": "recommendation",
+                "income_dependent": False,
                 "priority": "high",
                 "action": "Payer le minimum exigible du prêt auto.",
                 "amount": 250,
@@ -215,6 +216,7 @@ def test_session_commitment_replaces_stored_value_for_current_generation(
             "outputs": [
                 {
                     "type": "recommendation",
+                    "income_dependent": False,
                     "priority": "high",
                     "action": "Payer le minimum corrigé.",
                     "amount": fact.minimum_payment,

@@ -7,6 +7,7 @@ from pydantic import ConfigDict, Field, model_validator
 
 from app.db.models.emergency_fund_fact import EmergencyFundFactType
 from app.repositories.commitment_fact import CommitmentFactType
+from app.repositories.income_fact import IncomeFactType
 from app.services.models import FrozenModel
 
 
@@ -17,14 +18,20 @@ class TransactionSample(FrozenModel):
     ----------
     description : str
         Transaction label.
+    transaction_id : int
+        Stable observed identifier.
     amount : float
         Absolute amount.
     subcategory : str | None
         Money Map subcategory.
+    date : date
+        Booking date.
     """
 
+    transaction_id: int
     description: str
     amount: float
+    date: date
     subcategory: str | None = None
 
 
@@ -237,6 +244,39 @@ class CommitmentFactContext(DecisionModel):
         return self
 
 
+class IncomeFactContext(DecisionModel):
+    """Declared income available to generation."""
+
+    fact_type: IncomeFactType
+    amount: float = Field(gt=0, allow_inf_nan=False)
+    frequency: Literal["weekly", "biweekly", "monthly", "quarterly", "yearly"] | None = None
+    expected_date: date | None = None
+    matched_transaction: bool = False
+    state: Literal["active", "corrected", "to_confirm", "session"]
+    last_confirmed_at: datetime
+    valid_until: datetime | None
+
+    @model_validator(mode="after")
+    def require_variant_fields(self) -> Self:
+        """Reject incomplete income variants.
+
+        Returns
+        -------
+        Self
+            Validated fact.
+
+        Raises
+        ------
+        ValueError
+            Variant-specific field is absent.
+        """
+        if self.fact_type == "usual_disposable_income" and self.frequency is None:
+            raise ValueError("usual_disposable_income requires frequency")
+        if self.fact_type == "expected_one_off_income" and self.expected_date is None:
+            raise ValueError("expected_one_off_income requires expected_date")
+        return self
+
+
 class AdviceContext(DecisionModel):
     """Declared facts and remaining clarification budget.
 
@@ -255,6 +295,7 @@ class AdviceContext(DecisionModel):
     active_priority: ActivePriorityContext | None = None
     emergency_fund_facts: list[EmergencyFundFactContext] = Field(default_factory=list)
     commitment_facts: list[CommitmentFactContext] = Field(default_factory=list)
+    income_facts: list[IncomeFactContext] = Field(default_factory=list)
     clarifications_remaining: int = Field(default=3, ge=0, le=3)
 
 
@@ -315,10 +356,83 @@ class CommitmentFactCitation(CommitmentFactContext):
     can_delete: Literal[True]
 
 
+class IncomeFactCitation(IncomeFactContext):
+    """Income fact cited by decision."""
+
+    state: Literal["active", "corrected", "session"]
+    can_correct: Literal[True]
+    can_delete: Literal[True]
+
+
 DeclaredFactCitation = Annotated[
-    ActivePriorityCitation | EmergencyFundFactCitation | CommitmentFactCitation,
+    ActivePriorityCitation | EmergencyFundFactCitation | CommitmentFactCitation | IncomeFactCitation,
     Field(discriminator="fact_type"),
 ]
+
+
+class IncomeNormalization(DecisionModel):
+    """Structured income conversion used by a decision.
+
+    Attributes
+    ----------
+    fact_type : IncomeFactType
+        Declared source key.
+    source_amount : float
+        Declared amount before conversion.
+    source_frequency : Literal | None
+        Declared recurrence, absent for one-off income.
+    period : str
+        Applicable month or exact expected date.
+    conversion : Literal
+        Canonical conversion rule.
+    normalized_amount : float
+        Amount after conversion.
+    """
+
+    fact_type: IncomeFactType
+    source_amount: float = Field(gt=0, allow_inf_nan=False)
+    source_frequency: Literal["weekly", "biweekly", "monthly", "quarterly", "yearly"] | None = None
+    period: str = Field(pattern=r"^\d{4}-\d{2}(?:-\d{2})?$")
+    conversion: Literal[
+        "weekly_x_52_div_12",
+        "biweekly_x_26_div_12",
+        "monthly",
+        "quarterly_div_3",
+        "yearly_div_12",
+        "one_off",
+    ]
+    normalized_amount: float = Field(gt=0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def require_variant_fields(self) -> Self:
+        """Reject mismatched source and conversion variants.
+
+        Returns
+        -------
+        Self
+            Valid normalization.
+
+        Raises
+        ------
+        ValueError
+            Source variant and conversion disagree.
+        """
+        if self.fact_type == "expected_one_off_income":
+            if self.source_frequency is not None or self.conversion != "one_off" or len(self.period) != 10:
+                raise ValueError("expected income requires one-off dated normalization")
+            return self
+        if self.source_frequency is None:
+            raise ValueError("habitual income requires a source frequency")
+        expected_conversion = {
+            "weekly": "weekly_x_52_div_12",
+            "biweekly": "biweekly_x_26_div_12",
+            "monthly": "monthly",
+            "quarterly": "quarterly_div_3",
+            "yearly": "yearly_div_12",
+        }[self.source_frequency]
+        if self.conversion != expected_conversion or len(self.period) != 7:
+            raise ValueError("habitual income requires matching monthly normalization")
+        return self
 
 
 class DecisionTraceDetails(DecisionModel):
@@ -332,6 +446,8 @@ class DecisionTraceDetails(DecisionModel):
         Reproducible derivations.
     conventions : list[str]
         Contestable rules.
+    income_normalizations : list[IncomeNormalization]
+        Structured income conversions.
     limits : list[str]
         Data limits.
     """
@@ -340,6 +456,7 @@ class DecisionTraceDetails(DecisionModel):
     calculations: list[str] = Field(default_factory=list)
     conventions: list[str] = Field(default_factory=list)
     limits: list[str] = Field(default_factory=list)
+    income_normalizations: list[IncomeNormalization] = Field(default_factory=list)
     declared_facts: list[DeclaredFactCitation] = Field(default_factory=list)
 
 
@@ -369,6 +486,8 @@ class RecommendationOutput(DecisionModel):
         Decision priority.
     action : str
         Supported action.
+    income_dependent : bool
+        Whether amount or deadline derives from income.
     amount : float | None
         Derived amount only.
     deadline : date | None
@@ -380,6 +499,7 @@ class RecommendationOutput(DecisionModel):
     type: Literal["recommendation"]
     priority: Literal["high", "medium", "low"]
     action: str = Field(min_length=1)
+    income_dependent: bool
     amount: float | None = Field(default=None, gt=0, exclude_if=lambda value: value is None)
     deadline: date | None = Field(default=None, exclude_if=lambda value: value is None)
     trace: DecisionTrace
@@ -486,6 +606,8 @@ class ClarificationOutput(DecisionModel):
         "one_off_obligation",
         "debt_position",
         "debt_terms",
+        "usual_disposable_income",
+        "expected_one_off_income",
     ]
     material_effects: list[str] = Field(min_length=2)
 

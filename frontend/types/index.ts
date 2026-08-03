@@ -274,6 +274,10 @@ export type EmergencyFundFactType =
   | "safety_floor"
   | "priority_allocation";
 
+export type IncomeFactType =
+  | "usual_disposable_income"
+  | "expected_one_off_income";
+
 export type CommitmentFactType =
   | "recurring_obligation"
   | "one_off_obligation"
@@ -283,7 +287,8 @@ export type CommitmentFactType =
 export type DeclaredFactType =
   | "active_priority"
   | EmergencyFundFactType
-  | CommitmentFactType;
+  | CommitmentFactType
+  | IncomeFactType;
 
 export interface EmergencyFundFactInput {
   fact_type: EmergencyFundFactType;
@@ -304,6 +309,42 @@ export interface EmergencyFundFactResponse {
   fact: EmergencyFundFact;
 }
 
+export type IncomeFrequency =
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "quarterly"
+  | "yearly";
+
+export interface UsualDisposableIncomeInput {
+  fact_type: "usual_disposable_income";
+  amount: number;
+  frequency: IncomeFrequency;
+}
+
+export interface ExpectedOneOffIncomeInput {
+  fact_type: "expected_one_off_income";
+  amount: number;
+  expected_date: string;
+}
+
+export type IncomeFactInput =
+  | UsualDisposableIncomeInput
+  | ExpectedOneOffIncomeInput;
+
+export type IncomeFact = IncomeFactInput & {
+  state: Exclude<ActivePriorityState, "session">;
+  last_confirmed_at: string;
+  valid_until: string;
+};
+
+export interface IncomeContextResponse {
+  facts: IncomeFact[];
+}
+
+export interface IncomeFactResponse {
+  fact: IncomeFact;
+}
 export type CommitmentFrequency =
   | "weekly"
   | "biweekly"
@@ -389,10 +430,43 @@ export type CommitmentFactCitation = CommitmentFactInput & {
   can_delete: true;
 };
 
+type IncomeCitationLifecycle = {
+  matched_transaction: boolean;
+  state: Exclude<ActivePriorityState, "to_confirm">;
+  last_confirmed_at: string;
+  valid_until: string | null;
+  can_correct: true;
+  can_delete: true;
+};
+
+export type IncomeFactCitation =
+  | (UsualDisposableIncomeInput & {
+      expected_date: null;
+    } & IncomeCitationLifecycle)
+  | (ExpectedOneOffIncomeInput & {
+      frequency: null;
+    } & IncomeCitationLifecycle);
+
 export type DeclaredFactCitation =
   | ActivePriorityCitation
   | EmergencyFundFactCitation
-  | CommitmentFactCitation;
+  | CommitmentFactCitation
+  | IncomeFactCitation;
+
+export interface IncomeNormalization {
+  fact_type: IncomeFactType;
+  source_amount: number;
+  source_frequency: IncomeFrequency | null;
+  period: string;
+  conversion:
+    | "weekly_x_52_div_12"
+    | "biweekly_x_26_div_12"
+    | "monthly"
+    | "quarterly_div_3"
+    | "yearly_div_12"
+    | "one_off";
+  normalized_amount: number;
+}
 
 export interface DecisionTrace {
   summary: string;
@@ -401,6 +475,7 @@ export interface DecisionTrace {
     calculations: string[];
     conventions: string[];
     limits: string[];
+    income_normalizations: IncomeNormalization[];
     declared_facts: DeclaredFactCitation[];
   };
 }
@@ -413,6 +488,7 @@ interface DecisionOutputBase {
 export interface RecommendationOutput extends DecisionOutputBase {
   type: "recommendation";
   action: string;
+  income_dependent: boolean;
   amount?: number;
   deadline?: string;
 }

@@ -10,6 +10,10 @@ import type {
   EmergencyFundFactInput,
   EmergencyFundFactResponse,
   EmergencyFundFactType,
+  IncomeContextResponse,
+  IncomeFactInput,
+  IncomeFactResponse,
+  IncomeFactType,
   CashFlowResponse,
   CategorizeResponse,
   GenerateAdviceResponse,
@@ -505,6 +509,63 @@ export async function deleteEmergencyFundFact(
 }
 
 /**
+ * Load declared income facts.
+ * @returns Stored facts, including expired values.
+ * @throws Network or API failure.
+ */
+export async function getIncomeContext(): Promise<IncomeContextResponse> {
+  const response = await fetch(`${API_BASE}/api/advice/context/income`);
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(response, "Failed to load income context"),
+    );
+  }
+  return safeParseJson<IncomeContextResponse>(response);
+}
+
+/**
+ * Create, correct, or reconfirm income.
+ * @param fact - Habitual or dated expected income.
+ * @returns Updated lifecycle data.
+ * @throws Network or API failure.
+ */
+export async function putIncomeFact(
+  fact: IncomeFactInput,
+): Promise<IncomeFactResponse> {
+  const response = await fetch(`${API_BASE}/api/advice/context/income`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fact),
+  });
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(response, "Failed to save income fact"),
+    );
+  }
+  return safeParseJson<IncomeFactResponse>(response);
+}
+
+/**
+ * Delete declared income.
+ * @param factType - Income fact key.
+ * @returns Completion.
+ * @throws Network or API failure.
+ */
+export async function deleteIncomeFact(
+  factType: IncomeFactType,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/advice/context/income/${factType}`,
+    { method: "DELETE" },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(response, "Failed to delete income fact"),
+    );
+  }
+}
+
+/**
  * Fetch obligations and debt facts.
  * @returns Stored facts, including expired values.
  * @throws Network or API failure.
@@ -582,6 +643,7 @@ export async function generateAdvice(
     rememberPriority?: boolean;
     emergencyFundFact?: EmergencyFundFactInput;
     commitmentFact?: CommitmentFactInput;
+    incomeFact?: IncomeFactInput;
     rememberFact?: boolean;
     clarificationAction?: "skip" | "unknown";
   } = {},
@@ -599,9 +661,11 @@ export async function generateAdvice(
         remember_priority: options.rememberPriority ?? true,
         emergency_fund_fact: options.emergencyFundFact,
         commitment_fact: options.commitmentFact,
+        income_fact: options.incomeFact,
         remember_fact:
           options.emergencyFundFact === undefined &&
-          options.commitmentFact === undefined
+          options.commitmentFact === undefined &&
+          options.incomeFact === undefined
             ? undefined
             : (options.rememberFact ?? true),
         clarification_action: options.clarificationAction,

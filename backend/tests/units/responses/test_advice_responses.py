@@ -36,6 +36,7 @@ def test_parses_recommendation_with_auditable_trace() -> None:
                 "outputs": [
                     {
                         "type": "recommendation",
+                        "income_dependent": False,
                         "priority": "high",
                         "action": "Réduire les repas au restaurant à la moyenne récente.",
                         "amount": 120,
@@ -95,6 +96,7 @@ def test_omits_underived_recommendation_amount_and_deadline() -> None:
             "outputs": [
                 {
                     "type": "recommendation",
+                    "income_dependent": False,
                     "priority": "low",
                     "action": "Maintenir la trajectoire actuelle.",
                     "trace": _trace([]),
@@ -116,6 +118,7 @@ def test_rejects_amount_without_deriving_calculation() -> None:
                 "outputs": [
                     {
                         "type": "recommendation",
+                        "income_dependent": False,
                         "priority": "high",
                         "action": "Réduire les repas au restaurant.",
                         "amount": 120,

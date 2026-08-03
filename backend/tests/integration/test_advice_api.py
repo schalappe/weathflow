@@ -59,6 +59,7 @@ def _advice(output_type: str = "recommendation") -> AdviceResponse:
     }
     if output_type == "recommendation":
         common.update(
+            income_dependent=False,
             action="Réduire les repas au restaurant à la moyenne récente.",
             amount=120,
             deadline="2025-11-30",

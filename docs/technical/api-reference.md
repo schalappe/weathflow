@@ -560,17 +560,25 @@ Content-Type: application/json
 {
   "year": 2025,
   "month": 1,
-  "regenerate": false
+  "regenerate": true,
+  "income_fact": {
+    "fact_type": "usual_disposable_income",
+    "amount": 3200,
+    "frequency": "monthly"
+  },
+  "remember_fact": true
 }
 ```
 
 **Fields:**
 
-| Field        | Type    | Required | Default | Description                         |
-| ------------ | ------- | -------- | ------- | ----------------------------------- |
-| `year`       | Integer | Yes      | -       | 4-digit year                        |
-| `month`      | Integer | Yes      | -       | 1-2 digit month                     |
-| `regenerate` | Boolean | No       | false   | Force new generation (ignore cache) |
+| Field           | Type    | Required | Default | Description                                     |
+| --------------- | ------- | -------- | ------- | ----------------------------------------------- |
+| `year`          | Integer | Yes      | -       | 4-digit year                                    |
+| `month`         | Integer | Yes      | -       | 1-2 digit month                                 |
+| `regenerate`    | Boolean | No       | false   | Force new generation (ignore cache)             |
+| `income_fact`   | Object  | No       | null    | Habitual or dated expected income clarification |
+| `remember_fact` | Boolean | No       | true    | Reuse clarification beyond the current session  |
 
 **Response (Cached):** `200 OK`
 
@@ -647,6 +655,41 @@ curl -X POST http://localhost:8000/api/advice/generate \
   -H "Content-Type: application/json" \
   -d '{"year": 2025, "month": 1, "regenerate": true}'
 ```
+
+---
+
+### Declared Income Context
+
+```http
+GET /api/advice/context/income
+PUT /api/advice/context/income
+DELETE /api/advice/context/income/{fact_type}
+```
+
+`GET` returns habitual and expected income facts, including inactive expired
+values. `PUT` creates, corrects, or reconfirms one fact:
+
+```json
+{
+  "fact_type": "expected_one_off_income",
+  "amount": 1500,
+  "expected_date": "2026-08-15"
+}
+```
+
+`usual_disposable_income` requires `amount` and `frequency` (`weekly`,
+`biweekly`, `monthly`, `quarterly`, or `yearly`) and expires after 90 days.
+`expected_one_off_income` requires `amount` and `expected_date` and expires at
+the end of that date. Expired facts remain visible with `state: "to_confirm"`.
+
+Income-dependent recommendations set `income_dependent: true` and include one
+validated `income_normalizations` record per cited income: source amount,
+frequency, period, canonical conversion, and normalized amount. Exact
+amount/date matches remove one observed entry before generation and expose
+`matched_transaction: true`.
+
+`DELETE` accepts either fact type and invalidates advice that cited or requested
+it.
 
 ---
 

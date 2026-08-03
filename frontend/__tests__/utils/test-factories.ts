@@ -87,6 +87,7 @@ export function createMockRecommendationOutput(
     type: "recommendation",
     priority: "high",
     action: "Réduire les repas au restaurant à la moyenne récente.",
+    income_dependent: false,
     amount: 120,
     deadline: "2026-01-31",
     trace: {
@@ -103,6 +104,7 @@ export function createMockRecommendationOutput(
         calculations: ["240 € - 120 € = 120 € d'écart mensuel."],
         conventions: ["Écart supérieur à 20 % considéré matériel."],
         limits: ["Trois mois observés seulement."],
+        income_normalizations: [],
         declared_facts: [],
       },
     },

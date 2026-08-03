@@ -79,6 +79,7 @@ def test_expired_priority_stays_visible_but_invalidates_dependent_advice(
             "outputs": [
                 {
                     "type": "recommendation",
+                    "income_dependent": False,
                     "priority": "high",
                     "action": "Affecter l'épargne au fonds d'urgence.",
                     "trace": {

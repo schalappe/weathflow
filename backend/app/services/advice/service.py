@@ -1,5 +1,7 @@
 """Advice storage and generation-data services."""
 
+from datetime import UTC
+from math import isclose
 from typing import Any, Literal, cast
 
 from loguru import logger
@@ -7,22 +9,27 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.models.advice import Advice
 from app.db.models.commitment_fact import CommitmentFact
+from app.db.models.income_fact import IncomeFact
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.repositories.advice import AdviceRepository
 from app.repositories.commitment_fact import CommitmentFactRepository, CommitmentFactType
+from app.repositories.income_fact import IncomeFactRepository, IncomeFactType
 from app.services.advice.models import (
     AdviceResponse,
     CommitmentFactContext,
     DecisionOutput,
     DecisionTrace,
     DecisionTraceDetails,
+    IncomeFactCitation,
+    IncomeFactContext,
     MonthData,
     ObservedFact,
     TransactionSample,
     UnresolvedOutput,
 )
-from app.services.exceptions import AdviceQueryError
+from app.services.calculation.service import calculate_month_stats
+from app.services.exceptions import AdviceParseError, AdviceQueryError
 
 
 def get_advice_by_month_id(advice_repo: AdviceRepository, month_id: int) -> Advice | None:
@@ -86,7 +93,7 @@ def create_or_update_advice(advice_repo: AdviceRepository, month_id: int, advice
 
 
 def _extract_all_transactions(transactions: list[Transaction]) -> dict[str, list[TransactionSample]]:
-    """Group observed expenses.
+    """Group observed transactions.
 
     Parameters
     ----------
@@ -96,9 +103,9 @@ def _extract_all_transactions(transactions: list[Transaction]) -> dict[str, list
     Returns
     -------
     dict[str, list[TransactionSample]]
-        Expenses grouped by Money Map category.
+        Transactions grouped by Money Map category.
     """
-    categories = {"CORE", "CHOICE", "COMPOUND"}
+    categories = {"INCOME", "CORE", "CHOICE", "COMPOUND"}
     grouped: dict[str, list[Transaction]] = {category: [] for category in categories}
     for transaction in transactions:
         if transaction.money_map_type in categories:
@@ -107,8 +114,10 @@ def _extract_all_transactions(transactions: list[Transaction]) -> dict[str, list
     return {
         category: [
             TransactionSample(
+                transaction_id=transaction.id,
                 description=transaction.description,
                 amount=abs(transaction.amount),
+                date=transaction.date,
                 subcategory=transaction.money_map_subcategory,
             )
             for transaction in sorted(items, key=lambda item: abs(item.amount), reverse=True)
@@ -360,6 +369,287 @@ def prepare_commitment_context(
     return contexts
 
 
+def income_fact_context(fact: IncomeFact) -> IncomeFactContext:
+    """Map persisted income to generation context.
+
+    Parameters
+    ----------
+    fact : IncomeFact
+        Stored income.
+
+    Returns
+    -------
+    IncomeFactContext
+        Typed generation fact.
+    """
+    return IncomeFactContext.model_validate(
+        {
+            "fact_type": fact.fact_type,
+            "amount": fact.amount,
+            "frequency": fact.frequency,
+            "expected_date": fact.expected_date,
+            "state": fact.state,
+            "last_confirmed_at": fact.last_confirmed_at.replace(tzinfo=UTC),
+            "valid_until": fact.valid_until.replace(tzinfo=UTC),
+        }
+    )
+
+
+def load_income_context(
+    fact_repo: IncomeFactRepository,
+    advice_repo: AdviceRepository,
+) -> list[IncomeFactContext]:
+    """Load income and invalidate advice citing stale facts.
+
+    Parameters
+    ----------
+    fact_repo : IncomeFactRepository
+        Income persistence.
+    advice_repo : AdviceRepository
+        Advice persistence.
+
+    Returns
+    -------
+    list[IncomeFactContext]
+        Stored facts, including inactive values.
+    """
+    facts = fact_repo.get_all()
+    for fact in facts:
+        if fact.state == "to_confirm":
+            advice_repo.delete_depending_on_declared_fact(fact.fact_type)
+    return [income_fact_context(fact) for fact in facts]
+
+
+def put_income_fact(
+    fact_repo: IncomeFactRepository,
+    advice_repo: AdviceRepository,
+    values: dict[str, Any],
+) -> IncomeFact:
+    """Store income and invalidate dependent advice.
+
+    Parameters
+    ----------
+    fact_repo : IncomeFactRepository
+        Income persistence.
+    advice_repo : AdviceRepository
+        Advice persistence.
+    values : dict[str, Any]
+        Validated income fields.
+
+    Returns
+    -------
+    IncomeFact
+        Stored fact.
+    """
+    fact_type = cast(IncomeFactType, values["fact_type"])
+    advice_repo.delete_depending_on_declared_fact(fact_type)
+    return fact_repo.put(values)
+
+
+def delete_income_fact(
+    fact_repo: IncomeFactRepository,
+    advice_repo: AdviceRepository,
+    fact_type: IncomeFactType,
+) -> None:
+    """Delete income and invalidate dependent advice.
+
+    Parameters
+    ----------
+    fact_repo : IncomeFactRepository
+        Income persistence.
+    advice_repo : AdviceRepository
+        Advice persistence.
+    fact_type : IncomeFactType
+        Fact key.
+    """
+    fact_repo.delete(fact_type)
+    advice_repo.delete_depending_on_declared_fact(fact_type)
+
+
+def prepare_income_context(
+    fact_repo: IncomeFactRepository,
+    advice_repo: AdviceRepository,
+    answer: IncomeFactContext | None,
+    remember: bool,
+) -> list[IncomeFactContext]:
+    """Apply optional answer to stored income context.
+
+    Parameters
+    ----------
+    fact_repo : IncomeFactRepository
+        Income persistence.
+    advice_repo : AdviceRepository
+        Advice persistence.
+    answer : IncomeFactContext | None
+        Request-scoped income.
+    remember : bool
+        Persist answer when true.
+
+    Returns
+    -------
+    list[IncomeFactContext]
+        Current generation context.
+    """
+    contexts = load_income_context(fact_repo, advice_repo)
+    if answer is None:
+        return contexts
+    contexts = [context for context in contexts if context.fact_type != answer.fact_type]
+    if remember:
+        fields = {"fact_type", "amount", "frequency", "expected_date"}
+        contexts.append(
+            income_fact_context(
+                put_income_fact(
+                    fact_repo,
+                    advice_repo,
+                    answer.model_dump(include=fields),
+                )
+            )
+        )
+    else:
+        fact_repo.mark_to_confirm(answer.fact_type)
+        advice_repo.delete_depending_on_declared_fact(answer.fact_type)
+        contexts.append(answer)
+    return contexts
+
+
+def deduplicate_expected_income(
+    contexts: list[IncomeFactContext],
+    months: list[MonthData],
+) -> tuple[list[IncomeFactContext], list[MonthData]]:
+    """Remove matched observation; declaration remains sole income input.
+
+    Parameters
+    ----------
+    contexts : list[IncomeFactContext]
+        Declared income.
+    months : list[MonthData]
+        Observed generation data.
+
+    Returns
+    -------
+    tuple[list[IncomeFactContext], list[MonthData]]
+        Match-marked context and neutralized observations.
+    """
+    updated_contexts: list[IncomeFactContext] = []
+    updated_months = list(months)
+    for context in contexts:
+        matched = False
+        if context.fact_type == "expected_one_off_income" and context.state != "to_confirm":
+            for month_index, month in enumerate(updated_months):
+                transactions = month.transactions or {}
+                incomes = transactions.get("INCOME", [])
+                matching = [
+                    (index, transaction)
+                    for index, transaction in enumerate(incomes)
+                    if transaction.date == context.expected_date and transaction.amount == context.amount
+                ]
+                match_index = min(matching, key=lambda item: item[1].transaction_id)[0] if matching else None
+                if match_index is None:
+                    continue
+                matched = True
+                updated_transactions = dict(transactions)
+                updated_transactions["INCOME"] = [
+                    transaction for index, transaction in enumerate(incomes) if index != match_index
+                ]
+                adjusted = calculate_month_stats(
+                    max(0, month.total_income - context.amount),
+                    month.total_core,
+                    month.total_choice,
+                )
+                updated_months[month_index] = month.model_copy(
+                    update={
+                        **adjusted.model_dump(exclude={"score_label"}),
+                        "score_label": adjusted.score_label.value,
+                        "transactions": updated_transactions,
+                    }
+                )
+                break
+        updated_contexts.append(context.model_copy(update={"matched_transaction": matched}))
+    return updated_contexts, updated_months
+
+
+def validate_income_usage(
+    advice: AdviceResponse,
+    contexts: list[IncomeFactContext],
+    year: int,
+    month: int,
+) -> None:
+    """Reject inactive, untraced, or inconsistent income use.
+
+    Parameters
+    ----------
+    advice : AdviceResponse
+        Parsed generator output.
+    contexts : list[IncomeFactContext]
+        Current declared income.
+    year : int
+        Advice year.
+    month : int
+        Advice month.
+
+    Raises
+    ------
+    AdviceParseError
+        Income dependency lacks active matching normalization.
+    """
+    active = {
+        context.fact_type: context for context in contexts if context.state in {"active", "corrected", "session"}
+    }
+    rules = {
+        "weekly": ("weekly_x_52_div_12", 52 / 12),
+        "biweekly": ("biweekly_x_26_div_12", 26 / 12),
+        "monthly": ("monthly", 1),
+        "quarterly": ("quarterly_div_3", 1 / 3),
+        "yearly": ("yearly_div_12", 1 / 12),
+    }
+    for output in advice.outputs:
+        if output.type == "clarification":
+            continue
+        citations = [
+            citation for citation in output.trace.details.declared_facts if isinstance(citation, IncomeFactCitation)
+        ]
+        normalizations = output.trace.details.income_normalizations
+        if (
+            output.type == "recommendation"
+            and output.income_dependent != bool(citations)
+            or len(normalizations) != len(citations)
+        ):
+            raise AdviceParseError(advice.model_dump_json())
+        for citation in citations:
+            source = active.get(citation.fact_type)
+            normalization = next(
+                (item for item in normalizations if item.fact_type == citation.fact_type),
+                None,
+            )
+            if source is None or normalization is None:
+                raise AdviceParseError(advice.model_dump_json())
+            if citation.fact_type == "expected_one_off_income":
+                expected_conversion = "one_off"
+                expected_amount = citation.amount
+                expected_period = citation.expected_date.isoformat() if citation.expected_date else ""
+            else:
+                rule = rules.get(citation.frequency or "")
+                if rule is None:
+                    raise AdviceParseError(advice.model_dump_json())
+                expected_conversion, factor = rule
+                expected_amount = citation.amount * factor
+                expected_period = f"{year}-{month:02d}"
+            if (
+                citation.amount != source.amount
+                or citation.frequency != source.frequency
+                or citation.expected_date != source.expected_date
+                or citation.matched_transaction != source.matched_transaction
+                or normalization.source_amount != citation.amount
+                or normalization.source_frequency != citation.frequency
+                or normalization.conversion != expected_conversion
+                or normalization.period != expected_period
+                or not isclose(normalization.normalized_amount, expected_amount, rel_tol=0, abs_tol=0.005)
+                or not output.trace.details.calculations
+                or not output.trace.details.conventions
+            ):
+                raise AdviceParseError(advice.model_dump_json())
+
+
 def resolve_clarification(
     advice: AdviceResponse,
     year: int,
@@ -398,6 +688,8 @@ def resolve_clarification(
             "one_off_obligation": "obligation ponctuelle",
             "debt_position": "position de dette",
             "debt_terms": "conditions de dette",
+            "usual_disposable_income": "revenu disponible habituel",
+            "expected_one_off_income": "entrée exceptionnelle attendue",
         }[output.fact_type]
         limit = (
             f"Information non fournie ({label}) : question passée."

@@ -197,7 +197,8 @@ class AdviceGenerator:
             # ##>: Include all transactions for pattern analysis and personalized recommendations.
             if month.transactions:
                 month_dict["transactions"] = {
-                    category: [tx.model_dump() for tx in txs] for category, txs in month.transactions.items()
+                    category: [tx.model_dump(mode="json") for tx in txs]
+                    for category, txs in month.transactions.items()
                 }
 
             months_data.append(month_dict)

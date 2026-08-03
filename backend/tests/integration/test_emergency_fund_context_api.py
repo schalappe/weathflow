@@ -134,6 +134,7 @@ def test_canonical_emergency_fund_trajectory_reaches_generation_and_trace(
         "outputs": [
             {
                 "type": "recommendation",
+                "income_dependent": False,
                 "priority": "high",
                 "action": "Affecter 700 € par mois au fonds d'urgence.",
                 "amount": 700,

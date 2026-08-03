@@ -28,14 +28,17 @@ import {
   deleteActivePriority,
   deleteCommitmentFact,
   deleteEmergencyFundFact,
+  deleteIncomeFact,
   generateAdvice,
   getCommitmentContext,
   getEmergencyFundContext,
+  getIncomeContext,
   getActivePriority,
   getAdvice,
   putActivePriority,
   putCommitmentFact,
   putEmergencyFundFact,
+  putIncomeFact,
 } from "@/lib/api-client";
 import { t } from "@/lib/translations";
 import {
@@ -56,6 +59,11 @@ import type {
   EmergencyFundFact,
   EmergencyFundFactInput,
   EmergencyFundFactType,
+  IncomeFact,
+  IncomeFactCitation,
+  IncomeFactInput,
+  IncomeFactType,
+  IncomeFrequency,
   ClarificationOutput,
   DecisionOutput,
   DecisionPriority,
@@ -124,6 +132,54 @@ const commitmentFactTypes: Record<CommitmentFactType, true> = {
   debt_position: true,
   debt_terms: true,
 };
+
+const incomeFactLabels: Record<IncomeFactType, string> = {
+  usual_disposable_income: "Revenu disponible habituel",
+  expected_one_off_income: "Entrée exceptionnelle attendue",
+};
+
+const incomeFrequencyLabels: Record<IncomeFrequency, string> = {
+  weekly: "Hebdomadaire",
+  biweekly: "Toutes les deux semaines",
+  monthly: "Mensuelle",
+  quarterly: "Trimestrielle",
+  yearly: "Annuelle",
+};
+
+function isIncomeFactType(factType: string): factType is IncomeFactType {
+  return (
+    factType === "usual_disposable_income" ||
+    factType === "expected_one_off_income"
+  );
+}
+
+function isIncomeFact(fact: DeclaredFactCitation): fact is IncomeFactCitation {
+  return isIncomeFactType(fact.fact_type);
+}
+
+function incomeInputFromForm(
+  factType: IncomeFactType,
+  data: FormData,
+): IncomeFactInput {
+  const amount = Number(data.get("amount"));
+  return factType === "usual_disposable_income"
+    ? {
+        fact_type: factType,
+        amount,
+        frequency: String(data.get("frequency")) as IncomeFrequency,
+      }
+    : {
+        fact_type: factType,
+        amount,
+        expected_date: String(data.get("expected_date")),
+      };
+}
+
+function incomeFactSummary(fact: IncomeFactInput): string {
+  return fact.fact_type === "usual_disposable_income"
+    ? `${incomeFactLabels[fact.fact_type]} — ${formatCurrency(fact.amount)} / ${incomeFrequencyLabels[fact.frequency].toLowerCase()}`
+    : `${incomeFactLabels[fact.fact_type]} — ${formatCurrency(fact.amount)} le ${new Date(`${fact.expected_date}T00:00:00`).toLocaleDateString("fr-FR")}`;
+}
 
 function isCommitmentFactType(
   factType: string,
@@ -260,6 +316,7 @@ export function AdvicePanelContent({
     EmergencyFundFact[]
   >([]);
   const [commitmentFacts, setCommitmentFacts] = useState<CommitmentFact[]>([]);
+  const [incomeFacts, setIncomeFacts] = useState<IncomeFact[]>([]);
   const [contextError, setContextError] = useState<string | null>(null);
   const canGenerate = state.eligibility?.can_generate ?? false;
 
@@ -270,15 +327,24 @@ export function AdvicePanelContent({
       getActivePriority(),
       getEmergencyFundContext(),
       getCommitmentContext(),
+      getIncomeContext(),
     ])
-      .then(([{ priority }, emergencyFundContext, commitmentContext]) => {
-        if (active) {
-          setActivePriority(priority);
-          setEmergencyFundFacts(emergencyFundContext.facts);
-          setCommitmentFacts(commitmentContext.facts);
-          setContextError(null);
-        }
-      })
+      .then(
+        ([
+          { priority },
+          emergencyFundContext,
+          commitmentContext,
+          incomeContext,
+        ]) => {
+          if (active) {
+            setActivePriority(priority);
+            setEmergencyFundFacts(emergencyFundContext.facts);
+            setCommitmentFacts(commitmentContext.facts);
+            setIncomeFacts(incomeContext.facts);
+            setContextError(null);
+          }
+        },
+      )
       .catch((error: unknown) => {
         if (active)
           setContextError(getErrorMessage(error, "Contexte indisponible."));
@@ -345,8 +411,7 @@ export function AdvicePanelContent({
           advice: response.advice,
           generatedAt: response.generated_at,
         });
-        const context = await getActivePriority();
-        setActivePriority(context.priority);
+        setActivePriority((await getActivePriority()).priority);
       } catch (error) {
         dispatch({
           type: "REGENERATE_ERROR",
@@ -371,8 +436,7 @@ export function AdvicePanelContent({
           advice: response.advice,
           generatedAt: response.generated_at,
         });
-        const context = await getEmergencyFundContext();
-        setEmergencyFundFacts(context.facts);
+        setEmergencyFundFacts((await getEmergencyFundContext()).facts);
       } catch (error) {
         dispatch({
           type: "REGENERATE_ERROR",
@@ -397,8 +461,32 @@ export function AdvicePanelContent({
           advice: response.advice,
           generatedAt: response.generated_at,
         });
-        const context = await getCommitmentContext();
-        setCommitmentFacts(context.facts);
+        setCommitmentFacts((await getCommitmentContext()).facts);
+      } catch (error) {
+        dispatch({
+          type: "REGENERATE_ERROR",
+          error: getErrorMessage(error, t.advice.generateError),
+        });
+      }
+    },
+    [year, month],
+  );
+
+  const handleIncomeAnswer = useCallback(
+    async (fact: IncomeFactInput, rememberFact: boolean) => {
+      dispatch({ type: "REGENERATE_START" });
+      try {
+        const response = await generateAdvice(year, month, {
+          regenerate: true,
+          incomeFact: fact,
+          rememberFact,
+        });
+        dispatch({
+          type: "REGENERATE_SUCCESS",
+          advice: response.advice,
+          generatedAt: response.generated_at,
+        });
+        setIncomeFacts((await getIncomeContext()).facts);
       } catch (error) {
         dispatch({
           type: "REGENERATE_ERROR",
@@ -435,8 +523,7 @@ export function AdvicePanelContent({
   const handlePriorityCorrection = useCallback(
     async (priority: ActivePriorityInput) => {
       try {
-        const response = await putActivePriority(priority);
-        setActivePriority(response.priority);
+        setActivePriority((await putActivePriority(priority)).priority);
         reload();
       } catch (error) {
         setContextError(getErrorMessage(error, "Correction impossible."));
@@ -517,6 +604,32 @@ export function AdvicePanelContent({
     }
   }, []);
 
+  const handleIncomeCorrection = useCallback(async (input: IncomeFactInput) => {
+    try {
+      const { fact } = await putIncomeFact(input);
+      setIncomeFacts((facts) => [
+        ...facts.filter((item) => item.fact_type !== input.fact_type),
+        fact,
+      ]);
+      reload();
+    } catch (error) {
+      setContextError(getErrorMessage(error, "Correction impossible."));
+    }
+  }, []);
+
+  const handleIncomeDeletion = useCallback(async (factType: IncomeFactType) => {
+    if (!window.confirm("Supprimer ce revenu mémorisé ?")) return;
+    try {
+      await deleteIncomeFact(factType);
+      setIncomeFacts((facts) =>
+        facts.filter((fact) => fact.fact_type !== factType),
+      );
+      reload();
+    } catch (error) {
+      setContextError(getErrorMessage(error, "Suppression impossible."));
+    }
+  }, []);
+
   return (
     <div className={cn("space-y-6", className)}>
       <ActivePriorityPanel
@@ -524,6 +637,11 @@ export function AdvicePanelContent({
         error={contextError}
         onCorrect={handlePriorityCorrection}
         onDelete={handlePriorityDeletion}
+      />
+      <IncomeFactsPanel
+        facts={incomeFacts}
+        onCorrect={handleIncomeCorrection}
+        onDelete={handleIncomeDeletion}
       />
       <EmergencyFundFactsPanel
         facts={emergencyFundFacts}
@@ -559,6 +677,7 @@ export function AdvicePanelContent({
           onPriorityAnswer={handlePriorityAnswer}
           onEmergencyFundAnswer={handleEmergencyFundAnswer}
           onCommitmentAnswer={handleCommitmentAnswer}
+          onIncomeAnswer={handleIncomeAnswer}
           onClarificationAbstention={handleClarificationAbstention}
           onCorrectSession={reload}
         />
@@ -713,6 +832,195 @@ function ActivePriorityPanel({
         </form>
       )}
     </section>
+  );
+}
+
+interface IncomeFactsPanelProps {
+  facts: IncomeFact[];
+  onCorrect: (fact: IncomeFactInput) => Promise<void>;
+  onDelete: (factType: IncomeFactType) => Promise<void>;
+}
+
+function IncomeFactsPanel({
+  facts,
+  onCorrect,
+  onDelete,
+}: IncomeFactsPanelProps) {
+  return (
+    <section className="space-y-4 rounded-xl border bg-muted/20 p-5">
+      <h4 className="font-semibold">Revenus déclarés</h4>
+      {facts.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Aucun revenu fiable mémorisé.
+        </p>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {facts.map((fact) => (
+            <IncomeFactCard
+              key={fact.fact_type}
+              fact={fact}
+              onCorrect={onCorrect}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function IncomeFactCard({
+  fact,
+  onCorrect,
+  onDelete,
+}: {
+  fact: IncomeFact;
+  onCorrect: (fact: IncomeFactInput) => Promise<void>;
+  onDelete: (factType: IncomeFactType) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const label = incomeFactLabels[fact.fact_type];
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onCorrect(
+      incomeInputFromForm(fact.fact_type, new FormData(event.currentTarget)),
+    );
+    setEditing(false);
+  }
+
+  return (
+    <article
+      id={`income-context-${fact.fact_type}`}
+      className="space-y-3 rounded-lg border bg-background/50 p-4"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h5 className="text-sm font-medium">{incomeFactSummary(fact)}</h5>
+        <Badge variant={fact.state === "to_confirm" ? "secondary" : "outline"}>
+          {fact.state === "active"
+            ? "Actif"
+            : fact.state === "corrected"
+              ? "Corrigé"
+              : "À confirmer"}
+        </Badge>
+      </div>
+      {editing ? (
+        <form className="space-y-3" onSubmit={handleSubmit}>
+          <IncomeFields
+            factType={fact.fact_type}
+            defaultValue={fact}
+            idPrefix={`context-income-${fact.fact_type}`}
+          />
+          <div className="flex gap-2">
+            <Button type="submit" size="sm">
+              Enregistrer
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setEditing(false)}
+            >
+              Annuler
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">
+            Confirmé le {formatAdviceTimestamp(fact.last_confirmed_at)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Valide jusqu’au{" "}
+            {new Date(fact.valid_until).toLocaleDateString("fr-FR")}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label={`Corriger ${label}`}
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="h-4 w-4" />
+              Corriger
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              aria-label={`Supprimer ${label}`}
+              onClick={() => onDelete(fact.fact_type)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Supprimer
+            </Button>
+          </div>
+        </>
+      )}
+    </article>
+  );
+}
+
+function IncomeFields({
+  factType,
+  defaultValue,
+  idPrefix,
+}: {
+  factType: IncomeFactType;
+  defaultValue?: IncomeFactInput;
+  idPrefix: string;
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <NumberField
+        id={`${idPrefix}-amount`}
+        name="amount"
+        label={
+          factType === "usual_disposable_income"
+            ? "Montant du revenu disponible habituel"
+            : "Montant de l’entrée exceptionnelle"
+        }
+        defaultValue={defaultValue?.amount}
+        required
+      />
+      {factType === "usual_disposable_income" ? (
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-frequency`}>Fréquence</Label>
+          <select
+            id={`${idPrefix}-frequency`}
+            name="frequency"
+            defaultValue={
+              defaultValue?.fact_type === "usual_disposable_income"
+                ? defaultValue.frequency
+                : "monthly"
+            }
+            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+          >
+            {Object.entries(incomeFrequencyLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-expected-date`}>Date attendue</Label>
+          <Input
+            id={`${idPrefix}-expected-date`}
+            name="expected_date"
+            type="date"
+            defaultValue={
+              defaultValue?.fact_type === "expected_one_off_income"
+                ? defaultValue.expected_date
+                : undefined
+            }
+            required
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1410,6 +1718,16 @@ function DecisionTraceDetails({
                         </p>
                       )}
                     </>
+                  ) : isIncomeFact(fact) ? (
+                    <>
+                      <p className="font-medium">{incomeFactSummary(fact)}</p>
+                      {fact.matched_transaction && (
+                        <p className="text-muted-foreground">
+                          Déjà rapprochée d’une opération observée ; comptée une
+                          seule fois.
+                        </p>
+                      )}
+                    </>
                   ) : isCommitmentFact(fact) ? (
                     <p className="font-medium">{commitmentFactSummary(fact)}</p>
                   ) : (
@@ -1456,9 +1774,11 @@ function DecisionTraceDetails({
                       href={
                         fact.fact_type === "active_priority"
                           ? "#active-priority-context"
-                          : isCommitmentFact(fact)
-                            ? `#commitment-context-${fact.fact_id}`
-                            : `#emergency-fund-context-${fact.fact_type}`
+                          : isIncomeFact(fact)
+                            ? `#income-context-${fact.fact_type}`
+                            : isCommitmentFact(fact)
+                              ? `#commitment-context-${fact.fact_id}`
+                              : `#emergency-fund-context-${fact.fact_type}`
                       }
                       className="inline-block font-medium text-primary underline-offset-4 hover:underline"
                     >
@@ -1473,6 +1793,14 @@ function DecisionTraceDetails({
         <TraceList
           title={t.advice.calculations}
           items={trace.details.calculations}
+          icon={<Calculator className="h-4 w-4" />}
+        />
+        <TraceList
+          title="Normalisation des revenus"
+          items={trace.details.income_normalizations.map(
+            (income) =>
+              `${formatCurrency(income.source_amount)}${income.source_frequency ? ` / ${incomeFrequencyLabels[income.source_frequency].toLowerCase()}` : ""} → ${formatCurrency(income.normalized_amount)} · ${income.period} · ${income.conversion}`,
+          )}
           icon={<Calculator className="h-4 w-4" />}
         />
         <TraceList
@@ -1507,6 +1835,10 @@ interface ClarificationCardProps {
     fact: CommitmentFactInput,
     rememberFact: boolean,
   ) => Promise<void>;
+  onIncomeAnswer: (
+    fact: IncomeFactInput,
+    rememberFact: boolean,
+  ) => Promise<void>;
   onAbstain: (action: "skip" | "unknown") => Promise<void>;
 }
 
@@ -1516,6 +1848,7 @@ function ClarificationCard({
   onPriorityAnswer,
   onEmergencyFundAnswer,
   onCommitmentAnswer,
+  onIncomeAnswer,
   onAbstain,
 }: ClarificationCardProps) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -1536,6 +1869,11 @@ function ClarificationCard({
     } else if (isCommitmentFactType(output.fact_type)) {
       await onCommitmentAnswer(
         commitmentInputFromForm(output.fact_type, data),
+        remember,
+      );
+    } else if (isIncomeFactType(output.fact_type)) {
+      await onIncomeAnswer(
+        incomeInputFromForm(output.fact_type, data),
         remember,
       );
     } else {
@@ -1591,6 +1929,11 @@ function ClarificationCard({
           </>
         ) : isCommitmentFactType(output.fact_type) ? (
           <CommitmentFields
+            factType={output.fact_type}
+            idPrefix={`clarification-${output.fact_type}`}
+          />
+        ) : isIncomeFactType(output.fact_type) ? (
+          <IncomeFields
             factType={output.fact_type}
             idPrefix={`clarification-${output.fact_type}`}
           />
@@ -1700,6 +2043,10 @@ interface AdviceContentProps {
     fact: CommitmentFactInput,
     rememberFact: boolean,
   ) => Promise<void>;
+  onIncomeAnswer: (
+    fact: IncomeFactInput,
+    rememberFact: boolean,
+  ) => Promise<void>;
   onClarificationAbstention: (action: "skip" | "unknown") => Promise<void>;
   onCorrectSession: () => void;
 }
@@ -1714,6 +2061,7 @@ function AdviceContent({
   onPriorityAnswer,
   onEmergencyFundAnswer,
   onCommitmentAnswer,
+  onIncomeAnswer,
   onClarificationAbstention,
   onCorrectSession,
 }: AdviceContentProps) {
@@ -1730,6 +2078,7 @@ function AdviceContent({
               onPriorityAnswer={onPriorityAnswer}
               onEmergencyFundAnswer={onEmergencyFundAnswer}
               onCommitmentAnswer={onCommitmentAnswer}
+              onIncomeAnswer={onIncomeAnswer}
               onAbstain={onClarificationAbstention}
             />
           ) : (

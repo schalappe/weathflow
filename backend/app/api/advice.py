@@ -1,6 +1,6 @@
 """FastAPI router for Advice API endpoints."""
 
-from datetime import UTC
+from datetime import UTC, datetime, time
 
 from fastapi import HTTPException, Path, Response, status
 from loguru import logger
@@ -12,12 +12,14 @@ from app.api.deps import (
     AdviceRepo,
     CommitmentRepo,
     EmergencyFundRepo,
+    IncomeFactRepo,
     MonthRepo,
     create_router,
 )
 from app.db.models.active_priority import ActivePriority
 from app.db.models.base import utc_now
 from app.db.models.emergency_fund_fact import EmergencyFundFact, EmergencyFundFactType
+from app.repositories.income_fact import IncomeFactType
 from app.responses.advice import (
     ActivePriorityData,
     ActivePriorityInput,
@@ -36,6 +38,10 @@ from app.responses.advice import (
     GenerateAdviceRequest,
     GenerateAdviceResponse,
     GetAdviceResponse,
+    IncomeContextResponse,
+    IncomeFactData,
+    IncomeFactInput,
+    IncomeFactResponse,
 )
 from app.services.advice import service as advice_service
 from app.services.advice.eligibility import check_eligibility
@@ -47,6 +53,7 @@ from app.services.advice.models import (
     DecisionTrace,
     DecisionTraceDetails,
     EmergencyFundFactContext,
+    IncomeFactContext,
     ObservedFact,
     UnresolvedOutput,
 )
@@ -62,6 +69,7 @@ from app.services.exceptions import (
 
 router = create_router("advice")
 commitment_fact_adapter: TypeAdapter[CommitmentFactData] = TypeAdapter(CommitmentFactData)
+income_fact_adapter: TypeAdapter[IncomeFactData] = TypeAdapter(IncomeFactData)
 
 
 def _http_detail_for_advice_error(error: AdviceGenerationError) -> str:
@@ -95,6 +103,7 @@ def generate_advice(
     priority_repo: ActivePriorityRepo,
     fact_repo: EmergencyFundRepo,
     commitment_repo: CommitmentRepo,
+    income_repo: IncomeFactRepo,
     generator: AdviceGen,
 ) -> GenerateAdviceResponse:
     """
@@ -148,6 +157,7 @@ def generate_advice(
                 request.active_priority,
                 request.emergency_fund_fact,
                 request.commitment_fact,
+                request.income_fact,
             )
         )
         previous_question_count = 0
@@ -225,6 +235,12 @@ def generate_advice(
             _session_commitment_context(request.commitment_fact) if request.commitment_fact is not None else None,
             request.remember_fact,
         )
+        income_contexts = advice_service.prepare_income_context(
+            income_repo,
+            advice_repo,
+            _session_income_context(request.income_fact) if request.income_fact is not None else None,
+            request.remember_fact,
+        )
 
         if not request.regenerate and not answer_count:
             existing_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
@@ -246,15 +262,28 @@ def generate_advice(
         filtered_history = [m for m in history_months if (m.year, m.month) < (request.year, request.month)]
         history_data = [advice_service.month_to_month_data(month) for month in filtered_history]
         current_data = advice_service.month_to_month_data(month_record)
+        income_contexts, generation_months = advice_service.deduplicate_expected_income(
+            income_contexts,
+            [*history_data, current_data],
+        )
+        history_data = generation_months[:-1]
+        current_data = generation_months[-1]
 
         generation_context = AdviceContext(
             active_priority=priority_context,
             emergency_fund_facts=emergency_fund_contexts,
             commitment_facts=commitment_contexts,
+            income_facts=income_contexts,
             clarifications_remaining=max(0, 3 - previous_question_count),
         )
         advice_response = generator.generate_advice(current_data, history_data, generation_context)
         advice_response = AdviceData.model_validate(advice_response)
+        advice_service.validate_income_usage(
+            advice_response,
+            income_contexts,
+            request.year,
+            request.month,
+        )
         answered_fact_type = (
             "active_priority"
             if request.active_priority is not None
@@ -262,6 +291,12 @@ def generate_advice(
             if request.emergency_fund_fact is not None
             else request.commitment_fact.fact_type
             if request.commitment_fact is not None
+            else request.income_fact.fact_type
+            if request.income_fact is not None
+            and any(
+                context.fact_type == request.income_fact.fact_type and context.state != "to_confirm"
+                for context in income_contexts
+            )
             else None
         )
         if answered_fact_type is not None:
@@ -291,6 +326,8 @@ def generate_advice(
             or request.emergency_fund_fact is not None
             and not request.remember_fact
             or request.commitment_fact is not None
+            and not request.remember_fact
+            or request.income_fact is not None
             and not request.remember_fact
         )
         if session_only_answer:
@@ -751,6 +788,129 @@ def delete_emergency_fund_fact(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+def _session_income_context(payload: IncomeFactInput) -> IncomeFactContext:
+    """Build request-scoped income.
+
+    Parameters
+    ----------
+    payload : IncomeFactInput
+        Validated request answer.
+
+    Returns
+    -------
+    IncomeFactContext
+        Session lifecycle context.
+    """
+    now = utc_now()
+    valid_until = (
+        datetime.combine(payload.expected_date, time.max, tzinfo=UTC)
+        if payload.fact_type == "expected_one_off_income"
+        else None
+    )
+    return IncomeFactContext.model_validate(
+        {
+            **payload.model_dump(),
+            "state": "to_confirm" if valid_until is not None and valid_until < now else "session",
+            "last_confirmed_at": now,
+            "valid_until": valid_until,
+        }
+    )
+
+
+def _income_fact_data(fact: IncomeFactContext) -> IncomeFactData:
+    """Map income context to API data.
+
+    Parameters
+    ----------
+    fact : IncomeFactContext
+        Stored generation context.
+
+    Returns
+    -------
+    IncomeFactData
+        API lifecycle data.
+    """
+    return income_fact_adapter.validate_python(fact.model_dump())
+
+
+@router.get("/context/income", response_model=IncomeContextResponse)
+def get_income_context(
+    income_repo: IncomeFactRepo,
+    advice_repo: AdviceRepo,
+) -> IncomeContextResponse:
+    """Return income facts, including expired values.
+
+    Parameters
+    ----------
+    income_repo : IncomeFactRepo
+        Income persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+
+    Returns
+    -------
+    IncomeContextResponse
+        Visible stored facts.
+    """
+    contexts = advice_service.load_income_context(income_repo, advice_repo)
+    return IncomeContextResponse(facts=[_income_fact_data(context) for context in contexts])
+
+
+@router.put("/context/income", response_model=IncomeFactResponse)
+def put_income_fact(
+    payload: IncomeFactInput,
+    income_repo: IncomeFactRepo,
+    advice_repo: AdviceRepo,
+) -> IncomeFactResponse:
+    """Create, correct, or reconfirm income.
+
+    Parameters
+    ----------
+    payload : IncomeFactInput
+        Validated replacement.
+    income_repo : IncomeFactRepo
+        Income persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+
+    Returns
+    -------
+    IncomeFactResponse
+        Updated lifecycle data.
+    """
+    fact = advice_service.put_income_fact(income_repo, advice_repo, payload.model_dump())
+    return IncomeFactResponse(fact=_income_fact_data(advice_service.income_fact_context(fact)))
+
+
+@router.delete(
+    "/context/income/{fact_type}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_income_fact(
+    income_repo: IncomeFactRepo,
+    advice_repo: AdviceRepo,
+    fact_type: IncomeFactType,
+) -> Response:
+    """Delete income and dependent advice.
+
+    Parameters
+    ----------
+    income_repo : IncomeFactRepo
+        Income persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+    fact_type : IncomeFactType
+        Fact key.
+
+    Returns
+    -------
+    Response
+        Empty 204 response.
+    """
+    advice_service.delete_income_fact(income_repo, advice_repo, fact_type)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 def _commitment_fact_data(fact: CommitmentFactContext) -> CommitmentFactData:
     """Map commitment context to API data.
 
@@ -919,6 +1079,7 @@ def get_advice(
     priority_repo: ActivePriorityRepo,
     fact_repo: EmergencyFundRepo,
     commitment_repo: CommitmentRepo,
+    income_repo: IncomeFactRepo,
     year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
     month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
 ) -> GetAdviceResponse:
@@ -956,6 +1117,7 @@ def get_advice(
             advice_repo.delete_depending_on_active_priority()
         _load_emergency_fund_facts(fact_repo, advice_repo)
         advice_service.load_commitment_context(commitment_repo, advice_repo)
+        advice_service.load_income_context(income_repo, advice_repo)
 
         # ##>: Check eligibility for this month.
         eligibility = check_eligibility(year, month, month_record.id, month_repo, advice_repo)

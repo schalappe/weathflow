@@ -1,7 +1,7 @@
 """Tests for AdviceGenerator service."""
 
 import json
-from datetime import datetime
+from datetime import date, datetime
 from unittest.mock import MagicMock
 
 import anthropic
@@ -14,10 +14,11 @@ from app.services.advice.models import (
     AdviceResponse,
     CommitmentFactContext,
     EmergencyFundFactContext,
+    IncomeFactContext,
     MonthData,
 )
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
-from app.services.advice.service import resolve_clarification
+from app.services.advice.service import resolve_clarification, validate_income_usage
 from app.services.exceptions import AdviceAPIError, AdviceGenerationError, AdviceParseError, InsufficientDataError
 
 
@@ -61,6 +62,7 @@ def _decision_json(output_type: str = "recommendation") -> str:
         },
     }
     if output_type == "recommendation":
+        output["income_dependent"] = False
         output["action"] = "Réduire les repas au restaurant."
         output["amount"] = 120
     else:
@@ -229,9 +231,136 @@ def test_prompt_defines_emergency_fund_materiality_and_trajectory() -> None:
     assert '"liquid_reserve":' not in prompt
     assert '"fact_type": "liquid_reserve"' in prompt
     assert "plancher - réserve liquide non affectée - montant déjà affecté" in prompt
-    assert "revenus - dépenses essentielles - dépenses discrétionnaires" in prompt
+    assert "revenu disponible habituel mensuel - dépenses essentielles" in prompt
     assert "N'infère jamais ces trois faits depuis les transactions" in prompt
     assert "conclusion `no_action`" in prompt
+
+
+def test_prompt_calibrates_income_without_double_counting_observed_entries() -> None:
+    """Prompt requires reliable declared income and single-counted expected entries."""
+    confirmed_at = datetime(2026, 8, 2)
+    context = AdviceContext(
+        income_facts=[
+            IncomeFactContext(
+                fact_type="usual_disposable_income",
+                amount=3_200,
+                frequency="monthly",
+                state="active",
+                last_confirmed_at=confirmed_at,
+                valid_until=datetime(2026, 10, 31),
+            ),
+            IncomeFactContext(
+                fact_type="expected_one_off_income",
+                amount=1_500,
+                expected_date=date(2026, 8, 3),
+                matched_transaction=True,
+                state="active",
+                last_confirmed_at=confirmed_at,
+                valid_until=datetime(2026, 8, 3, 23, 59),
+            ),
+        ]
+    )
+
+    prompt = _generator()._build_user_prompt(_month(month=8), [_month(month=7)], context)
+
+    assert '"fact_type": "usual_disposable_income"' in prompt
+    assert '"frequency": "monthly"' in prompt
+    assert '"expected_date": "2026-08-03"' in prompt
+    assert '"matched_transaction": true' in prompt
+    assert "ne constitue pas un revenu fiable" in prompt
+    assert "aucun montant dépendant du revenu" in prompt
+    assert "une seule fois" in prompt
+    assert "hebdomadaire × 52 / 12" in prompt
+
+
+def test_income_dependent_output_requires_active_income_trace() -> None:
+    """Income-dependent amount without declared citation is rejected."""
+    advice = AdviceResponse.model_validate_json(_decision_json())
+    recommendation = advice.outputs[0]
+    assert recommendation.type == "recommendation"
+    advice = AdviceResponse(
+        outputs=[
+            recommendation.model_copy(
+                update={
+                    "income_dependent": True,
+                    "trace": recommendation.trace.model_copy(update={"summary": "Le revenu borne ce montant."}),
+                }
+            )
+        ]
+    )
+
+    with pytest.raises(AdviceParseError):
+        validate_income_usage(advice, [], 2025, 1)
+
+
+def test_income_normalization_rejects_nonderivable_precision() -> None:
+    """Income normalization cannot drift beyond currency precision."""
+    payload = json.loads(_decision_json())
+    output = payload["outputs"][0]
+    output["income_dependent"] = True
+    details = output["trace"]["details"]
+    details["conventions"] = ["Fréquence mensuelle."]
+    details["declared_facts"] = [
+        {
+            "fact_type": "usual_disposable_income",
+            "amount": 3_200,
+            "frequency": "monthly",
+            "expected_date": None,
+            "matched_transaction": False,
+            "state": "active",
+            "last_confirmed_at": "2025-01-01T00:00:00",
+            "valid_until": "2025-03-31T00:00:00",
+            "can_correct": True,
+            "can_delete": True,
+        }
+    ]
+    details["income_normalizations"] = [
+        {
+            "fact_type": "usual_disposable_income",
+            "source_amount": 3_200,
+            "source_frequency": "monthly",
+            "period": "2025-01",
+            "conversion": "monthly",
+            "normalized_amount": 3_200.01,
+        }
+    ]
+    advice = AdviceResponse.model_validate(payload)
+    context = IncomeFactContext(
+        fact_type="usual_disposable_income",
+        amount=3_200,
+        frequency="monthly",
+        state="active",
+        last_confirmed_at=datetime(2025, 1, 1),
+        valid_until=datetime(2025, 3, 31),
+    )
+
+    with pytest.raises(AdviceParseError):
+        validate_income_usage(advice, [context], 2025, 1)
+
+
+def test_income_clarification_can_be_skipped() -> None:
+    """Income clarification resolves to an explicit abstention."""
+    advice = AdviceResponse.model_validate(
+        {
+            "outputs": [
+                {
+                    "type": "clarification",
+                    "priority": "medium",
+                    "subject": "Capacité soutenable",
+                    "observation": "Le revenu fiable est absent.",
+                    "possible_effect": "Le montant peut changer.",
+                    "question": "Quel est votre revenu disponible habituel ?",
+                    "fact_type": "usual_disposable_income",
+                    "material_effects": ["Calculer une capacité.", "Ne fournir aucun montant."],
+                }
+            ]
+        }
+    )
+
+    resolved = resolve_clarification(advice, 2026, 8, "skip")
+
+    assert resolved.outputs[0].type == "unresolved"
+    assert "revenu disponible habituel" in resolved.outputs[0].trace.details.limits[0]
 
 
 def test_prompt_protects_obligations_and_debt_before_savings() -> None:

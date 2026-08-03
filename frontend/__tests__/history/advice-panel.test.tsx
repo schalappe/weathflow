@@ -21,6 +21,9 @@ vi.mock("@/lib/api-client", () => ({
   getCommitmentContext: vi.fn(),
   putCommitmentFact: vi.fn(),
   deleteCommitmentFact: vi.fn(),
+  getIncomeContext: vi.fn(),
+  putIncomeFact: vi.fn(),
+  deleteIncomeFact: vi.fn(),
 }));
 
 const mockGetAdvice = vi.mocked(apiClient.getAdvice);
@@ -38,6 +41,9 @@ const mockDeleteEmergencyFundFact = vi.mocked(
 const mockGetCommitmentContext = vi.mocked(apiClient.getCommitmentContext);
 const mockPutCommitmentFact = vi.mocked(apiClient.putCommitmentFact);
 const mockDeleteCommitmentFact = vi.mocked(apiClient.deleteCommitmentFact);
+const mockGetIncomeContext = vi.mocked(apiClient.getIncomeContext);
+const mockPutIncomeFact = vi.mocked(apiClient.putIncomeFact);
+const mockDeleteIncomeFact = vi.mocked(apiClient.deleteIncomeFact);
 const eligibility: EligibilityInfo = {
   can_generate: true,
   is_first_advice: false,
@@ -61,6 +67,7 @@ describe("AdvicePanel decision outputs", () => {
     mockGetActivePriority.mockResolvedValue({ priority: null });
     mockGetEmergencyFundContext.mockResolvedValue({ facts: [] });
     mockGetCommitmentContext.mockResolvedValue({ facts: [] });
+    mockGetIncomeContext.mockResolvedValue({ facts: [] });
   });
 
   it("renders recommendation, no-action, unresolved, and auditable trace", async () => {
@@ -668,5 +675,141 @@ describe("AdvicePanel decision outputs", () => {
     });
     await user.click(screen.getByRole("button", { name: "Supprimer" }));
     expect(mockDeleteCommitmentFact).toHaveBeenCalledWith(3);
+  });
+  it("answers dated expected income and shows single-counted provenance", async () => {
+    const user = userEvent.setup();
+    const clarification = {
+      type: "clarification" as const,
+      priority: "medium" as const,
+      subject: "Montant soutenable",
+      observation: "Le revenu habituel ne couvre pas l'échéance.",
+      possible_effect:
+        "Une entrée attendue peut changer le montant ou la date.",
+      question: "Quelle entrée exceptionnelle attendez-vous ?",
+      fact_type: "expected_one_off_income" as const,
+      material_effects: ["Agir le 15 août.", "Ne conseiller aucun montant."],
+    };
+    mockGetAdvice.mockResolvedValue(
+      loaded(createMockAdviceData({ outputs: [clarification] })),
+    );
+    const recommendation = createMockRecommendationOutput({
+      action: "Affecter la prime à la priorité le 15 août.",
+      amount: 1_500,
+      deadline: "2026-08-15",
+      income_dependent: true,
+    });
+    recommendation.trace.details.declared_facts = [
+      {
+        fact_type: "expected_one_off_income",
+        amount: 1_500,
+        frequency: null,
+        expected_date: "2026-08-15",
+        matched_transaction: true,
+        state: "active",
+        last_confirmed_at: "2026-08-03T12:00:00Z",
+        valid_until: "2026-08-15T23:59:59Z",
+        can_correct: true,
+        can_delete: true,
+      },
+    ];
+    recommendation.trace.details.income_normalizations = [
+      {
+        fact_type: "expected_one_off_income",
+        source_amount: 1_500,
+        source_frequency: null,
+        period: "2026-08-15",
+        conversion: "one_off",
+        normalized_amount: 1_500,
+      },
+    ];
+    mockGenerateAdvice.mockResolvedValue({
+      success: true,
+      advice: createMockAdviceData({ outputs: [recommendation] }),
+      generated_at: "2026-08-03T12:00:00Z",
+      is_valid: true,
+      was_cached: false,
+    });
+
+    render(<AdvicePanel year={2025} month={12} />);
+    await user.type(
+      await screen.findByLabelText("Montant de l’entrée exceptionnelle"),
+      "1500",
+    );
+    await user.type(screen.getByLabelText("Date attendue"), "2026-08-15");
+    await user.click(
+      screen.getByRole("button", { name: "Répondre et réutiliser" }),
+    );
+
+    expect(mockGenerateAdvice).toHaveBeenCalledWith(2025, 12, {
+      regenerate: true,
+      incomeFact: {
+        fact_type: "expected_one_off_income",
+        amount: 1_500,
+        expected_date: "2026-08-15",
+      },
+      rememberFact: true,
+    });
+    expect(
+      await screen.findByText(/Entrée exceptionnelle attendue/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Déjà rapprochée d’une opération observée/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Normalisation des revenus")).toBeInTheDocument();
+    expect(screen.getByText(/1.*500.*2026-08-15.*one_off/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Corriger ou supprimer" }),
+    ).toHaveAttribute("href", "#income-context-expected_one_off_income");
+  });
+
+  it("corrects and deletes expired habitual income from declared context", async () => {
+    const user = userEvent.setup();
+    const fact = {
+      fact_type: "usual_disposable_income" as const,
+      amount: 3_200,
+      frequency: "monthly" as const,
+      expected_date: null,
+      state: "to_confirm" as const,
+      last_confirmed_at: "2026-05-01T12:00:00Z",
+      valid_until: "2026-07-30T12:00:00Z",
+    };
+    mockGetIncomeContext.mockResolvedValue({ facts: [fact] });
+    mockGetAdvice.mockResolvedValue(loaded());
+    mockPutIncomeFact.mockResolvedValue({
+      fact: { ...fact, amount: 3_500, state: "corrected" },
+    });
+    mockDeleteIncomeFact.mockResolvedValue();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<AdvicePanel year={2025} month={12} />);
+    expect(
+      await screen.findByText(/Revenu disponible habituel — 3/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("À confirmer")).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Corriger Revenu disponible habituel",
+      }),
+    );
+    const amount = screen.getByLabelText(
+      "Montant du revenu disponible habituel",
+    );
+    await user.clear(amount);
+    await user.type(amount, "3500");
+    await user.click(screen.getByRole("button", { name: "Enregistrer" }));
+
+    expect(mockPutIncomeFact).toHaveBeenCalledWith({
+      fact_type: "usual_disposable_income",
+      amount: 3_500,
+      frequency: "monthly",
+    });
+    await user.click(
+      screen.getByRole("button", {
+        name: "Supprimer Revenu disponible habituel",
+      }),
+    );
+    expect(mockDeleteIncomeFact).toHaveBeenCalledWith(
+      "usual_disposable_income",
+    );
   });
 });
