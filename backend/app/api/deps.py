@@ -10,6 +10,7 @@ from app.db.database import get_db
 from app.repositories.active_priority import ActivePriorityRepository
 from app.repositories.advice import AdviceRepository
 from app.repositories.commitment_fact import CommitmentFactRepository
+from app.repositories.constraint_fact import ConstraintFactRepository
 from app.repositories.emergency_fund_fact import EmergencyFundFactRepository
 from app.repositories.income_fact import IncomeFactRepository
 from app.repositories.month import MonthRepository
@@ -109,6 +110,22 @@ def get_commitment_fact_repository(db: DbSession) -> CommitmentFactRepository:
     return CommitmentFactRepository(db)
 
 
+def get_constraint_fact_repository(db: DbSession) -> ConstraintFactRepository:
+    """Provide decision-constraint repository.
+
+    Parameters
+    ----------
+    db : DbSession
+        Request database session.
+
+    Returns
+    -------
+    ConstraintFactRepository
+        Constraint persistence.
+    """
+    return ConstraintFactRepository(db)
+
+
 def get_income_fact_repository(db: DbSession) -> IncomeFactRepository:
     """Provide declared-income repository."""
     return IncomeFactRepository(db)
@@ -142,6 +159,7 @@ AdviceRepo = Annotated[AdviceRepository, Depends(get_advice_repository)]
 ActivePriorityRepo = Annotated[ActivePriorityRepository, Depends(get_active_priority_repository)]
 EmergencyFundRepo = Annotated[EmergencyFundFactRepository, Depends(get_emergency_fund_fact_repository)]
 CommitmentRepo = Annotated[CommitmentFactRepository, Depends(get_commitment_fact_repository)]
+ConstraintRepo = Annotated[ConstraintFactRepository, Depends(get_constraint_fact_repository)]
 IncomeFactRepo = Annotated[IncomeFactRepository, Depends(get_income_fact_repository)]
 UploadSvc = Annotated[UploadService, Depends(get_upload_service)]
 AdviceGen = Annotated[AdviceGenerator, Depends(get_advice_generator)]

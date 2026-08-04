@@ -11,6 +11,7 @@ from app.api.deps import (
     AdviceGen,
     AdviceRepo,
     CommitmentRepo,
+    ConstraintRepo,
     EmergencyFundRepo,
     IncomeFactRepo,
     MonthRepo,
@@ -18,6 +19,7 @@ from app.api.deps import (
 )
 from app.db.models.active_priority import ActivePriority
 from app.db.models.base import utc_now
+from app.db.models.constraint_fact import ConstraintFact
 from app.db.models.emergency_fund_fact import EmergencyFundFact, EmergencyFundFactType
 from app.repositories.income_fact import IncomeFactType
 from app.responses.advice import (
@@ -29,6 +31,10 @@ from app.responses.advice import (
     CommitmentFactData,
     CommitmentFactInput,
     CommitmentFactResponse,
+    ConstraintContextResponse,
+    ConstraintFactData,
+    ConstraintFactInput,
+    ConstraintFactResponse,
     EligibilityInfo,
     EmergencyFundContextResponse,
     EmergencyFundFactAnswer,
@@ -46,13 +52,16 @@ from app.responses.advice import (
 from app.services.advice import service as advice_service
 from app.services.advice.eligibility import check_eligibility
 from app.services.advice.models import (
+    ActionUnavailabilityContext,
     ActivePriorityContext,
     AdviceContext,
     CommitmentFactContext,
+    ConstraintFactContext,
     DecisionOutput,
     DecisionTrace,
     DecisionTraceDetails,
     EmergencyFundFactContext,
+    FinancialLimitContext,
     IncomeFactContext,
     ObservedFact,
     UnresolvedOutput,
@@ -69,6 +78,7 @@ from app.services.exceptions import (
 
 router = create_router("advice")
 commitment_fact_adapter: TypeAdapter[CommitmentFactData] = TypeAdapter(CommitmentFactData)
+constraint_fact_adapter: TypeAdapter[ConstraintFactData] = TypeAdapter(ConstraintFactData)
 income_fact_adapter: TypeAdapter[IncomeFactData] = TypeAdapter(IncomeFactData)
 
 
@@ -104,6 +114,7 @@ def generate_advice(
     fact_repo: EmergencyFundRepo,
     commitment_repo: CommitmentRepo,
     income_repo: IncomeFactRepo,
+    constraint_repo: ConstraintRepo,
     generator: AdviceGen,
 ) -> GenerateAdviceResponse:
     """
@@ -158,6 +169,7 @@ def generate_advice(
                 request.emergency_fund_fact,
                 request.commitment_fact,
                 request.income_fact,
+                request.constraint_fact,
             )
         )
         previous_question_count = 0
@@ -241,6 +253,12 @@ def generate_advice(
             _session_income_context(request.income_fact) if request.income_fact is not None else None,
             request.remember_fact,
         )
+        constraint_contexts = advice_service.prepare_constraint_context(
+            constraint_repo,
+            advice_repo,
+            _session_constraint_context(request.constraint_fact) if request.constraint_fact is not None else None,
+            request.remember_fact,
+        )
 
         if not request.regenerate and not answer_count:
             existing_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
@@ -274,6 +292,7 @@ def generate_advice(
             emergency_fund_facts=emergency_fund_contexts,
             commitment_facts=commitment_contexts,
             income_facts=income_contexts,
+            constraint_facts=constraint_contexts,
             clarifications_remaining=max(0, 3 - previous_question_count),
         )
         advice_response = generator.generate_advice(current_data, history_data, generation_context)
@@ -284,21 +303,21 @@ def generate_advice(
             request.year,
             request.month,
         )
-        answered_fact_type = (
-            "active_priority"
-            if request.active_priority is not None
-            else request.emergency_fund_fact.fact_type
-            if request.emergency_fund_fact is not None
-            else request.commitment_fact.fact_type
-            if request.commitment_fact is not None
-            else request.income_fact.fact_type
-            if request.income_fact is not None
-            and any(
-                context.fact_type == request.income_fact.fact_type and context.state != "to_confirm"
-                for context in income_contexts
-            )
-            else None
-        )
+        advice_service.validate_constraint_usage(advice_response, constraint_contexts)
+        answered_fact_type = None
+        if request.active_priority is not None:
+            answered_fact_type = "active_priority"
+        elif request.emergency_fund_fact is not None:
+            answered_fact_type = request.emergency_fund_fact.fact_type
+        elif request.commitment_fact is not None:
+            answered_fact_type = request.commitment_fact.fact_type
+        elif request.income_fact is not None and any(
+            context.fact_type == request.income_fact.fact_type and context.state != "to_confirm"
+            for context in income_contexts
+        ):
+            answered_fact_type = request.income_fact.fact_type
+        elif request.constraint_fact is not None:
+            answered_fact_type = request.constraint_fact.fact_type
         if answered_fact_type is not None:
             repeats_answered_question = any(
                 output.type == "clarification" and output.fact_type == answered_fact_type
@@ -328,6 +347,8 @@ def generate_advice(
             or request.commitment_fact is not None
             and not request.remember_fact
             or request.income_fact is not None
+            and not request.remember_fact
+            or request.constraint_fact is not None
             and not request.remember_fact
         )
         if session_only_answer:
@@ -1072,6 +1093,187 @@ def delete_commitment_fact(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+def _session_constraint_context(payload: ConstraintFactInput) -> ConstraintFactContext:
+    """Build request-scoped decision constraint.
+
+    Parameters
+    ----------
+    payload : ConstraintFactInput
+        Clarification answer.
+
+    Returns
+    -------
+    ConstraintFactContext
+        Session-only generation context.
+    """
+    values = {
+        **payload.model_dump(),
+        "fact_id": None,
+        "state": "session",
+        "last_confirmed_at": utc_now().replace(tzinfo=None),
+        "valid_until": None,
+    }
+    model = FinancialLimitContext if payload.fact_type == "financial_limit" else ActionUnavailabilityContext
+    return model.model_validate(values)
+
+
+def _constraint_fact_data(fact: ConstraintFact) -> ConstraintFactData:
+    """Map persistence to API data.
+
+    Parameters
+    ----------
+    fact : ConstraintFact
+        Stored constraint.
+
+    Returns
+    -------
+    ConstraintFactData
+        Typed API fact.
+    """
+    values = {
+        "fact_id": fact.id,
+        "fact_type": fact.fact_type,
+        "state": fact.state,
+        "last_confirmed_at": fact.last_confirmed_at,
+        "valid_until": fact.valid_until,
+    }
+    if fact.fact_type == "financial_limit":
+        values.update(
+            scope_type=fact.scope_type,
+            scope=fact.scope,
+            limit_type=fact.limit_type,
+            amount=fact.amount,
+        )
+    else:
+        values.update(action=fact.action, review_date=fact.review_date)
+    return constraint_fact_adapter.validate_python(values)
+
+
+@router.get("/context/constraints", response_model=ConstraintContextResponse)
+def get_constraint_context(fact_repo: ConstraintRepo, advice_repo: AdviceRepo) -> ConstraintContextResponse:
+    """Return stored constraints, including expired values.
+
+    Parameters
+    ----------
+    fact_repo : ConstraintRepo
+        Constraint persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+
+    Returns
+    -------
+    ConstraintContextResponse
+        Stored constraints.
+    """
+    facts = fact_repo.get_all()
+    for fact in facts:
+        if fact.state == "to_confirm":
+            advice_repo.delete_depending_on_declared_fact(fact.fact_type)
+    return ConstraintContextResponse(facts=[_constraint_fact_data(fact) for fact in facts])
+
+
+@router.post("/context/constraints", response_model=ConstraintFactResponse)
+def create_constraint_fact(
+    payload: ConstraintFactInput,
+    fact_repo: ConstraintRepo,
+    advice_repo: AdviceRepo,
+) -> ConstraintFactResponse:
+    """Create one decision constraint.
+
+    Parameters
+    ----------
+    payload : ConstraintFactInput
+        Declared constraint.
+    fact_repo : ConstraintRepo
+        Constraint persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+
+    Returns
+    -------
+    ConstraintFactResponse
+        Created constraint.
+    """
+    fact = fact_repo.put(payload.model_dump())
+    advice_repo.delete_depending_on_declared_fact(fact.fact_type)
+    return ConstraintFactResponse(fact=_constraint_fact_data(fact))
+
+
+@router.put("/context/constraints/{fact_id}", response_model=ConstraintFactResponse)
+def update_constraint_fact(
+    payload: ConstraintFactInput,
+    fact_repo: ConstraintRepo,
+    advice_repo: AdviceRepo,
+    fact_id: int = Path(..., ge=1),
+) -> ConstraintFactResponse:
+    """Correct or reconfirm one decision constraint.
+
+    Parameters
+    ----------
+    payload : ConstraintFactInput
+        Replacement constraint.
+    fact_repo : ConstraintRepo
+        Constraint persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+    fact_id : int
+        Stored fact identifier.
+
+    Returns
+    -------
+    ConstraintFactResponse
+        Updated constraint.
+
+    Raises
+    ------
+    HTTPException
+        Fact is absent.
+    """
+    if fact_repo.get(fact_id) is None:
+        raise HTTPException(status_code=404, detail="Constraint fact not found.")
+    fact = fact_repo.put(payload.model_dump(), fact_id)
+    advice_repo.delete_depending_on_declared_fact(fact.fact_type)
+    return ConstraintFactResponse(fact=_constraint_fact_data(fact))
+
+
+@router.delete(
+    "/context/constraints/{fact_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+def delete_constraint_fact(
+    fact_repo: ConstraintRepo,
+    advice_repo: AdviceRepo,
+    fact_id: int = Path(..., ge=1),
+) -> Response:
+    """Delete one decision constraint.
+
+    Parameters
+    ----------
+    fact_repo : ConstraintRepo
+        Constraint persistence.
+    advice_repo : AdviceRepo
+        Advice persistence.
+    fact_id : int
+        Stored fact identifier.
+
+    Returns
+    -------
+    Response
+        Empty success response.
+
+    Raises
+    ------
+    HTTPException
+        Fact is absent.
+    """
+    fact_type = fact_repo.delete(fact_id)
+    if fact_type is None:
+        raise HTTPException(status_code=404, detail="Constraint fact not found.")
+    advice_repo.delete_depending_on_declared_fact(fact_type)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/{year}/{month}", response_model=GetAdviceResponse)
 def get_advice(
     month_repo: MonthRepo,
@@ -1080,6 +1282,7 @@ def get_advice(
     fact_repo: EmergencyFundRepo,
     commitment_repo: CommitmentRepo,
     income_repo: IncomeFactRepo,
+    constraint_repo: ConstraintRepo,
     year: int = Path(..., ge=2000, le=2100, description="Year (e.g., 2025)"),
     month: int = Path(..., ge=1, le=12, description="Month number (1-12)"),
 ) -> GetAdviceResponse:
@@ -1118,6 +1321,7 @@ def get_advice(
         _load_emergency_fund_facts(fact_repo, advice_repo)
         advice_service.load_commitment_context(commitment_repo, advice_repo)
         advice_service.load_income_context(income_repo, advice_repo)
+        advice_service.load_constraint_context(constraint_repo, advice_repo)
 
         # ##>: Check eligibility for this month.
         eligibility = check_eligibility(year, month, month_record.id, month_repo, advice_repo)

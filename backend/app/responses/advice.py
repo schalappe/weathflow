@@ -44,6 +44,7 @@ class GenerateAdviceRequest(BaseModel):
     emergency_fund_fact: EmergencyFundFactAnswer | None = None
     commitment_fact: CommitmentFactInput | None = None
     income_fact: IncomeFactInput | None = None
+    constraint_fact: ConstraintFactInput | None = None
     remember_fact: bool = True
     clarification_action: Literal["skip", "unknown"] | None = None
 
@@ -219,6 +220,153 @@ class IncomeContextResponse(BaseModel):
     """Stored income facts."""
 
     facts: list[IncomeFactData]
+
+
+class FinancialLimitInput(BaseModel):
+    """Scoped financial limit.
+
+    Attributes
+    ----------
+    fact_type : Literal["financial_limit"]
+        Discriminator.
+    scope_type : Literal["expense", "action"]
+        Scope kind.
+    scope : str
+        Exact scope.
+    limit_type : Literal["floor", "cap", "sustainable_amount"]
+        Boundary kind.
+    amount : float
+        Boundary amount.
+    """
+
+    fact_type: Literal["financial_limit"]
+    scope_type: Literal["expense", "action"]
+    scope: str = Field(min_length=1, max_length=200)
+    limit_type: Literal["floor", "cap", "sustainable_amount"]
+    amount: float = Field(gt=0, allow_inf_nan=False)
+
+
+class ActionUnavailabilityInput(BaseModel):
+    """Action unavailable until explicit review date.
+
+    Attributes
+    ----------
+    fact_type : Literal["action_unavailability"]
+        Discriminator.
+    action : str
+        Exact unavailable action.
+    review_date : date
+        Review date.
+    """
+
+    fact_type: Literal["action_unavailability"]
+    action: str = Field(min_length=1, max_length=200)
+    review_date: date
+
+
+ConstraintFactInput = Annotated[
+    FinancialLimitInput | ActionUnavailabilityInput,
+    Field(discriminator="fact_type"),
+]
+
+
+class ConstraintFactLifecycle(BaseModel):
+    """Stored constraint lifecycle.
+
+    Attributes
+    ----------
+    fact_id : int
+        Stored identifier.
+    state : Literal["active", "corrected", "to_confirm"]
+        Lifecycle state.
+    last_confirmed_at : datetime
+        Last declaration timestamp.
+    valid_until : datetime
+        Freshness cutoff.
+    """
+
+    fact_id: int
+    state: Literal["active", "corrected", "to_confirm"]
+    last_confirmed_at: datetime
+    valid_until: datetime
+
+
+class FinancialLimitData(FinancialLimitInput, ConstraintFactLifecycle):
+    """Stored financial limit.
+
+    Attributes
+    ----------
+    fact_type : Literal["financial_limit"]
+        Discriminator.
+    scope_type : Literal["expense", "action"]
+        Scope kind.
+    scope : str
+        Exact scope.
+    limit_type : Literal["floor", "cap", "sustainable_amount"]
+        Boundary kind.
+    amount : float
+        Boundary amount.
+    fact_id : int
+        Stored identifier.
+    state : Literal["active", "corrected", "to_confirm"]
+        Lifecycle state.
+    last_confirmed_at : datetime
+        Last declaration timestamp.
+    valid_until : datetime
+        Freshness cutoff.
+    """
+
+
+class ActionUnavailabilityData(ActionUnavailabilityInput, ConstraintFactLifecycle):
+    """Stored unavailable action.
+
+    Attributes
+    ----------
+    fact_type : Literal["action_unavailability"]
+        Discriminator.
+    action : str
+        Exact unavailable action.
+    review_date : date
+        Review date.
+    fact_id : int
+        Stored identifier.
+    state : Literal["active", "corrected", "to_confirm"]
+        Lifecycle state.
+    last_confirmed_at : datetime
+        Last declaration timestamp.
+    valid_until : datetime
+        Freshness cutoff.
+    """
+
+
+ConstraintFactData = Annotated[
+    FinancialLimitData | ActionUnavailabilityData,
+    Field(discriminator="fact_type"),
+]
+
+
+class ConstraintFactResponse(BaseModel):
+    """One stored decision constraint.
+
+    Attributes
+    ----------
+    fact : ConstraintFactData
+        Stored constraint.
+    """
+
+    fact: ConstraintFactData
+
+
+class ConstraintContextResponse(BaseModel):
+    """Stored decision constraints.
+
+    Attributes
+    ----------
+    facts : list[ConstraintFactData]
+        Stored constraints.
+    """
+
+    facts: list[ConstraintFactData]
 
 
 CommitmentFactType = Literal[

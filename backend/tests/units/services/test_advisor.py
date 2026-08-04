@@ -9,11 +9,13 @@ import pytest
 
 from app.services.advice.generator import AdviceGenerator
 from app.services.advice.models import (
+    ActionUnavailabilityContext,
     ActivePriorityContext,
     AdviceContext,
     AdviceResponse,
     CommitmentFactContext,
     EmergencyFundFactContext,
+    FinancialLimitContext,
     IncomeFactContext,
     MonthData,
 )
@@ -234,6 +236,44 @@ def test_prompt_defines_emergency_fund_materiality_and_trajectory() -> None:
     assert "revenu disponible habituel mensuel - dépenses essentielles" in prompt
     assert "N'infère jamais ces trois faits depuis les transactions" in prompt
     assert "conclusion `no_action`" in prompt
+
+
+def test_prompt_respects_scoped_limits_and_unavailable_actions() -> None:
+    """Prompt keeps declared constraints authoritative and narrowly scoped."""
+    confirmed_at = datetime(2026, 8, 2)
+    context = AdviceContext(
+        constraint_facts=[
+            FinancialLimitContext(
+                fact_id=8,
+                fact_type="financial_limit",
+                scope_type="expense",
+                scope="Budget transports",
+                limit_type="sustainable_amount",
+                amount=90,
+                state="active",
+                last_confirmed_at=confirmed_at,
+                valid_until=datetime(2026, 10, 31),
+            ),
+            ActionUnavailabilityContext(
+                fact_id=9,
+                fact_type="action_unavailability",
+                action="Renégocier le loyer",
+                review_date=date(2026, 9, 15),
+                state="active",
+                last_confirmed_at=confirmed_at,
+                valid_until=datetime(2026, 9, 15),
+            ),
+        ]
+    )
+
+    prompt = _generator()._build_user_prompt(_month(month=2), [_month(month=1)], context)
+
+    assert '"scope": "Budget transports"' in prompt
+    assert '"action": "Renégocier le loyer"' in prompt
+    assert "tout montant conseillé sur la portée vaut au plus `amount`" in prompt
+    assert "ne la remplace pas par une alternative" in prompt
+    assert "Les habitudes et transactions passées" in prompt
+    assert "prime sur le repère 50/30/20" in prompt
 
 
 def test_prompt_calibrates_income_without_double_counting_observed_entries() -> None:

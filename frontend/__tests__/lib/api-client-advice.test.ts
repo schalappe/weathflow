@@ -2,14 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   deleteActivePriority,
   deleteCommitmentFact,
+  deleteConstraintFact,
   deleteEmergencyFundFact,
   generateAdvice,
   getCommitmentContext,
+  getConstraintContext,
   getActivePriority,
   getEmergencyFundContext,
   getAdvice,
   putActivePriority,
   putCommitmentFact,
+  putConstraintFact,
   putEmergencyFundFact,
 } from "@/lib/api-client";
 import { createMockAdviceData } from "@/__tests__/utils/test-factories";
@@ -263,6 +266,52 @@ describe("API Client - Advice Functions", () => {
       );
     });
 
+    it("sends a reusable scoped financial limit", async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            advice: createMockAdviceData(),
+            generated_at: "2026-08-02T12:00:00Z",
+            is_valid: true,
+            was_cached: false,
+          }),
+      });
+
+      await generateAdvice(2025, 12, {
+        regenerate: true,
+        constraintFact: {
+          fact_type: "financial_limit",
+          scope_type: "expense",
+          scope: "Budget transports",
+          limit_type: "sustainable_amount",
+          amount: 90,
+        },
+        rememberFact: true,
+      });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/advice/generate"),
+        expect.objectContaining({
+          body: JSON.stringify({
+            year: 2025,
+            month: 12,
+            regenerate: true,
+            remember_priority: true,
+            constraint_fact: {
+              fact_type: "financial_limit",
+              scope_type: "expense",
+              scope: "Budget transports",
+              limit_type: "sustainable_amount",
+              amount: 90,
+            },
+            remember_fact: true,
+          }),
+        }),
+      );
+    });
+
     it("persists unknown clarification as an abstention", async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -460,6 +509,52 @@ describe("API Client - Advice Functions", () => {
       expect(global.fetch).toHaveBeenNthCalledWith(
         3,
         expect.stringContaining("/api/advice/context/commitments/7"),
+        { method: "DELETE" },
+      );
+    });
+  });
+
+  describe("constraint context", () => {
+    it("reads, corrects, and deletes constraints by id", async () => {
+      const input = {
+        fact_type: "action_unavailability" as const,
+        action: "Renégocier le loyer",
+        review_date: "2026-09-15",
+      };
+      const fact = {
+        ...input,
+        fact_id: 9,
+        state: "active" as const,
+        last_confirmed_at: "2026-08-02T12:00:00Z",
+        valid_until: "2026-09-15T00:00:00Z",
+      };
+      global.fetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ facts: [fact] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ fact }),
+        })
+        .mockResolvedValueOnce({ ok: true });
+
+      await expect(getConstraintContext()).resolves.toEqual({ facts: [fact] });
+      await expect(putConstraintFact(9, input)).resolves.toEqual({ fact });
+      await expect(deleteConstraintFact(9)).resolves.toBeUndefined();
+
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining("/api/advice/context/constraints/9"),
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify(input),
+        }),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining("/api/advice/context/constraints/9"),
         { method: "DELETE" },
       );
     });

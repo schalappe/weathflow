@@ -9,18 +9,25 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.models.advice import Advice
 from app.db.models.commitment_fact import CommitmentFact
+from app.db.models.constraint_fact import ConstraintFact
 from app.db.models.income_fact import IncomeFact
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.repositories.advice import AdviceRepository
 from app.repositories.commitment_fact import CommitmentFactRepository, CommitmentFactType
+from app.repositories.constraint_fact import ConstraintFactRepository, ConstraintFactType
 from app.repositories.income_fact import IncomeFactRepository, IncomeFactType
 from app.services.advice.models import (
+    ActionUnavailabilityCitation,
+    ActionUnavailabilityContext,
     AdviceResponse,
     CommitmentFactContext,
+    ConstraintFactContext,
     DecisionOutput,
     DecisionTrace,
     DecisionTraceDetails,
+    FinancialLimitCitation,
+    FinancialLimitContext,
     IncomeFactCitation,
     IncomeFactContext,
     MonthData,
@@ -512,6 +519,140 @@ def prepare_income_context(
     return contexts
 
 
+_CONSTRAINT_FIELDS: dict[ConstraintFactType, tuple[str, ...]] = {
+    "financial_limit": ("scope_type", "scope", "limit_type", "amount"),
+    "action_unavailability": ("action", "review_date"),
+}
+
+
+def constraint_fact_context(fact: ConstraintFact) -> ConstraintFactContext:
+    """Map persistence to generation context.
+
+    Parameters
+    ----------
+    fact : ConstraintFact
+        Stored constraint.
+
+    Returns
+    -------
+    ConstraintFactContext
+        Generation constraint.
+    """
+    fact_type = cast(ConstraintFactType, fact.fact_type)
+    values = {
+        "fact_id": fact.id,
+        "fact_type": fact_type,
+        "state": fact.state,
+        "last_confirmed_at": fact.last_confirmed_at,
+        "valid_until": fact.valid_until,
+    }
+    values.update({field: getattr(fact, field) for field in _CONSTRAINT_FIELDS[fact_type]})
+    model = FinancialLimitContext if fact_type == "financial_limit" else ActionUnavailabilityContext
+    return model.model_validate(values)
+
+
+def load_constraint_context(
+    fact_repo: ConstraintFactRepository,
+    advice_repo: AdviceRepository,
+) -> list[ConstraintFactContext]:
+    """Load constraints and invalidate advice citing expired facts.
+
+    Parameters
+    ----------
+    fact_repo : ConstraintFactRepository
+        Constraint persistence.
+    advice_repo : AdviceRepository
+        Advice persistence.
+
+    Returns
+    -------
+    list[ConstraintFactContext]
+        Current generation constraints.
+    """
+    facts = fact_repo.get_all()
+    for fact in facts:
+        if fact.state == "to_confirm":
+            advice_repo.delete_depending_on_declared_fact(fact.fact_type)
+    return [constraint_fact_context(fact) for fact in facts]
+
+
+def _same_constraint(left: ConstraintFactContext, right: ConstraintFactContext) -> bool:
+    """Match one scoped constraint.
+
+    Parameters
+    ----------
+    left : ConstraintFactContext
+        First constraint.
+    right : ConstraintFactContext
+        Second constraint.
+
+    Returns
+    -------
+    bool
+        Whether identities match.
+    """
+    if left.fact_type != right.fact_type:
+        return False
+    if isinstance(left, FinancialLimitContext) and isinstance(right, FinancialLimitContext):
+        return (
+            left.scope_type,
+            left.scope,
+            left.limit_type,
+        ) == (
+            right.scope_type,
+            right.scope,
+            right.limit_type,
+        )
+    return (
+        isinstance(left, ActionUnavailabilityContext)
+        and isinstance(right, ActionUnavailabilityContext)
+        and left.action == right.action
+    )
+
+
+def prepare_constraint_context(
+    fact_repo: ConstraintFactRepository,
+    advice_repo: AdviceRepository,
+    answer: ConstraintFactContext | None,
+    remember: bool,
+) -> list[ConstraintFactContext]:
+    """Apply optional answer to stored constraints.
+
+    Parameters
+    ----------
+    fact_repo : ConstraintFactRepository
+        Constraint persistence.
+    advice_repo : AdviceRepository
+        Advice persistence.
+    answer : ConstraintFactContext | None
+        Request-scoped answer.
+    remember : bool
+        Persist answer when true.
+
+    Returns
+    -------
+    list[ConstraintFactContext]
+        Current generation constraints.
+    """
+    contexts = load_constraint_context(fact_repo, advice_repo)
+    if answer is None:
+        return contexts
+    matching = next((context for context in contexts if _same_constraint(context, answer)), None)
+    matching_id = matching.fact_id if matching is not None else None
+    contexts = [context for context in contexts if context is not matching]
+    if remember:
+        values = answer.model_dump(include={"fact_type", *_CONSTRAINT_FIELDS[answer.fact_type]})
+        fact = fact_repo.put(values, matching_id)
+        advice_repo.delete_depending_on_declared_fact(answer.fact_type)
+        contexts.append(constraint_fact_context(fact))
+    else:
+        if matching_id is not None:
+            fact_repo.mark_to_confirm(matching_id)
+            advice_repo.delete_depending_on_declared_fact(answer.fact_type)
+        contexts.append(answer)
+    return contexts
+
+
 def deduplicate_expected_income(
     contexts: list[IncomeFactContext],
     months: list[MonthData],
@@ -650,6 +791,74 @@ def validate_income_usage(
                 raise AdviceParseError(advice.model_dump_json())
 
 
+def validate_constraint_usage(
+    advice: AdviceResponse,
+    contexts: list[ConstraintFactContext],
+) -> None:
+    """Reject forged, unavailable, untraced, or out-of-bounds recommendations.
+
+    Parameters
+    ----------
+    advice : AdviceResponse
+        Parsed generator output.
+    contexts : list[ConstraintFactContext]
+        Current declared constraints.
+
+    Raises
+    ------
+    AdviceParseError
+        Constraint is forged, omitted, unavailable, or violated.
+    """
+    active = [context for context in contexts if context.state in {"active", "corrected", "session"}]
+    financial_limits = [context for context in active if isinstance(context, FinancialLimitContext)]
+    unavailable_actions = [context for context in active if isinstance(context, ActionUnavailabilityContext)]
+    for output in advice.outputs:
+        if output.type == "clarification":
+            continue
+        citations = [
+            citation
+            for citation in output.trace.details.declared_facts
+            if isinstance(citation, (FinancialLimitCitation, ActionUnavailabilityCitation))
+        ]
+        for citation in citations:
+            source = next((context for context in active if _same_constraint(context, citation)), None)
+            if source is None or citation.model_dump(exclude={"can_correct", "can_delete"}) != source.model_dump():
+                raise AdviceParseError(advice.model_dump_json())
+            if output.type != "recommendation":
+                continue
+            if isinstance(citation, ActionUnavailabilityCitation):
+                raise AdviceParseError(advice.model_dump_json())
+            if output.subject is None or output.subject.strip().casefold() != citation.scope.strip().casefold():
+                raise AdviceParseError(advice.model_dump_json())
+
+        if output.type != "recommendation":
+            continue
+        if financial_limits and output.subject is None:
+            raise AdviceParseError(advice.model_dump_json())
+        if any(
+            output.action.strip().casefold() == unavailable.action.strip().casefold()
+            for unavailable in unavailable_actions
+        ):
+            raise AdviceParseError(advice.model_dump_json())
+        for limit in financial_limits:
+            if output.subject is None or output.subject.strip().casefold() != limit.scope.strip().casefold():
+                continue
+            if not any(
+                isinstance(citation, FinancialLimitCitation) and _same_constraint(limit, citation)
+                for citation in citations
+            ):
+                raise AdviceParseError(advice.model_dump_json())
+            if output.amount is None:
+                continue
+            if (
+                limit.limit_type in {"cap", "sustainable_amount"}
+                and output.amount > limit.amount
+                or limit.limit_type == "floor"
+                and output.amount < limit.amount
+            ):
+                raise AdviceParseError(advice.model_dump_json())
+
+
 def resolve_clarification(
     advice: AdviceResponse,
     year: int,
@@ -690,6 +899,8 @@ def resolve_clarification(
             "debt_terms": "conditions de dette",
             "usual_disposable_income": "revenu disponible habituel",
             "expected_one_off_income": "entrée exceptionnelle attendue",
+            "financial_limit": "limite financière",
+            "action_unavailability": "indisponibilité d'action",
         }[output.fact_type]
         limit = (
             f"Information non fournie ({label}) : question passée."

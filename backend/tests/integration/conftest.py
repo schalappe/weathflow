@@ -15,6 +15,7 @@ from app.db.database import Base, get_db
 from app.db.models.active_priority import ActivePriority  # noqa: F401
 from app.db.models.advice import Advice  # noqa: F401
 from app.db.models.commitment_fact import CommitmentFact  # noqa: F401
+from app.db.models.constraint_fact import ConstraintFact  # noqa: F401
 from app.db.models.emergency_fund_fact import EmergencyFundFact  # noqa: F401
 from app.db.models.income_fact import IncomeFact  # noqa: F401
 from app.db.models.month import Month  # noqa: F401

@@ -284,11 +284,14 @@ export type CommitmentFactType =
   | "debt_position"
   | "debt_terms";
 
+export type ConstraintFactType = "financial_limit" | "action_unavailability";
+
 export type DeclaredFactType =
   | "active_priority"
   | EmergencyFundFactType
   | CommitmentFactType
-  | IncomeFactType;
+  | IncomeFactType
+  | ConstraintFactType;
 
 export interface EmergencyFundFactInput {
   fact_type: EmergencyFundFactType;
@@ -404,6 +407,39 @@ export interface CommitmentFactResponse {
   fact: CommitmentFact;
 }
 
+export interface FinancialLimitInput {
+  fact_type: "financial_limit";
+  scope_type: "expense" | "action";
+  scope: string;
+  limit_type: "floor" | "cap" | "sustainable_amount";
+  amount: number;
+}
+
+export interface ActionUnavailabilityInput {
+  fact_type: "action_unavailability";
+  action: string;
+  review_date: string;
+}
+
+export type ConstraintFactInput =
+  | FinancialLimitInput
+  | ActionUnavailabilityInput;
+
+export type ConstraintFact = ConstraintFactInput & {
+  fact_id: number;
+  state: Exclude<ActivePriorityState, "session">;
+  last_confirmed_at: string;
+  valid_until: string;
+};
+
+export interface ConstraintContextResponse {
+  facts: ConstraintFact[];
+}
+
+export interface ConstraintFactResponse {
+  fact: ConstraintFact;
+}
+
 export interface ActivePriorityCitation extends ActivePriorityInput {
   fact_type: "active_priority";
   state: Exclude<ActivePriorityState, "to_confirm">;
@@ -447,11 +483,21 @@ export type IncomeFactCitation =
       frequency: null;
     } & IncomeCitationLifecycle);
 
+export type ConstraintFactCitation = ConstraintFactInput & {
+  fact_id: number | null;
+  state: Exclude<ActivePriorityState, "to_confirm">;
+  last_confirmed_at: string;
+  valid_until: string | null;
+  can_correct: true;
+  can_delete: true;
+};
+
 export type DeclaredFactCitation =
   | ActivePriorityCitation
   | EmergencyFundFactCitation
   | CommitmentFactCitation
-  | IncomeFactCitation;
+  | IncomeFactCitation
+  | ConstraintFactCitation;
 
 export interface IncomeNormalization {
   fact_type: IncomeFactType;
@@ -487,6 +533,7 @@ interface DecisionOutputBase {
 
 export interface RecommendationOutput extends DecisionOutputBase {
   type: "recommendation";
+  subject?: string;
   action: string;
   income_dependent: boolean;
   amount?: number;

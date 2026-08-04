@@ -27,16 +27,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   deleteActivePriority,
   deleteCommitmentFact,
+  deleteConstraintFact,
   deleteEmergencyFundFact,
   deleteIncomeFact,
   generateAdvice,
   getCommitmentContext,
+  getConstraintContext,
   getEmergencyFundContext,
   getIncomeContext,
   getActivePriority,
   getAdvice,
   putActivePriority,
   putCommitmentFact,
+  putConstraintFact,
   putEmergencyFundFact,
   putIncomeFact,
 } from "@/lib/api-client";
@@ -56,6 +59,10 @@ import type {
   CommitmentFactInput,
   CommitmentFactType,
   CommitmentFrequency,
+  ConstraintFact,
+  ConstraintFactCitation,
+  ConstraintFactInput,
+  ConstraintFactType,
   EmergencyFundFact,
   EmergencyFundFactInput,
   EmergencyFundFactType,
@@ -145,6 +152,51 @@ const incomeFrequencyLabels: Record<IncomeFrequency, string> = {
   quarterly: "Trimestrielle",
   yearly: "Annuelle",
 };
+
+const constraintFactTypes: Record<ConstraintFactType, true> = {
+  financial_limit: true,
+  action_unavailability: true,
+};
+
+function isConstraintFactType(
+  factType: string,
+): factType is ConstraintFactType {
+  return factType in constraintFactTypes;
+}
+
+function isConstraintFact(
+  fact: DeclaredFactCitation,
+): fact is ConstraintFactCitation {
+  return isConstraintFactType(fact.fact_type);
+}
+
+function constraintInputFromForm(
+  factType: ConstraintFactType,
+  data: FormData,
+): ConstraintFactInput {
+  return factType === "financial_limit"
+    ? {
+        fact_type: factType,
+        scope_type: String(data.get("scope_type")) as "expense" | "action",
+        scope: String(data.get("scope")),
+        limit_type: String(data.get("limit_type")) as
+          | "floor"
+          | "cap"
+          | "sustainable_amount",
+        amount: Number(data.get("amount")),
+      }
+    : {
+        fact_type: factType,
+        action: String(data.get("action")),
+        review_date: String(data.get("review_date")),
+      };
+}
+
+function constraintFactSummary(fact: ConstraintFactInput): string {
+  return fact.fact_type === "financial_limit"
+    ? `${fact.scope} — ${formatCurrency(fact.amount)}`
+    : `${fact.action} — indisponible jusqu’au ${new Date(`${fact.review_date}T00:00:00`).toLocaleDateString("fr-FR")}`;
+}
 
 function isIncomeFactType(factType: string): factType is IncomeFactType {
   return (
@@ -317,6 +369,7 @@ export function AdvicePanelContent({
   >([]);
   const [commitmentFacts, setCommitmentFacts] = useState<CommitmentFact[]>([]);
   const [incomeFacts, setIncomeFacts] = useState<IncomeFact[]>([]);
+  const [constraintFacts, setConstraintFacts] = useState<ConstraintFact[]>([]);
   const [contextError, setContextError] = useState<string | null>(null);
   const canGenerate = state.eligibility?.can_generate ?? false;
 
@@ -328,6 +381,7 @@ export function AdvicePanelContent({
       getEmergencyFundContext(),
       getCommitmentContext(),
       getIncomeContext(),
+      getConstraintContext(),
     ])
       .then(
         ([
@@ -335,12 +389,14 @@ export function AdvicePanelContent({
           emergencyFundContext,
           commitmentContext,
           incomeContext,
+          constraintContext,
         ]) => {
           if (active) {
             setActivePriority(priority);
             setEmergencyFundFacts(emergencyFundContext.facts);
             setCommitmentFacts(commitmentContext.facts);
             setIncomeFacts(incomeContext.facts);
+            setConstraintFacts(constraintContext.facts);
             setContextError(null);
           }
         },
@@ -397,21 +453,23 @@ export function AdvicePanelContent({
     }
   }, [year, month, state.panelState]);
 
-  const handlePriorityAnswer = useCallback(
-    async (priority: ActivePriorityInput, rememberPriority: boolean) => {
+  const answerClarification = useCallback(
+    async (
+      options: NonNullable<Parameters<typeof generateAdvice>[2]>,
+      refresh?: () => Promise<void>,
+    ) => {
       dispatch({ type: "REGENERATE_START" });
       try {
         const response = await generateAdvice(year, month, {
+          ...options,
           regenerate: true,
-          activePriority: priority,
-          rememberPriority,
         });
         dispatch({
           type: "REGENERATE_SUCCESS",
           advice: response.advice,
           generatedAt: response.generated_at,
         });
-        setActivePriority((await getActivePriority()).priority);
+        await refresh?.();
       } catch (error) {
         dispatch({
           type: "REGENERATE_ERROR",
@@ -420,104 +478,53 @@ export function AdvicePanelContent({
       }
     },
     [year, month],
+  );
+
+  const handlePriorityAnswer = useCallback(
+    (priority: ActivePriorityInput, rememberPriority: boolean) =>
+      answerClarification(
+        { activePriority: priority, rememberPriority },
+        async () => setActivePriority((await getActivePriority()).priority),
+      ),
+    [answerClarification],
   );
 
   const handleEmergencyFundAnswer = useCallback(
-    async (fact: EmergencyFundFactInput, rememberFact: boolean) => {
-      dispatch({ type: "REGENERATE_START" });
-      try {
-        const response = await generateAdvice(year, month, {
-          regenerate: true,
-          emergencyFundFact: fact,
-          rememberFact,
-        });
-        dispatch({
-          type: "REGENERATE_SUCCESS",
-          advice: response.advice,
-          generatedAt: response.generated_at,
-        });
-        setEmergencyFundFacts((await getEmergencyFundContext()).facts);
-      } catch (error) {
-        dispatch({
-          type: "REGENERATE_ERROR",
-          error: getErrorMessage(error, t.advice.generateError),
-        });
-      }
-    },
-    [year, month],
+    (fact: EmergencyFundFactInput, rememberFact: boolean) =>
+      answerClarification({ emergencyFundFact: fact, rememberFact }, async () =>
+        setEmergencyFundFacts((await getEmergencyFundContext()).facts),
+      ),
+    [answerClarification],
   );
 
   const handleCommitmentAnswer = useCallback(
-    async (fact: CommitmentFactInput, rememberFact: boolean) => {
-      dispatch({ type: "REGENERATE_START" });
-      try {
-        const response = await generateAdvice(year, month, {
-          regenerate: true,
-          commitmentFact: fact,
-          rememberFact,
-        });
-        dispatch({
-          type: "REGENERATE_SUCCESS",
-          advice: response.advice,
-          generatedAt: response.generated_at,
-        });
-        setCommitmentFacts((await getCommitmentContext()).facts);
-      } catch (error) {
-        dispatch({
-          type: "REGENERATE_ERROR",
-          error: getErrorMessage(error, t.advice.generateError),
-        });
-      }
-    },
-    [year, month],
+    (fact: CommitmentFactInput, rememberFact: boolean) =>
+      answerClarification({ commitmentFact: fact, rememberFact }, async () =>
+        setCommitmentFacts((await getCommitmentContext()).facts),
+      ),
+    [answerClarification],
   );
 
   const handleIncomeAnswer = useCallback(
-    async (fact: IncomeFactInput, rememberFact: boolean) => {
-      dispatch({ type: "REGENERATE_START" });
-      try {
-        const response = await generateAdvice(year, month, {
-          regenerate: true,
-          incomeFact: fact,
-          rememberFact,
-        });
-        dispatch({
-          type: "REGENERATE_SUCCESS",
-          advice: response.advice,
-          generatedAt: response.generated_at,
-        });
-        setIncomeFacts((await getIncomeContext()).facts);
-      } catch (error) {
-        dispatch({
-          type: "REGENERATE_ERROR",
-          error: getErrorMessage(error, t.advice.generateError),
-        });
-      }
-    },
-    [year, month],
+    (fact: IncomeFactInput, rememberFact: boolean) =>
+      answerClarification({ incomeFact: fact, rememberFact }, async () =>
+        setIncomeFacts((await getIncomeContext()).facts),
+      ),
+    [answerClarification],
+  );
+
+  const handleConstraintAnswer = useCallback(
+    (fact: ConstraintFactInput, rememberFact: boolean) =>
+      answerClarification({ constraintFact: fact, rememberFact }, async () =>
+        setConstraintFacts((await getConstraintContext()).facts),
+      ),
+    [answerClarification],
   );
 
   const handleClarificationAbstention = useCallback(
-    async (clarificationAction: "skip" | "unknown") => {
-      dispatch({ type: "REGENERATE_START" });
-      try {
-        const response = await generateAdvice(year, month, {
-          regenerate: true,
-          clarificationAction,
-        });
-        dispatch({
-          type: "REGENERATE_SUCCESS",
-          advice: response.advice,
-          generatedAt: response.generated_at,
-        });
-      } catch (error) {
-        dispatch({
-          type: "REGENERATE_ERROR",
-          error: getErrorMessage(error, t.advice.generateError),
-        });
-      }
-    },
-    [year, month],
+    (clarificationAction: "skip" | "unknown") =>
+      answerClarification({ clarificationAction }),
+    [answerClarification],
   );
 
   const handlePriorityCorrection = useCallback(
@@ -630,6 +637,37 @@ export function AdvicePanelContent({
     }
   }, []);
 
+  const handleConstraintCorrection = useCallback(
+    async (factId: number, input: ConstraintFactInput) => {
+      try {
+        const { fact } = await putConstraintFact(factId, input);
+        setConstraintFacts((facts) =>
+          facts.map((item) => (item.fact_id === factId ? fact : item)),
+        );
+        reload();
+      } catch (error) {
+        setContextError(getErrorMessage(error, "Correction impossible."));
+      }
+    },
+    [],
+  );
+
+  const handleConstraintDeletion = useCallback(async (factId: number) => {
+    if (
+      !window.confirm("Supprimer cette limite ou indisponibilité mémorisée ?")
+    )
+      return;
+    try {
+      await deleteConstraintFact(factId);
+      setConstraintFacts((facts) =>
+        facts.filter((fact) => fact.fact_id !== factId),
+      );
+      reload();
+    } catch (error) {
+      setContextError(getErrorMessage(error, "Suppression impossible."));
+    }
+  }, []);
+
   return (
     <div className={cn("space-y-6", className)}>
       <ActivePriorityPanel
@@ -652,6 +690,11 @@ export function AdvicePanelContent({
         facts={commitmentFacts}
         onCorrect={handleCommitmentCorrection}
         onDelete={handleCommitmentDeletion}
+      />
+      <ConstraintFactsPanel
+        facts={constraintFacts}
+        onCorrect={handleConstraintCorrection}
+        onDelete={handleConstraintDeletion}
       />
       {state.panelState === "loading" && <AdviceSkeletonLoader />}
       {state.panelState === "empty" && (
@@ -678,6 +721,7 @@ export function AdvicePanelContent({
           onEmergencyFundAnswer={handleEmergencyFundAnswer}
           onCommitmentAnswer={handleCommitmentAnswer}
           onIncomeAnswer={handleIncomeAnswer}
+          onConstraintAnswer={handleConstraintAnswer}
           onClarificationAbstention={handleClarificationAbstention}
           onCorrectSession={reload}
         />
@@ -1462,6 +1506,240 @@ function CommitmentFields({
   );
 }
 
+function ConstraintFactsPanel({
+  facts,
+  onCorrect,
+  onDelete,
+}: {
+  facts: ConstraintFact[];
+  onCorrect: (factId: number, fact: ConstraintFactInput) => Promise<void>;
+  onDelete: (factId: number) => Promise<void>;
+}) {
+  return (
+    <section className="space-y-4 rounded-xl border bg-muted/20 p-5">
+      <h4 className="font-semibold">Limites et indisponibilités</h4>
+      {facts.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Aucune contrainte financière mémorisée.
+        </p>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {facts.map((fact) => (
+            <ConstraintFactCard
+              key={fact.fact_id}
+              fact={fact}
+              onCorrect={onCorrect}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ConstraintFactCard({
+  fact,
+  onCorrect,
+  onDelete,
+}: {
+  fact: ConstraintFact;
+  onCorrect: (factId: number, fact: ConstraintFactInput) => Promise<void>;
+  onDelete: (factId: number) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const label = fact.fact_type === "financial_limit" ? fact.scope : fact.action;
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onCorrect(
+      fact.fact_id,
+      constraintInputFromForm(
+        fact.fact_type,
+        new FormData(event.currentTarget),
+      ),
+    );
+    setEditing(false);
+  }
+
+  return (
+    <article
+      id={`constraint-context-${fact.fact_id}`}
+      className="space-y-3 rounded-lg border bg-background/50 p-4"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h5 className="text-sm font-medium">{constraintFactSummary(fact)}</h5>
+        <Badge variant={fact.state === "to_confirm" ? "secondary" : "outline"}>
+          {fact.state === "active"
+            ? "Actif"
+            : fact.state === "corrected"
+              ? "Corrigé"
+              : "À confirmer"}
+        </Badge>
+      </div>
+      {editing ? (
+        <form className="space-y-3" onSubmit={handleSubmit}>
+          <ConstraintFields
+            factType={fact.fact_type}
+            defaultValue={fact}
+            idPrefix={`context-constraint-${fact.fact_id}`}
+          />
+          <div className="flex gap-2">
+            <Button type="submit" size="sm">
+              Enregistrer
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setEditing(false)}
+            >
+              Annuler
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">
+            Confirmé le {formatAdviceTimestamp(fact.last_confirmed_at)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Valide jusqu’au{" "}
+            {new Date(fact.valid_until).toLocaleDateString("fr-FR")}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label={`Corriger ${label}`}
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="h-4 w-4" />
+              Corriger
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              aria-label={`Supprimer ${label}`}
+              onClick={() => onDelete(fact.fact_id)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Supprimer
+            </Button>
+          </div>
+        </>
+      )}
+    </article>
+  );
+}
+
+function ConstraintFields({
+  factType,
+  defaultValue,
+  idPrefix,
+}: {
+  factType: ConstraintFactType;
+  defaultValue?: ConstraintFactInput;
+  idPrefix: string;
+}) {
+  if (factType === "action_unavailability") {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-action`}>Action indisponible</Label>
+          <Input
+            id={`${idPrefix}-action`}
+            name="action"
+            defaultValue={
+              defaultValue?.fact_type === "action_unavailability"
+                ? defaultValue.action
+                : ""
+            }
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-review-date`}>Date de réexamen</Label>
+          <Input
+            id={`${idPrefix}-review-date`}
+            name="review_date"
+            type="date"
+            defaultValue={
+              defaultValue?.fact_type === "action_unavailability"
+                ? defaultValue.review_date
+                : ""
+            }
+            required
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-2">
+        <Label htmlFor={`${idPrefix}-scope-type`}>Type de portée</Label>
+        <select
+          id={`${idPrefix}-scope-type`}
+          name="scope_type"
+          defaultValue={
+            defaultValue?.fact_type === "financial_limit"
+              ? defaultValue.scope_type
+              : "expense"
+          }
+          className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+        >
+          <option value="expense">Poste</option>
+          <option value="action">Action</option>
+        </select>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={`${idPrefix}-scope`}>Portée exacte</Label>
+        <Input
+          id={`${idPrefix}-scope`}
+          name="scope"
+          defaultValue={
+            defaultValue?.fact_type === "financial_limit"
+              ? defaultValue.scope
+              : ""
+          }
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={`${idPrefix}-limit-type`}>Type de limite</Label>
+        <select
+          id={`${idPrefix}-limit-type`}
+          name="limit_type"
+          defaultValue={
+            defaultValue?.fact_type === "financial_limit"
+              ? defaultValue.limit_type
+              : "sustainable_amount"
+          }
+          className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+        >
+          <option value="floor">Plancher</option>
+          <option value="cap">Plafond</option>
+          <option value="sustainable_amount">Montant soutenable</option>
+        </select>
+      </div>
+      <NumberField
+        id={`${idPrefix}-amount`}
+        name="amount"
+        label="Montant en euros"
+        defaultValue={
+          defaultValue?.fact_type === "financial_limit"
+            ? defaultValue.amount
+            : undefined
+        }
+        required
+      />
+    </div>
+  );
+}
 function NumberField({
   id,
   name,
@@ -1730,6 +2008,8 @@ function DecisionTraceDetails({
                     </>
                   ) : isCommitmentFact(fact) ? (
                     <p className="font-medium">{commitmentFactSummary(fact)}</p>
+                  ) : isConstraintFact(fact) ? (
+                    <p className="font-medium">{constraintFactSummary(fact)}</p>
                   ) : (
                     <p className="font-medium">
                       {emergencyFundFactLabels[fact.fact_type]} —{" "}
@@ -1778,7 +2058,9 @@ function DecisionTraceDetails({
                             ? `#income-context-${fact.fact_type}`
                             : isCommitmentFact(fact)
                               ? `#commitment-context-${fact.fact_id}`
-                              : `#emergency-fund-context-${fact.fact_type}`
+                              : isConstraintFact(fact)
+                                ? `#constraint-context-${fact.fact_id}`
+                                : `#emergency-fund-context-${fact.fact_type}`
                       }
                       className="inline-block font-medium text-primary underline-offset-4 hover:underline"
                     >
@@ -1839,6 +2121,10 @@ interface ClarificationCardProps {
     fact: IncomeFactInput,
     rememberFact: boolean,
   ) => Promise<void>;
+  onConstraintAnswer: (
+    fact: ConstraintFactInput,
+    rememberFact: boolean,
+  ) => Promise<void>;
   onAbstain: (action: "skip" | "unknown") => Promise<void>;
 }
 
@@ -1849,6 +2135,7 @@ function ClarificationCard({
   onEmergencyFundAnswer,
   onCommitmentAnswer,
   onIncomeAnswer,
+  onConstraintAnswer,
   onAbstain,
 }: ClarificationCardProps) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -1874,6 +2161,11 @@ function ClarificationCard({
     } else if (isIncomeFactType(output.fact_type)) {
       await onIncomeAnswer(
         incomeInputFromForm(output.fact_type, data),
+        remember,
+      );
+    } else if (isConstraintFactType(output.fact_type)) {
+      await onConstraintAnswer(
+        constraintInputFromForm(output.fact_type, data),
         remember,
       );
     } else {
@@ -1934,6 +2226,11 @@ function ClarificationCard({
           />
         ) : isIncomeFactType(output.fact_type) ? (
           <IncomeFields
+            factType={output.fact_type}
+            idPrefix={`clarification-${output.fact_type}`}
+          />
+        ) : isConstraintFactType(output.fact_type) ? (
+          <ConstraintFields
             factType={output.fact_type}
             idPrefix={`clarification-${output.fact_type}`}
           />
@@ -2047,6 +2344,10 @@ interface AdviceContentProps {
     fact: IncomeFactInput,
     rememberFact: boolean,
   ) => Promise<void>;
+  onConstraintAnswer: (
+    fact: ConstraintFactInput,
+    rememberFact: boolean,
+  ) => Promise<void>;
   onClarificationAbstention: (action: "skip" | "unknown") => Promise<void>;
   onCorrectSession: () => void;
 }
@@ -2062,6 +2363,7 @@ function AdviceContent({
   onEmergencyFundAnswer,
   onCommitmentAnswer,
   onIncomeAnswer,
+  onConstraintAnswer,
   onClarificationAbstention,
   onCorrectSession,
 }: AdviceContentProps) {
@@ -2079,6 +2381,7 @@ function AdviceContent({
               onEmergencyFundAnswer={onEmergencyFundAnswer}
               onCommitmentAnswer={onCommitmentAnswer}
               onIncomeAnswer={onIncomeAnswer}
+              onConstraintAnswer={onConstraintAnswer}
               onAbstain={onClarificationAbstention}
             />
           ) : (

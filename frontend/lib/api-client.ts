@@ -6,6 +6,9 @@ import type {
   CommitmentContextResponse,
   CommitmentFactInput,
   CommitmentFactResponse,
+  ConstraintContextResponse,
+  ConstraintFactInput,
+  ConstraintFactResponse,
   EmergencyFundContextResponse,
   EmergencyFundFactInput,
   EmergencyFundFactResponse,
@@ -626,6 +629,66 @@ export async function deleteCommitmentFact(factId: number): Promise<void> {
 }
 
 /**
+ * Load declared decision constraints.
+ * @returns Stored constraints, including expired values.
+ * @throws Network or API failure.
+ */
+export async function getConstraintContext(): Promise<ConstraintContextResponse> {
+  const response = await fetch(`${API_BASE}/api/advice/context/constraints`);
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(response, "Failed to load constraints"),
+    );
+  }
+  return safeParseJson<ConstraintContextResponse>(response);
+}
+
+/**
+ * Correct or reconfirm decision constraint.
+ * @param factId - Stored constraint id.
+ * @param fact - Replacement fields.
+ * @returns Updated constraint.
+ * @throws Network or API failure.
+ */
+export async function putConstraintFact(
+  factId: number,
+  fact: ConstraintFactInput,
+): Promise<ConstraintFactResponse> {
+  const response = await fetch(
+    `${API_BASE}/api/advice/context/constraints/${factId}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fact),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(response, "Failed to update constraint"),
+    );
+  }
+  return safeParseJson<ConstraintFactResponse>(response);
+}
+
+/**
+ * Delete decision constraint.
+ * @param factId - Stored constraint id.
+ * @returns Completion.
+ * @throws Network or API failure.
+ */
+export async function deleteConstraintFact(factId: number): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/advice/context/constraints/${factId}`,
+    { method: "DELETE" },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await extractErrorMessage(response, "Failed to delete constraint"),
+    );
+  }
+}
+
+/**
  * Generate advice with optional clarification answer.
  * @param year - Advice year.
  * @param month - Advice month.
@@ -644,6 +707,7 @@ export async function generateAdvice(
     emergencyFundFact?: EmergencyFundFactInput;
     commitmentFact?: CommitmentFactInput;
     incomeFact?: IncomeFactInput;
+    constraintFact?: ConstraintFactInput;
     rememberFact?: boolean;
     clarificationAction?: "skip" | "unknown";
   } = {},
@@ -662,10 +726,12 @@ export async function generateAdvice(
         emergency_fund_fact: options.emergencyFundFact,
         commitment_fact: options.commitmentFact,
         income_fact: options.incomeFact,
+        constraint_fact: options.constraintFact,
         remember_fact:
           options.emergencyFundFact === undefined &&
           options.commitmentFact === undefined &&
-          options.incomeFact === undefined
+          options.incomeFact === undefined &&
+          options.constraintFact === undefined
             ? undefined
             : (options.rememberFact ?? true),
         clarification_action: options.clarificationAction,

@@ -53,6 +53,7 @@ def init_db() -> None:
         active_priority,
         advice,
         commitment_fact,
+        constraint_fact,
         emergency_fund_fact,
         income_fact,
         month,

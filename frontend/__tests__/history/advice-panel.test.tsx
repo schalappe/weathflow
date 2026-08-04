@@ -24,6 +24,9 @@ vi.mock("@/lib/api-client", () => ({
   getIncomeContext: vi.fn(),
   putIncomeFact: vi.fn(),
   deleteIncomeFact: vi.fn(),
+  getConstraintContext: vi.fn(),
+  putConstraintFact: vi.fn(),
+  deleteConstraintFact: vi.fn(),
 }));
 
 const mockGetAdvice = vi.mocked(apiClient.getAdvice);
@@ -44,6 +47,9 @@ const mockDeleteCommitmentFact = vi.mocked(apiClient.deleteCommitmentFact);
 const mockGetIncomeContext = vi.mocked(apiClient.getIncomeContext);
 const mockPutIncomeFact = vi.mocked(apiClient.putIncomeFact);
 const mockDeleteIncomeFact = vi.mocked(apiClient.deleteIncomeFact);
+const mockGetConstraintContext = vi.mocked(apiClient.getConstraintContext);
+const mockPutConstraintFact = vi.mocked(apiClient.putConstraintFact);
+const mockDeleteConstraintFact = vi.mocked(apiClient.deleteConstraintFact);
 const eligibility: EligibilityInfo = {
   can_generate: true,
   is_first_advice: false,
@@ -68,6 +74,7 @@ describe("AdvicePanel decision outputs", () => {
     mockGetEmergencyFundContext.mockResolvedValue({ facts: [] });
     mockGetCommitmentContext.mockResolvedValue({ facts: [] });
     mockGetIncomeContext.mockResolvedValue({ facts: [] });
+    mockGetConstraintContext.mockResolvedValue({ facts: [] });
   });
 
   it("renders recommendation, no-action, unresolved, and auditable trace", async () => {
@@ -811,5 +818,136 @@ describe("AdvicePanel decision outputs", () => {
     expect(mockDeleteIncomeFact).toHaveBeenCalledWith(
       "usual_disposable_income",
     );
+  });
+
+  it("corrects and deletes scoped decision constraints", async () => {
+    const user = userEvent.setup();
+    const financialLimit = {
+      fact_id: 8,
+      fact_type: "financial_limit" as const,
+      scope_type: "expense" as const,
+      scope: "Budget transports",
+      limit_type: "sustainable_amount" as const,
+      amount: 90,
+      state: "active" as const,
+      last_confirmed_at: "2026-08-02T12:00:00Z",
+      valid_until: "2026-10-31T12:00:00Z",
+    };
+    const unavailableAction = {
+      fact_id: 9,
+      fact_type: "action_unavailability" as const,
+      action: "Renégocier le loyer",
+      review_date: "2026-09-15",
+      state: "active" as const,
+      last_confirmed_at: "2026-08-02T12:00:00Z",
+      valid_until: "2026-09-15T00:00:00Z",
+    };
+    mockGetConstraintContext.mockResolvedValue({
+      facts: [financialLimit, unavailableAction],
+    });
+    mockGetAdvice.mockResolvedValue(loaded());
+    mockPutConstraintFact.mockResolvedValue({
+      fact: { ...financialLimit, amount: 75, state: "corrected" },
+    });
+    mockDeleteConstraintFact.mockResolvedValue();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    expect(
+      await screen.findByText("Limites et indisponibilités"),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Corriger Budget transports" }),
+    );
+    const amount = screen.getByLabelText("Montant en euros");
+    await user.clear(amount);
+    await user.type(amount, "75");
+    await user.click(screen.getByRole("button", { name: "Enregistrer" }));
+    expect(mockPutConstraintFact).toHaveBeenCalledWith(8, {
+      fact_type: "financial_limit",
+      scope_type: "expense",
+      scope: "Budget transports",
+      limit_type: "sustainable_amount",
+      amount: 75,
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "Supprimer Renégocier le loyer" }),
+    );
+    expect(mockDeleteConstraintFact).toHaveBeenCalledWith(9);
+  });
+
+  it("answers an unavailable-action clarification with exact scope and review date", async () => {
+    const user = userEvent.setup();
+    const clarification = {
+      type: "clarification" as const,
+      priority: "medium" as const,
+      subject: "Coût du logement",
+      observation: "Le logement dépasse le repère générique.",
+      possible_effect: "La faisabilité change l’action.",
+      question: "Cette action est-elle indisponible jusqu’à une date ?",
+      fact_type: "action_unavailability" as const,
+      material_effects: ["Reporter le sujet.", "Conserver une action étayée."],
+    };
+    const trace = createMockRecommendationOutput().trace;
+    trace.details.declared_facts = [
+      {
+        fact_id: 9,
+        fact_type: "action_unavailability",
+        action: "Renégocier le loyer",
+        review_date: "2026-09-15",
+        state: "active",
+        last_confirmed_at: "2026-08-02T12:00:00Z",
+        valid_until: "2026-09-15T00:00:00Z",
+        can_correct: true,
+        can_delete: true,
+      },
+    ];
+    mockGetAdvice.mockResolvedValue(
+      loaded(createMockAdviceData({ outputs: [clarification] })),
+    );
+    mockGenerateAdvice.mockResolvedValue({
+      success: true,
+      advice: {
+        outputs: [
+          {
+            type: "unresolved",
+            priority: "medium",
+            conclusion: "Aucune action faisable n’est étayée.",
+            trace,
+          },
+        ],
+      },
+      generated_at: "2026-08-02T12:00:00Z",
+      is_valid: true,
+      was_cached: false,
+    });
+
+    render(<AdvicePanel year={2025} month={12} />);
+    await user.type(
+      await screen.findByLabelText("Action indisponible"),
+      "Renégocier le loyer",
+    );
+    await user.type(screen.getByLabelText("Date de réexamen"), "2026-09-15");
+    await user.click(
+      screen.getByRole("button", { name: "Répondre et réutiliser" }),
+    );
+
+    expect(mockGenerateAdvice).toHaveBeenCalledWith(2025, 12, {
+      regenerate: true,
+      constraintFact: {
+        fact_type: "action_unavailability",
+        action: "Renégocier le loyer",
+        review_date: "2026-09-15",
+      },
+      rememberFact: true,
+    });
+    expect(
+      await screen.findByText("Aucune action faisable n’est étayée."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Corriger ou supprimer" }),
+    ).toHaveAttribute("href", "#constraint-context-9");
   });
 });

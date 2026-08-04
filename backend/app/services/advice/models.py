@@ -277,6 +277,78 @@ class IncomeFactContext(DecisionModel):
         return self
 
 
+class FinancialLimitContext(DecisionModel):
+    """Scoped declared amount boundary.
+
+    Attributes
+    ----------
+    fact_id : int | None
+        Stored identifier.
+    fact_type : Literal["financial_limit"]
+        Discriminator.
+    scope_type : Literal["expense", "action"]
+        Scope kind.
+    scope : str
+        Exact scope.
+    limit_type : Literal["floor", "cap", "sustainable_amount"]
+        Boundary kind.
+    amount : float
+        Boundary amount.
+    state : Literal["active", "corrected", "to_confirm", "session"]
+        Lifecycle state.
+    last_confirmed_at : datetime
+        Last declaration timestamp.
+    valid_until : datetime | None
+        Freshness cutoff.
+    """
+
+    fact_id: int | None = None
+    fact_type: Literal["financial_limit"]
+    scope_type: Literal["expense", "action"]
+    scope: str = Field(min_length=1)
+    limit_type: Literal["floor", "cap", "sustainable_amount"]
+    amount: float = Field(gt=0)
+    state: Literal["active", "corrected", "to_confirm", "session"]
+    last_confirmed_at: datetime
+    valid_until: datetime | None
+
+
+class ActionUnavailabilityContext(DecisionModel):
+    """Action unavailable until explicit review date.
+
+    Attributes
+    ----------
+    fact_id : int | None
+        Stored identifier.
+    fact_type : Literal["action_unavailability"]
+        Discriminator.
+    action : str
+        Exact unavailable action.
+    review_date : date
+        Review date.
+    state : Literal["active", "corrected", "to_confirm", "session"]
+        Lifecycle state.
+    last_confirmed_at : datetime
+        Last declaration timestamp.
+    valid_until : datetime | None
+        Freshness cutoff.
+    """
+
+    fact_id: int | None = None
+    fact_type: Literal["action_unavailability"]
+    action: str = Field(min_length=1)
+    review_date: date
+    state: Literal["active", "corrected", "to_confirm", "session"]
+    last_confirmed_at: datetime
+    valid_until: datetime | None
+
+
+ConstraintFactContext = Annotated[
+    FinancialLimitContext | ActionUnavailabilityContext,
+    Field(discriminator="fact_type"),
+]
+
+
 class AdviceContext(DecisionModel):
     """Declared facts and remaining clarification budget.
 
@@ -288,6 +360,10 @@ class AdviceContext(DecisionModel):
         Emergency-fund context.
     commitment_facts : list[CommitmentFactContext]
         Obligation and debt context.
+    income_facts : list[IncomeFactContext]
+        Declared income context.
+    constraint_facts : list[ConstraintFactContext]
+        Financial limits and unavailable actions.
     clarifications_remaining : int
         Questions available before abstention.
     """
@@ -296,6 +372,7 @@ class AdviceContext(DecisionModel):
     emergency_fund_facts: list[EmergencyFundFactContext] = Field(default_factory=list)
     commitment_facts: list[CommitmentFactContext] = Field(default_factory=list)
     income_facts: list[IncomeFactContext] = Field(default_factory=list)
+    constraint_facts: list[ConstraintFactContext] = Field(default_factory=list)
     clarifications_remaining: int = Field(default=3, ge=0, le=3)
 
 
@@ -364,8 +441,49 @@ class IncomeFactCitation(IncomeFactContext):
     can_delete: Literal[True]
 
 
+class FinancialLimitCitation(FinancialLimitContext):
+    """Financial limit cited by decision.
+
+    Attributes
+    ----------
+    state : Literal["active", "corrected", "session"]
+        Active citation state.
+    can_correct : Literal[True]
+        Correction capability.
+    can_delete : Literal[True]
+        Deletion capability.
+    """
+
+    state: Literal["active", "corrected", "session"]
+    can_correct: Literal[True]
+    can_delete: Literal[True]
+
+
+class ActionUnavailabilityCitation(ActionUnavailabilityContext):
+    """Unavailable action cited by decision.
+
+    Attributes
+    ----------
+    state : Literal["active", "corrected", "session"]
+        Active citation state.
+    can_correct : Literal[True]
+        Correction capability.
+    can_delete : Literal[True]
+        Deletion capability.
+    """
+
+    state: Literal["active", "corrected", "session"]
+    can_correct: Literal[True]
+    can_delete: Literal[True]
+
+
 DeclaredFactCitation = Annotated[
-    ActivePriorityCitation | EmergencyFundFactCitation | CommitmentFactCitation | IncomeFactCitation,
+    ActivePriorityCitation
+    | EmergencyFundFactCitation
+    | CommitmentFactCitation
+    | IncomeFactCitation
+    | FinancialLimitCitation
+    | ActionUnavailabilityCitation,
     Field(discriminator="fact_type"),
 ]
 
@@ -484,6 +602,8 @@ class RecommendationOutput(DecisionModel):
         Output discriminator.
     priority : Literal["high", "medium", "low"]
         Decision priority.
+    subject : str | None
+        Exact decision scope when constraints are available.
     action : str
         Supported action.
     income_dependent : bool
@@ -498,6 +618,7 @@ class RecommendationOutput(DecisionModel):
 
     type: Literal["recommendation"]
     priority: Literal["high", "medium", "low"]
+    subject: str | None = Field(default=None, min_length=1, exclude_if=lambda value: value is None)
     action: str = Field(min_length=1)
     income_dependent: bool
     amount: float | None = Field(default=None, gt=0, exclude_if=lambda value: value is None)
@@ -608,6 +729,8 @@ class ClarificationOutput(DecisionModel):
         "debt_terms",
         "usual_disposable_income",
         "expected_one_off_income",
+        "financial_limit",
+        "action_unavailability",
     ]
     material_effects: list[str] = Field(min_length=2)
 
