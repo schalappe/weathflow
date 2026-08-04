@@ -5,8 +5,8 @@
 from fastapi import File, HTTPException, Query, UploadFile
 from loguru import logger
 
-from app.api.deps import AdviceRepo, MonthRepo, TransactionRepo, UploadSvc, create_router
-from app.responses.upload import CategorizeResponse, ImportMode, UploadResponse
+from app.api.deps import AdviceRepo, MonthRepo, ObservationFactRepo, TransactionRepo, UploadSvc, create_router
+from app.responses.upload import CategorizeResponse, CoverageIssue, ImportMode, UploadResponse
 from app.services.exceptions import (
     APIConnectionError,
     BatchCategorizationError,
@@ -61,18 +61,30 @@ async def upload_file(
 @router.post("/categorize", response_model=CategorizeResponse)
 async def categorize_file(
     advice_repo: AdviceRepo,
+    observation_repo: ObservationFactRepo,
     month_repo: MonthRepo,
     transaction_repo: TransactionRepo,
     service: UploadSvc,
     file: UploadFile = File(...),
     months_to_process: str = Query(..., description="Comma-separated months (YYYY-MM) or 'all'"),
     import_mode: ImportMode = Query(..., description="Import mode: 'replace' or 'merge'"),
+    coverage_issue: CoverageIssue | None = Query(None, description="Known incomplete or truncated source"),
 ) -> CategorizeResponse:
     """
     Categorize transactions from CSV and persist to database.
 
     Parameters
     ----------
+    advice_repo : AdviceRepo
+        Advice persistence.
+    observation_repo : ObservationFactRepo
+        Import provenance persistence.
+    month_repo : MonthRepo
+        Month persistence.
+    transaction_repo : TransactionRepo
+        Transaction persistence.
+    service : UploadSvc
+        Upload application service.
     file : UploadFile
         CSV file in Bankin' export format.
     months_to_process : str
@@ -80,6 +92,8 @@ async def categorize_file(
     import_mode : ImportMode
         "replace" deletes existing month and all its transactions, creating fresh.
         "merge" preserves existing month and transactions, only adding new ones.
+    coverage_issue : CoverageIssue | None
+        Explicit incomplete or truncated source.
 
     Returns
     -------
@@ -108,9 +122,11 @@ async def categorize_file(
         content = await file.read()
         result = service.process_categorization(
             advice_repo=advice_repo,
+            observation_repo=observation_repo,
             file_content=content,
             months_to_process=months_list,
             import_mode=import_mode,
+            coverage_issue=coverage_issue,
             month_repo=month_repo,
             transaction_repo=transaction_repo,
         )

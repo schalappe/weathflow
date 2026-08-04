@@ -19,6 +19,9 @@ def _trace(calculations: list[str] | None = None) -> dict[str, object]:
                     "period": "2025-10 à 2025-12",
                     "scope": "Transactions CHOICE / Dining out",
                     "source": "observed_data",
+                    "evidence_type": "presence",
+                    "source_months": ["2025-01"],
+                    "transaction_ids": [],
                 }
             ],
             "calculations": (calculations if calculations is not None else ["240 € - 120 € = 120 € d'écart mensuel."]),

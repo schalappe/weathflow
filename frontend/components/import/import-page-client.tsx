@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useCallback } from "react";
+import { useReducer, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -32,6 +32,7 @@ import type {
   ImportState,
   ImportAction,
   ImportMode,
+  CoverageIssue,
   UploadResponse,
   CategorizeResponse,
 } from "@/types";
@@ -164,6 +165,9 @@ function importReducer(state: ImportState, action: ImportAction): ImportState {
 export function ImportPageClient() {
   const router = useRouter();
   const [state, dispatch] = useReducer(importReducer, initialState);
+  const [coverageIssue, setCoverageIssue] = useState<CoverageIssue | null>(
+    null,
+  );
 
   const handleFileSelected = useCallback(async (file: File) => {
     dispatch({ type: "FILE_SELECTED", payload: file });
@@ -190,6 +194,7 @@ export function ImportPageClient() {
         state.file,
         months,
         state.importMode,
+        coverageIssue ?? undefined,
       );
       dispatch({ type: "CATEGORIZE_SUCCESS", payload: response });
     } catch (error) {
@@ -199,7 +204,7 @@ export function ImportPageClient() {
           : "Failed to categorize transactions";
       dispatch({ type: "CATEGORIZE_ERROR", payload: message });
     }
-  }, [state.file, state.selectedMonths, state.importMode]);
+  }, [state.file, state.selectedMonths, state.importMode, coverageIssue]);
 
   const handleToggleMonth = useCallback((monthKey: string) => {
     dispatch({ type: "TOGGLE_MONTH", payload: monthKey });
@@ -343,6 +348,8 @@ export function ImportPageClient() {
               mode={state.importMode}
               onModeChange={handleModeChange}
               isDisabled={isProcessing}
+              coverageIssue={coverageIssue}
+              onCoverageIssueChange={setCoverageIssue}
             />
 
             <Separator />

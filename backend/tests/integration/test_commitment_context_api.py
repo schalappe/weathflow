@@ -146,6 +146,9 @@ def test_feasible_debt_minimum_stays_prioritized_when_savings_need_clarification
                                 "period": "2025-07",
                                 "scope": "Transactions du mois",
                                 "source": "observed_data",
+                                "evidence_type": "presence",
+                                "source_months": ["2025-01"],
+                                "transaction_ids": [],
                             }
                         ],
                         "calculations": ["3 000 € - 1 800 € - 500 € - 300 € = 400 €, donc 250 € est faisable."],
@@ -230,6 +233,9 @@ def test_session_commitment_replaces_stored_value_for_current_generation(
                                     "period": "2025-07",
                                     "scope": "Dette déclarée",
                                     "source": "observed_data",
+                                    "evidence_type": "presence",
+                                    "source_months": ["2025-01"],
+                                    "transaction_ids": [],
                                 }
                             ],
                             "calculations": ["275 € de capacité - 275 € de minimum = 0 €."],

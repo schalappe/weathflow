@@ -59,3 +59,4 @@ class CategorizeResponse(BaseModel):
 
 
 ImportMode = Literal["replace", "merge"]
+CoverageIssue = Literal["incomplete_import", "truncated_statement"]

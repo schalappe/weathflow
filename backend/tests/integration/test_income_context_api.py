@@ -120,6 +120,9 @@ def test_usual_income_changes_sustainable_amount_and_trace(
                                     "period": f"{today.year}-{today.month:02d}",
                                     "scope": "Dépenses essentielles et discrétionnaires",
                                     "source": "observed_data",
+                                    "evidence_type": "presence",
+                                    "source_months": ["2025-01"],
+                                    "transaction_ids": [],
                                 }
                             ],
                             "calculations": [f"{income.amount:g} € mensuels - 1 800 € - 500 € = {amount:g} €."],
@@ -242,6 +245,9 @@ def test_expected_income_is_matched_to_observed_transaction_once(
                                     "period": today.isoformat(),
                                     "scope": "Revenus observés",
                                     "source": "observed_data",
+                                    "evidence_type": "presence",
+                                    "source_months": ["2025-01"],
+                                    "transaction_ids": [],
                                 }
                             ],
                             "calculations": ["1 500 € déclarés = 1 500 € observés ; contribution totale 1 500 €."],
@@ -335,6 +341,9 @@ def test_expired_session_expected_income_is_inactive(
                                     "period": (today - timedelta(days=1)).isoformat(),
                                     "scope": "Entrée exceptionnelle",
                                     "source": "observed_data",
+                                    "evidence_type": "presence",
+                                    "source_months": ["2025-01"],
+                                    "transaction_ids": [],
                                 }
                             ]
                         },
@@ -421,6 +430,9 @@ def test_session_correction_and_deletion_recalculate_income_dependent_output(
                                     "period": f"{today.year}-{today.month:02d}",
                                     "scope": "Dépenses du mois",
                                     "source": "observed_data",
+                                    "evidence_type": "presence",
+                                    "source_months": ["2025-01"],
+                                    "transaction_ids": [],
                                 }
                             ],
                             "calculations": [f"{active.amount:g} € - 2 300 € = {amount:g} €."],

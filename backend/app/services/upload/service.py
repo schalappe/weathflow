@@ -11,6 +11,7 @@ from app.db.models.month import Month
 from app.db.models.transaction import Transaction
 from app.repositories.advice import AdviceRepository
 from app.repositories.month import MonthRepository
+from app.repositories.observation_fact import ObservationFactRepository
 from app.repositories.transaction import TransactionRepository
 from app.services.calculation.service import calculate_and_update_month
 from app.services.categorization.models import CategorizationResult, TransactionInput
@@ -117,10 +118,12 @@ class UploadService:
     def process_categorization(
         self,
         advice_repo: AdviceRepository,
+        observation_repo: ObservationFactRepository,
         file_content: bytes,
         months_to_process: list[str],
         import_mode: Literal["replace", "merge"],
         month_repo: MonthRepository,
+        coverage_issue: Literal["incomplete_import", "truncated_statement"] | None,
         transaction_repo: TransactionRepository,
     ) -> dict[str, Any]:
         """
@@ -130,6 +133,8 @@ class UploadService:
         ----------
         advice_repo : AdviceRepository
             Advice storage.
+        observation_repo : ObservationFactRepository
+            Import provenance persistence.
         file_content : bytes
             Raw CSV file content.
         months_to_process : list[str]
@@ -139,6 +144,8 @@ class UploadService:
             "merge" preserves existing month and transactions, only adding new ones.
         month_repo : MonthRepository
             Repository for month data access.
+        coverage_issue : Literal["incomplete_import", "truncated_statement"] | None
+            Explicit incomplete or truncated source.
         transaction_repo : TransactionRepository
             Repository for transaction data access.
 
@@ -187,10 +194,12 @@ class UploadService:
             month_data = result.months[month_key]
             month_result, api_calls = self._process_single_month(
                 advice_repo=advice_repo,
+                observation_repo=observation_repo,
                 month_repo=month_repo,
                 transaction_repo=transaction_repo,
                 month_data=month_data,
                 import_mode=import_mode,
+                coverage_issue=coverage_issue,
             )
             months_processed.append(month_result)
             total_api_calls += api_calls
@@ -206,9 +215,11 @@ class UploadService:
         self,
         advice_repo: AdviceRepository,
         month_repo: MonthRepository,
+        observation_repo: ObservationFactRepository,
         transaction_repo: TransactionRepository,
         month_data: MonthData,
         import_mode: Literal["replace", "merge"],
+        coverage_issue: Literal["incomplete_import", "truncated_statement"] | None,
     ) -> tuple[dict[str, Any], int]:
         """
         Process categorization and persistence for a single month.
@@ -228,6 +239,7 @@ class UploadService:
             If score calculation fails.
         """
         year, month = month_data.year, month_data.month
+        coverage_evidence = observation_repo.begin_import(year, month)
 
         try:
             # ##>: Handle import mode and get month record.
@@ -264,6 +276,12 @@ class UploadService:
         # ##>: ponytail: global invalidation; narrow by stored evidence if advice volume matters.
         advice_repo.delete_all()
         updated_month = calculate_and_update_month(month_repo, transaction_repo, month_record.id)
+        observation_repo.finish_import(
+            coverage_evidence,
+            [transaction.account for transaction in month_data.transactions],
+            coverage_issue,
+            missing_count,
+        )
 
         low_confidence_count = self._count_low_confidence(results)
 

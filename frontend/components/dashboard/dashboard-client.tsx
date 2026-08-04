@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useCallback, useEffect, useState } from "react";
+import { useReducer, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -179,6 +179,7 @@ export function DashboardClient() {
   const [state, dispatch] = useReducer(dashboardReducer, initialState);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const sourceTransactionOpened = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -188,6 +189,19 @@ export function DashboardClient() {
         const response = await getMonthsList();
         if (isMounted) {
           dispatch({ type: "MONTHS_LOADED", payload: response.months });
+          const requestedMonth = new URLSearchParams(
+            window.location.search,
+          ).get("month");
+          const [year, month] = requestedMonth?.split("-").map(Number) ?? [];
+          if (
+            year &&
+            month &&
+            response.months.some(
+              (item) => item.year === year && item.month === month,
+            )
+          ) {
+            dispatch({ type: "SELECT_MONTH", payload: { year, month } });
+          }
         }
       } catch (error) {
         console.error("[DashboardClient] Failed to load months:", error);
@@ -243,6 +257,20 @@ export function DashboardClient() {
     };
     // [>]: Removed currentPage and filters from deps since grouped view fetches all transactions.
   }, [state.selectedMonth, state.pageState]);
+
+  useEffect(() => {
+    if (!state.monthDetail || sourceTransactionOpened.current) return;
+    const transactionId = Number(
+      new URLSearchParams(window.location.search).get("transaction"),
+    );
+    const transaction = state.monthDetail.transactions.find(
+      (item) => item.id === transactionId,
+    );
+    if (transaction) {
+      sourceTransactionOpened.current = true;
+      dispatch({ type: "OPEN_EDIT_MODAL", payload: transaction });
+    }
+  }, [state.monthDetail]);
 
   const handleMonthChange = useCallback((year: number, month: number) => {
     dispatch({ type: "SELECT_MONTH", payload: { year, month } });

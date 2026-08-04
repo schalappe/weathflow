@@ -15,6 +15,8 @@ from app.api.deps import (
     EmergencyFundRepo,
     IncomeFactRepo,
     MonthRepo,
+    ObservationFactRepo,
+    TransactionRepo,
     create_router,
 )
 from app.db.models.active_priority import ActivePriority
@@ -55,6 +57,7 @@ from app.services.advice.models import (
     ActionUnavailabilityContext,
     ActivePriorityContext,
     AdviceContext,
+    ClarificationOutput,
     CommitmentFactContext,
     ConstraintFactContext,
     DecisionOutput,
@@ -74,6 +77,7 @@ from app.services.exceptions import (
     AdviceQueryError,
     InsufficientDataError,
     MonthDataError,
+    TransactionNotFoundError,
 )
 
 router = create_router("advice")
@@ -115,6 +119,8 @@ def generate_advice(
     commitment_repo: CommitmentRepo,
     income_repo: IncomeFactRepo,
     constraint_repo: ConstraintRepo,
+    observation_repo: ObservationFactRepo,
+    transaction_repo: TransactionRepo,
     generator: AdviceGen,
 ) -> GenerateAdviceResponse:
     """
@@ -170,9 +176,12 @@ def generate_advice(
                 request.commitment_fact,
                 request.income_fact,
                 request.constraint_fact,
+                request.period_coverage,
+                request.transaction_nature,
             )
         )
         previous_question_count = 0
+        previous_question: ClarificationOutput | None = None
         if answer_count:
             previous_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
             if previous_advice is not None:
@@ -185,6 +194,29 @@ def generate_advice(
                     previous_question_count = previous_question.question_number
         if answer_count > 1:
             raise HTTPException(status_code=422, detail="Answer one clarification at a time.")
+        if request.period_coverage is not None:
+            if previous_question is None or previous_question.fact_type != "period_coverage":
+                raise HTTPException(status_code=409, detail="No coverage clarification to answer.")
+            if set(request.period_coverage.coverage_months) != set(previous_question.coverage_months or []):
+                raise HTTPException(
+                    status_code=422,
+                    detail="Coverage answer must match the pending clarification.",
+                )
+        if request.transaction_nature is not None:
+            if previous_question is None or previous_question.fact_type != "transaction_nature":
+                raise HTTPException(status_code=409, detail="No transaction clarification to answer.")
+            pending_ids = set(previous_question.transaction_ids or [])
+            answer_ids = set(request.transaction_nature.transaction_ids)
+            scope_matches = (
+                answer_ids <= pending_ids
+                if request.transaction_nature.scope == "occurrence"
+                else answer_ids == pending_ids
+            )
+            if not scope_matches:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Transaction answer must match the pending clarification.",
+                )
         if request.clarification_action is not None:
             if answer_count:
                 raise HTTPException(
@@ -259,6 +291,23 @@ def generate_advice(
             _session_constraint_context(request.constraint_fact) if request.constraint_fact is not None else None,
             request.remember_fact,
         )
+        if request.period_coverage is not None:
+            advice_service.save_period_coverage_answer(
+                observation_repo,
+                advice_repo,
+                request.period_coverage.coverage_months,
+                request.period_coverage.complete,
+                request.period_coverage.missing_elements,
+            )
+        if request.transaction_nature is not None:
+            advice_service.save_transaction_nature_answer(
+                observation_repo,
+                advice_repo,
+                transaction_repo,
+                request.transaction_nature.transaction_ids,
+                request.transaction_nature.nature,
+                request.transaction_nature.scope,
+            )
 
         if not request.regenerate and not answer_count:
             existing_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
@@ -286,8 +335,16 @@ def generate_advice(
         )
         history_data = generation_months[:-1]
         current_data = generation_months[-1]
-
+        observation_context = advice_service.prepare_observation_context(
+            observation_repo,
+            transaction_repo,
+            generation_months,
+        )
         generation_context = AdviceContext(
+            period_coverages=observation_context.period_coverages,
+            coverage_signals=observation_context.coverage_signals,
+            transaction_natures=observation_context.transaction_natures,
+            transaction_nature_signals=observation_context.transaction_nature_signals,
             active_priority=priority_context,
             emergency_fund_facts=emergency_fund_contexts,
             commitment_facts=commitment_contexts,
@@ -302,6 +359,10 @@ def generate_advice(
             income_contexts,
             request.year,
             request.month,
+        )
+        advice_response = advice_service.enforce_observation_coverage(
+            advice_response,
+            generation_context.period_coverages,
         )
         advice_service.validate_constraint_usage(advice_response, constraint_contexts)
         answered_fact_type = None
@@ -318,6 +379,10 @@ def generate_advice(
             answered_fact_type = request.income_fact.fact_type
         elif request.constraint_fact is not None:
             answered_fact_type = request.constraint_fact.fact_type
+        elif request.period_coverage is not None:
+            answered_fact_type = "period_coverage"
+        elif request.transaction_nature is not None:
+            answered_fact_type = "transaction_nature"
         if answered_fact_type is not None:
             repeats_answered_question = any(
                 output.type == "clarification" and output.fact_type == answered_fact_type
@@ -371,6 +436,8 @@ def generate_advice(
             was_cached=False,
         )
 
+    except TransactionNotFoundError as error:
+        raise HTTPException(status_code=404, detail=f"Transaction {error.transaction_id} not found.") from error
     except HTTPException:
         raise
     except ValueError as error:
@@ -650,6 +717,9 @@ def _apply_clarification_limit(
                         period=f"{year}-{month:02d}",
                         scope=clarification.subject,
                         source="observed_data",
+                        evidence_type="presence",
+                        source_months=[f"{year}-{month:02d}"],
+                        transaction_ids=clarification.transaction_ids or [],
                     )
                 ],
                 limits=["Plafond de trois questions atteint."],

@@ -46,6 +46,16 @@ class TransactionRepository:
         """
         return self._db.get(Transaction, transaction_id)
 
+    def get_all(self) -> list[Transaction]:
+        """Return all source transactions.
+
+        Returns
+        -------
+        list[Transaction]
+            Stored transactions.
+        """
+        return self._db.query(Transaction).all()
+
     def get_filtered(
         self,
         month_id: int,

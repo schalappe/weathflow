@@ -91,6 +91,9 @@ def test_expired_priority_stays_visible_but_invalidates_dependent_advice(
                                     "period": "octobre 2025",
                                     "scope": "Transactions COMPOUND",
                                     "source": "observed_data",
+                                    "evidence_type": "presence",
+                                    "source_months": ["2025-01"],
+                                    "transaction_ids": [],
                                 }
                             ],
                             "declared_facts": [

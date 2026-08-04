@@ -49,6 +49,9 @@ def _create_mock_advice_response() -> AdviceResponse:
                                     "period": "2025-08 à 2025-10",
                                     "scope": "Transactions importées",
                                     "source": "observed_data",
+                                    "evidence_type": "presence",
+                                    "source_months": ["2025-01"],
+                                    "transaction_ids": [],
                                 }
                             ],
                             "calculations": [],

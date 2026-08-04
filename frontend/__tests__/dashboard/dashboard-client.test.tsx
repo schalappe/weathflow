@@ -99,6 +99,7 @@ const mockMonthDetail = {
 describe("DashboardClient", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState({}, "", "/");
   });
 
   it("initial load fetches months list", async () => {
@@ -210,6 +211,20 @@ describe("DashboardClient", () => {
     // [>]: New grouped view shows tabs instead of pagination.
     expect(screen.getByRole("tab", { name: /Entrées/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Sorties/i })).toBeInTheDocument();
+  });
+
+  it("opens the exact transaction linked from evidence", async () => {
+    window.history.replaceState({}, "", "/?month=2025-10&transaction=2");
+    vi.mocked(apiClient.getMonthsList).mockResolvedValue(mockMonthsList);
+    vi.mocked(apiClient.getMonthDetailAllTransactions).mockResolvedValue(
+      mockMonthDetail,
+    );
+
+    render(<DashboardClient />);
+
+    expect(
+      await screen.findByRole("dialog", { name: "Modifier la transaction" }),
+    ).toHaveTextContent("CB Carrefour");
   });
 
   it("error state displays with retry button", async () => {

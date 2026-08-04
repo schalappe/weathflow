@@ -3,18 +3,22 @@
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { t } from "@/lib/translations";
-import type { ImportMode } from "@/types";
+import type { CoverageIssue, ImportMode } from "@/types";
 
 interface ImportOptionsProps {
   mode: ImportMode;
   onModeChange: (mode: ImportMode) => void;
   isDisabled: boolean;
+  coverageIssue?: CoverageIssue | null;
+  onCoverageIssueChange?: (issue: CoverageIssue | null) => void;
 }
 
 export function ImportOptions({
   mode,
   onModeChange,
   isDisabled,
+  coverageIssue = null,
+  onCoverageIssueChange,
 }: ImportOptionsProps) {
   return (
     <div className="space-y-3">
@@ -46,6 +50,29 @@ export function ImportOptions({
           </Label>
         </div>
       </RadioGroup>
+      {onCoverageIssueChange && (
+        <div className="space-y-2">
+          <Label htmlFor="coverage-issue">Limite connue du relevé</Label>
+          <select
+            id="coverage-issue"
+            value={coverageIssue ?? ""}
+            onChange={(event) =>
+              onCoverageIssueChange(
+                (event.target.value || null) as CoverageIssue | null,
+              )
+            }
+            disabled={isDisabled}
+            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+          >
+            <option value="">Aucune limite connue</option>
+            <option value="incomplete_import">Import incomplet</option>
+            <option value="truncated_statement">Relevé tronqué</option>
+          </select>
+          <p className="text-sm text-muted-foreground">
+            Ce signal ne bloque le conseil que s’il peut changer une décision.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

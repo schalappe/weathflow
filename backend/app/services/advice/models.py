@@ -113,6 +113,108 @@ class ObservedFact(DecisionModel):
     period: str = Field(min_length=1)
     scope: str = Field(min_length=1)
     source: Literal["observed_data"]
+    evidence_type: Literal["presence", "absence", "aggregate", "comparison"]
+    source_months: list[str] = Field(min_length=1)
+    transaction_ids: list[int] = Field(default_factory=list)
+
+
+class PeriodCoverageContext(DecisionModel):
+    """Exact analyzed-window coverage.
+
+    Attributes
+    ----------
+    coverage_months : list[str]
+        Exact covered months.
+    complete : bool
+        Complete and gap-free marker.
+    state : Literal["active", "corrected", "to_confirm"]
+        Confirmation lifecycle.
+    """
+
+    coverage_months: list[str] = Field(min_length=1)
+    accounts: list[str] = Field(default_factory=list)
+    complete: bool
+    missing_elements: list[str] = Field(default_factory=list)
+    state: Literal["active", "corrected", "to_confirm"]
+    last_confirmed_at: datetime
+    valid_until: None = None
+    provenance_issues: list[str] = Field(default_factory=list)
+
+
+class PeriodCoverageSignal(DecisionModel):
+    """Admitted provenance limit in analyzed window.
+
+    Attributes
+    ----------
+    coverage_months : list[str]
+        Affected months.
+    provenance_issues : list[str]
+        Admitted source limits.
+    """
+
+    coverage_months: list[str] = Field(min_length=1)
+    provenance_issues: list[str] = Field(min_length=1)
+    details: list[str] = Field(default_factory=list)
+
+
+TransactionNature = Literal[
+    "income",
+    "reimbursement",
+    "transfer",
+    "expense",
+    "debt_payment",
+    "saving",
+]
+
+
+class TransactionNatureContext(DecisionModel):
+    """Confirmed meaning for explicit historical occurrences.
+
+    Attributes
+    ----------
+    transaction_ids : list[int]
+        Explicitly confirmed occurrences.
+    source_months : list[str]
+        Months containing those occurrences.
+    nature : TransactionNature
+        Confirmed financial nature.
+    scope : Literal["occurrence", "series"]
+        Narrow confirmation scope.
+    """
+
+    fact_id: int
+    transaction_ids: list[int] = Field(min_length=1)
+    source_months: list[str] = Field(min_length=1)
+    nature: TransactionNature
+    scope: Literal["occurrence", "series"]
+    state: Literal["active", "corrected", "to_confirm"]
+    last_confirmed_at: datetime
+    valid_until: None = None
+
+
+class TransactionNatureSignal(DecisionModel):
+    """New structural link affecting transaction meaning.
+
+    Attributes
+    ----------
+    signal_type : Literal
+        Structural contradiction kind.
+    transaction_ids : list[int]
+        Confirmed transactions affected.
+    linked_transaction_ids : list[int]
+        Newly linked transactions.
+    """
+
+    signal_type: Literal[
+        "counter_entry",
+        "paired_transfer",
+        "cancellation",
+        "linked_reimbursement",
+        "source_correction",
+    ]
+    transaction_ids: list[int] = Field(min_length=1)
+    linked_transaction_ids: list[int] = Field(min_length=1)
+    fact_id: int | None = None
 
 
 class ActivePriorityContext(DecisionModel):
@@ -369,11 +471,53 @@ class AdviceContext(DecisionModel):
     """
 
     active_priority: ActivePriorityContext | None = None
+    period_coverages: list[PeriodCoverageContext] = Field(default_factory=list)
+    coverage_signals: list[PeriodCoverageSignal] = Field(default_factory=list)
+    transaction_natures: list[TransactionNatureContext] = Field(default_factory=list)
+    transaction_nature_signals: list[TransactionNatureSignal] = Field(default_factory=list)
     emergency_fund_facts: list[EmergencyFundFactContext] = Field(default_factory=list)
     commitment_facts: list[CommitmentFactContext] = Field(default_factory=list)
     income_facts: list[IncomeFactContext] = Field(default_factory=list)
     constraint_facts: list[ConstraintFactContext] = Field(default_factory=list)
     clarifications_remaining: int = Field(default=3, ge=0, le=3)
+
+
+class PeriodCoverageCitation(PeriodCoverageContext):
+    """Coverage fact cited by decision.
+
+    Attributes
+    ----------
+    fact_type : Literal["period_coverage"]
+        Closed-catalog discriminator.
+    can_correct : Literal[True]
+        Correction capability.
+    can_delete : Literal[True]
+        Deletion capability.
+    """
+
+    fact_type: Literal["period_coverage"]
+    state: Literal["active", "corrected"]
+    can_correct: Literal[True]
+    can_delete: Literal[True]
+
+
+class TransactionNatureCitation(TransactionNatureContext):
+    """Transaction meaning cited by decision.
+
+    Attributes
+    ----------
+    fact_type : Literal["transaction_nature"]
+        Closed-catalog discriminator.
+    can_correct : Literal[True]
+        Correction capability.
+    can_delete : Literal[True]
+        Deletion capability.
+    """
+
+    fact_type: Literal["transaction_nature"]
+    state: Literal["active", "corrected"]
+    can_correct: Literal[True]
+    can_delete: Literal[True]
 
 
 class EmergencyFundFactCitation(EmergencyFundFactContext):
@@ -479,6 +623,8 @@ class ActionUnavailabilityCitation(ActionUnavailabilityContext):
 
 DeclaredFactCitation = Annotated[
     ActivePriorityCitation
+    | PeriodCoverageCitation
+    | TransactionNatureCitation
     | EmergencyFundFactCitation
     | CommitmentFactCitation
     | IncomeFactCitation
@@ -719,6 +865,8 @@ class ClarificationOutput(DecisionModel):
     question: str = Field(min_length=1)
     question_number: int = Field(default=1, ge=1, le=3)
     fact_type: Literal[
+        "period_coverage",
+        "transaction_nature",
         "active_priority",
         "liquid_reserve",
         "safety_floor",
@@ -733,6 +881,9 @@ class ClarificationOutput(DecisionModel):
         "action_unavailability",
     ]
     material_effects: list[str] = Field(min_length=2)
+    coverage_months: list[str] | None = None
+    transaction_ids: list[int] | None = None
+    linked_transaction_ids: list[int] | None = None
 
     @model_validator(mode="after")
     def require_distinct_effects(self) -> Self:
@@ -750,6 +901,17 @@ class ClarificationOutput(DecisionModel):
         """
         if len(set(self.material_effects)) < 2:
             raise ValueError("clarification requires distinct decision effects")
+        if self.fact_type == "period_coverage" and not self.coverage_months:
+            raise ValueError("period coverage clarification requires coverage_months")
+        if self.fact_type != "period_coverage" and self.coverage_months is not None:
+            raise ValueError("coverage_months only apply to period coverage")
+        if self.fact_type == "transaction_nature":
+            if not self.transaction_ids:
+                raise ValueError("transaction nature clarification requires transaction_ids")
+            if not self.linked_transaction_ids:
+                raise ValueError("transaction nature clarification requires linked_transaction_ids")
+        elif self.transaction_ids is not None or self.linked_transaction_ids is not None:
+            raise ValueError("transaction links only apply to transaction nature")
         return self
 
 

@@ -96,6 +96,7 @@ Content-Type: multipart/form-data
 | `file`              | File   | Yes      | Bankin' CSV export file                                     |
 | `months_to_process` | String | No       | Comma-separated list (e.g., `"2025-01,2025-02"`) or `"all"` |
 | `import_mode`       | String | No       | `"replace"` (default) or `"merge"`                          |
+| `coverage_issue`     | String | No       | Known source limit: `"incomplete_import"` or `"truncated_statement"`         |
 
 **Import Modes:**
 
@@ -119,7 +120,14 @@ Content-Type: multipart/form-data
     }
   ],
   "months_not_found": [],
-  "total_api_calls": 3
+  "total_api_calls": 3,
+  "coverage_signals": [
+    {
+      "coverage_months": ["2025-01", "2025-02"],
+      "provenance_issues": ["truncated_statement"],
+      "details": []
+    }
+  ]
 }
 ```
 
@@ -131,6 +139,7 @@ Content-Type: multipart/form-data
 - `score`: Money Map score (0-3)
 - `score_label`: "Poor" | "Need Improvement" | "Okay" | "Great"
 - `total_api_calls`: Number of Claude API calls made
+- `coverage_signals`: source limits recorded for the imported months
 
 **Errors:**
 
@@ -572,13 +581,15 @@ Content-Type: application/json
 
 **Fields:**
 
-| Field           | Type    | Required | Default | Description                                     |
-| --------------- | ------- | -------- | ------- | ----------------------------------------------- |
-| `year`          | Integer | Yes      | -       | 4-digit year                                    |
-| `month`         | Integer | Yes      | -       | 1-2 digit month                                 |
-| `regenerate`    | Boolean | No       | false   | Force new generation (ignore cache)             |
-| `income_fact`   | Object  | No       | null    | Habitual or dated expected income clarification |
-| `remember_fact` | Boolean | No       | true    | Reuse clarification beyond the current session  |
+| Field                | Type    | Required | Default | Description                                                   |
+| -------------------- | ------- | -------- | ------- | ------------------------------------------------------------- |
+| `year`               | Integer | Yes      | -       | 4-digit year                                                  |
+| `month`              | Integer | Yes      | -       | 1-2 digit month                                               |
+| `regenerate`         | Boolean | No       | false   | Force new generation (ignore cache)                           |
+| `income_fact`        | Object  | No       | null    | Habitual or dated expected income clarification               |
+| `period_coverage`    | Object  | No       | null    | Exact months, completeness, and known missing elements        |
+| `transaction_nature` | Object  | No       | null    | Nature and occurrence/explicit-series scope for transactions  |
+| `remember_fact`      | Boolean | No       | true    | Reuse other clarification facts beyond the current session    |
 
 **Response (Cached):** `200 OK`
 

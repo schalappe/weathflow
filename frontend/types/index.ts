@@ -51,6 +51,7 @@ export type PageState =
   | "error";
 
 export type ImportMode = "replace" | "merge";
+export type CoverageIssue = "incomplete_import" | "truncated_statement";
 
 export interface ImportState {
   pageState: PageState;
@@ -245,6 +246,9 @@ export interface ObservedFact {
   period: string;
   scope: string;
   source: "observed_data";
+  evidence_type: "presence" | "absence" | "aggregate" | "comparison";
+  source_months: string[];
+  transaction_ids: number[];
 }
 
 export type ActivePriorityState =
@@ -285,13 +289,34 @@ export type CommitmentFactType =
   | "debt_terms";
 
 export type ConstraintFactType = "financial_limit" | "action_unavailability";
+export type TransactionNature =
+  | "income"
+  | "reimbursement"
+  | "transfer"
+  | "expense"
+  | "debt_payment"
+  | "saving";
+
+export interface PeriodCoverageInput {
+  coverage_months: string[];
+  complete: boolean;
+  missing_elements: string[];
+}
+
+export interface TransactionNatureInput {
+  transaction_ids: number[];
+  nature: TransactionNature;
+  scope: "occurrence" | "series";
+}
 
 export type DeclaredFactType =
   | "active_priority"
   | EmergencyFundFactType
   | CommitmentFactType
   | IncomeFactType
-  | ConstraintFactType;
+  | ConstraintFactType
+  | "period_coverage"
+  | "transaction_nature";
 
 export interface EmergencyFundFactInput {
   fact_type: EmergencyFundFactType;
@@ -440,6 +465,27 @@ export interface ConstraintFactResponse {
   fact: ConstraintFact;
 }
 
+export interface PeriodCoverageCitation extends PeriodCoverageInput {
+  fact_type: "period_coverage";
+  accounts: string[];
+  state: "active" | "corrected";
+  last_confirmed_at: string;
+  valid_until: null;
+  can_correct: true;
+  can_delete: true;
+}
+
+export interface TransactionNatureCitation extends TransactionNatureInput {
+  fact_id: number;
+  source_months: string[];
+  fact_type: "transaction_nature";
+  state: "active" | "corrected";
+  last_confirmed_at: string;
+  valid_until: null;
+  can_correct: true;
+  can_delete: true;
+}
+
 export interface ActivePriorityCitation extends ActivePriorityInput {
   fact_type: "active_priority";
   state: Exclude<ActivePriorityState, "to_confirm">;
@@ -494,6 +540,8 @@ export type ConstraintFactCitation = ConstraintFactInput & {
 
 export type DeclaredFactCitation =
   | ActivePriorityCitation
+  | PeriodCoverageCitation
+  | TransactionNatureCitation
   | EmergencyFundFactCitation
   | CommitmentFactCitation
   | IncomeFactCitation
@@ -560,6 +608,9 @@ export interface ClarificationOutput {
   question_number?: number;
   fact_type: DeclaredFactType;
   material_effects: string[];
+  coverage_months?: string[];
+  transaction_ids?: number[];
+  linked_transaction_ids?: number[];
 }
 
 export type DecisionOutput =

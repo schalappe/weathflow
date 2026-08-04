@@ -57,6 +57,7 @@ def init_db() -> None:
         emergency_fund_fact,
         income_fact,
         month,
+        observation_fact,
         transaction,
     )
 

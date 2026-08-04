@@ -27,4 +27,21 @@ describe("ImportOptions", () => {
 
     expect(onModeChange).toHaveBeenCalledWith("replace");
   });
+  it("declares a known source coverage limit", () => {
+    const onCoverageIssueChange = vi.fn();
+    render(
+      <ImportOptions
+        mode="merge"
+        onModeChange={vi.fn()}
+        isDisabled={false}
+        onCoverageIssueChange={onCoverageIssueChange}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Limite connue du relevé"), {
+      target: { value: "truncated_statement" },
+    });
+
+    expect(onCoverageIssueChange).toHaveBeenCalledWith("truncated_statement");
+  });
 });

@@ -148,6 +148,9 @@ def test_canonical_emergency_fund_trajectory_reaches_generation_and_trace(
                                 "period": "2025-07",
                                 "scope": "Transactions du mois",
                                 "source": "observed_data",
+                                "evidence_type": "presence",
+                                "source_months": ["2025-01"],
+                                "transaction_ids": [],
                             }
                         ],
                         "calculations": [
@@ -270,6 +273,9 @@ def test_reserve_and_allocation_meeting_floor_produce_no_action(
                                 "period": "2025-07",
                                 "scope": "Transactions du mois",
                                 "source": "observed_data",
+                                "evidence_type": "presence",
+                                "source_months": ["2025-01"],
+                                "transaction_ids": [],
                             }
                         ],
                         "calculations": ["5 400 € - 2 000 € - 3 400 € = 0 €."],

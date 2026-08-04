@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.db.models.base import utc_now
 from app.db.models.constraint_fact import ConstraintFact
 from app.db.models.month import Month
-from app.services.advice.models import AdviceContext
+from app.services.advice.models import AdviceContext, FinancialLimitContext
 
 
 def _create_month(db: Session, year: int, month: int) -> None:
@@ -116,6 +116,7 @@ def test_financial_limit_caps_generated_amount_and_is_traced(
     def generated_advice(*args: object) -> dict[str, object]:
         context = cast(AdviceContext, args[2])
         limit = context.constraint_facts[0]
+        assert isinstance(limit, FinancialLimitContext)
         return {
             "outputs": [
                 {
@@ -134,6 +135,9 @@ def test_financial_limit_caps_generated_amount_and_is_traced(
                                     "period": f"{today.year}-{today.month:02d}",
                                     "scope": "Budget transports",
                                     "source": "observed_data",
+                                    "evidence_type": "presence",
+                                    "source_months": ["2025-01"],
+                                    "transaction_ids": [],
                                 }
                             ],
                             "calculations": ["300 € observés, plafonnés à 90 € déclarés."],
@@ -216,6 +220,9 @@ def test_generator_cannot_exceed_declared_limit(
                                     "period": f"{today.year}-{today.month:02d}",
                                     "scope": "Épargne mensuelle",
                                     "source": "observed_data",
+                                    "evidence_type": "presence",
+                                    "source_months": ["2025-01"],
+                                    "transaction_ids": [],
                                 }
                             ],
                             "calculations": ["120 € calculés."],
@@ -271,6 +278,9 @@ def test_unavailable_action_yields_traced_unresolved_subject_until_review(
                         "period": f"{today.year}-{today.month:02d}",
                         "scope": "Logement",
                         "source": "observed_data",
+                        "evidence_type": "presence",
+                        "source_months": ["2025-01"],
+                        "transaction_ids": [],
                     }
                 ],
                 "declared_facts": [
@@ -300,6 +310,9 @@ def test_unavailable_action_yields_traced_unresolved_subject_until_review(
                                         "period": f"{today.year}-{today.month:02d}",
                                         "scope": "Logement",
                                         "source": "observed_data",
+                                        "evidence_type": "presence",
+                                        "source_months": ["2025-01"],
+                                        "transaction_ids": [],
                                     }
                                 ],
                             },

@@ -49,6 +49,9 @@ def _advice(output_type: str = "recommendation") -> AdviceResponse:
                         "period": "2025-08 à 2025-10",
                         "scope": "Transactions CHOICE / Dining out",
                         "source": "observed_data",
+                        "evidence_type": "presence",
+                        "source_months": ["2025-01"],
+                        "transaction_ids": [],
                     }
                 ],
                 "calculations": ["240 € - 120 € = 120 €."],
@@ -100,6 +103,9 @@ def test_generate_cache_and_retrieve_decision_outputs(
         "period": "2025-08 à 2025-10",
         "scope": "Transactions CHOICE / Dining out",
         "source": "observed_data",
+        "evidence_type": "presence",
+        "source_months": ["2025-01"],
+        "transaction_ids": [],
     }
     assert output["trace"]["details"]["calculations"] == ["240 € - 120 € = 120 €."]
     assert mock_generator.generate_advice.call_count == 1

@@ -102,12 +102,21 @@ describe("ImportPageClient", () => {
     await waitFor(() => {
       expect(screen.getByText("janvier 2025")).toBeInTheDocument();
     });
+    fireEvent.change(screen.getByLabelText("Limite connue du relevé"), {
+      target: { value: "truncated_statement" },
+    });
 
     // [>]: Click categorize button.
     const categorizeButton = screen.getByRole("button", {
       name: /Catégoriser avec l'IA/i,
     });
     fireEvent.click(categorizeButton);
+    expect(apiClient.categorize).toHaveBeenCalledWith(
+      csvFile,
+      ["2025-01", "2025-02"],
+      "merge",
+      "truncated_statement",
+    );
 
     // [>]: Wait for results.
     await waitFor(() => {

@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.db.models.emergency_fund_fact import EmergencyFundFactType
-from app.services.advice.models import AdviceResponse
+from app.services.advice.models import AdviceResponse, TransactionNature
 
 AdviceData = AdviceResponse
 
@@ -45,8 +45,88 @@ class GenerateAdviceRequest(BaseModel):
     commitment_fact: CommitmentFactInput | None = None
     income_fact: IncomeFactInput | None = None
     constraint_fact: ConstraintFactInput | None = None
+    period_coverage: PeriodCoverageInput | None = None
+    transaction_nature: TransactionNatureInput | None = None
     remember_fact: bool = True
     clarification_action: Literal["skip", "unknown"] | None = None
+
+
+class PeriodCoverageInput(BaseModel):
+    """Exact analyzed-window coverage answer.
+
+    Attributes
+    ----------
+    coverage_months : list[str]
+        Exact months being confirmed.
+    complete : bool
+        Complete and gap-free marker.
+    missing_elements : list[str]
+        Known omissions when incomplete.
+    """
+
+    coverage_months: list[str] = Field(min_length=1)
+    complete: bool
+    missing_elements: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_missing_elements(self) -> PeriodCoverageInput:
+        """Keep complete and incomplete answers unambiguous.
+
+        Returns
+        -------
+        PeriodCoverageInput
+            Validated answer.
+
+        Raises
+        ------
+        ValueError
+            If completeness conflicts with missing elements.
+        """
+        if self.complete and self.missing_elements:
+            raise ValueError("complete coverage cannot list missing elements")
+        if not self.complete and not self.missing_elements:
+            raise ValueError("incomplete coverage requires missing elements")
+        return self
+
+
+class TransactionNatureInput(BaseModel):
+    """Confirmed meaning for explicit historical occurrences.
+
+    Attributes
+    ----------
+    transaction_ids : list[int]
+        Explicit occurrence IDs.
+    nature : TransactionNature
+        Confirmed financial nature.
+    scope : Literal["occurrence", "series"]
+        Occurrence or explicit-series scope.
+    """
+
+    transaction_ids: list[int] = Field(min_length=1)
+    nature: TransactionNature
+    scope: Literal["occurrence", "series"]
+
+    @model_validator(mode="after")
+    def validate_scope(self) -> TransactionNatureInput:
+        """Require explicit occurrences for selected scope.
+
+        Returns
+        -------
+        TransactionNatureInput
+            Validated answer.
+
+        Raises
+        ------
+        ValueError
+            If the ID count does not match scope.
+        """
+        if len(set(self.transaction_ids)) != len(self.transaction_ids):
+            raise ValueError("transaction ids must be unique")
+        if self.scope == "occurrence" and len(self.transaction_ids) != 1:
+            raise ValueError("occurrence scope requires one transaction")
+        if self.scope == "series" and len(self.transaction_ids) < 2:
+            raise ValueError("series scope requires at least two transactions")
+        return self
 
 
 class ActivePriorityInput(BaseModel):

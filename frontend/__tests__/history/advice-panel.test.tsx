@@ -950,4 +950,116 @@ describe("AdvicePanel decision outputs", () => {
       screen.getByRole("link", { name: "Corriger ou supprimer" }),
     ).toHaveAttribute("href", "#constraint-context-9");
   });
+  it("answers exact period coverage without a reuse choice", async () => {
+    const user = userEvent.setup();
+    mockGetAdvice.mockResolvedValue(
+      loaded(
+        createMockAdviceData({
+          outputs: [
+            {
+              type: "clarification",
+              priority: "high",
+              subject: "Couverture de la période",
+              observation: "La couverture exacte reste inconnue.",
+              possible_effect: "Une absence peut perdre sa valeur probante.",
+              question: "Le relevé est-il complet et sans trou ?",
+              fact_type: "period_coverage",
+              coverage_months: ["2025-11", "2025-12"],
+              material_effects: [
+                "Conserver la conclusion.",
+                "Retirer la conclusion.",
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+    mockGenerateAdvice.mockResolvedValue({
+      success: true,
+      advice: createMockAdviceData(),
+      generated_at: "2026-08-04T12:00:00Z",
+      is_valid: true,
+      was_cached: false,
+    });
+
+    render(<AdvicePanel year={2025} month={12} />);
+    await user.selectOptions(
+      await screen.findByLabelText("Couverture"),
+      "false",
+    );
+    await user.type(
+      screen.getByLabelText(/Éléments manquants/),
+      "Compte joint, décembre",
+    );
+    await user.click(screen.getByRole("button", { name: "Confirmer" }));
+
+    expect(mockGenerateAdvice).toHaveBeenCalledWith(2025, 12, {
+      regenerate: true,
+      periodCoverage: {
+        coverage_months: ["2025-11", "2025-12"],
+        complete: false,
+        missing_elements: ["Compte joint", "décembre"],
+      },
+    });
+  });
+
+  it("limits a transaction confirmation to the selected occurrence", async () => {
+    const user = userEvent.setup();
+    mockGetAdvice.mockResolvedValue(
+      loaded(
+        createMockAdviceData({
+          outputs: [
+            {
+              type: "clarification",
+              priority: "high",
+              subject: "Nature de la transaction",
+              observation: "Une contre-écriture a été importée.",
+              possible_effect: "La dépense peut être conservée ou retirée.",
+              question: "Quelle est la nature de cette transaction ?",
+              fact_type: "transaction_nature",
+              transaction_ids: [41, 42],
+              linked_transaction_ids: [42],
+              material_effects: [
+                "Conserver la dépense.",
+                "Retirer la dépense.",
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+    mockGenerateAdvice.mockResolvedValue({
+      success: true,
+      advice: createMockAdviceData(),
+      generated_at: "2026-08-04T12:00:00Z",
+      is_valid: true,
+      was_cached: false,
+    });
+
+    render(<AdvicePanel year={2025} month={12} />);
+    await user.click(await screen.findByRole("button", { name: "Confirmer" }));
+
+    expect(mockGenerateAdvice).toHaveBeenCalledWith(2025, 12, {
+      regenerate: true,
+      transactionNature: {
+        transaction_ids: [41],
+        nature: "expense",
+        scope: "occurrence",
+      },
+    });
+  });
+
+  it("links observed evidence to its exact source", async () => {
+    const output = createMockRecommendationOutput();
+    output.trace.details.observations[0].transaction_ids = [17];
+    mockGetAdvice.mockResolvedValue(
+      loaded(createMockAdviceData({ outputs: [output] })),
+    );
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    expect(
+      await screen.findByRole("link", { name: "Voir les transactions" }),
+    ).toHaveAttribute("href", "/?month=2025-12&transaction=17");
+  });
 });

@@ -12,14 +12,18 @@ from app.db.models.commitment_fact import CommitmentFact
 from app.db.models.constraint_fact import ConstraintFact
 from app.db.models.income_fact import IncomeFact
 from app.db.models.month import Month
+from app.db.models.observation_fact import ImportCoverageEvidence, PeriodCoverageFact
 from app.db.models.transaction import Transaction
 from app.repositories.advice import AdviceRepository
 from app.repositories.commitment_fact import CommitmentFactRepository, CommitmentFactType
 from app.repositories.constraint_fact import ConstraintFactRepository, ConstraintFactType
 from app.repositories.income_fact import IncomeFactRepository, IncomeFactType
+from app.repositories.observation_fact import ObservationFactRepository
+from app.repositories.transaction import TransactionRepository
 from app.services.advice.models import (
     ActionUnavailabilityCitation,
     ActionUnavailabilityContext,
+    AdviceContext,
     AdviceResponse,
     CommitmentFactContext,
     ConstraintFactContext,
@@ -32,11 +36,16 @@ from app.services.advice.models import (
     IncomeFactContext,
     MonthData,
     ObservedFact,
+    PeriodCoverageContext,
+    PeriodCoverageSignal,
+    TransactionNature,
+    TransactionNatureContext,
+    TransactionNatureSignal,
     TransactionSample,
     UnresolvedOutput,
 )
 from app.services.calculation.service import calculate_month_stats
-from app.services.exceptions import AdviceParseError, AdviceQueryError
+from app.services.exceptions import AdviceParseError, AdviceQueryError, TransactionNotFoundError
 
 
 def get_advice_by_month_id(advice_repo: AdviceRepository, month_id: int) -> Advice | None:
@@ -859,6 +868,355 @@ def validate_constraint_usage(
                 raise AdviceParseError(advice.model_dump_json())
 
 
+_COUNTER_ENTRY_MARKERS = ("annulation", "remboursement", "rejet", "contre-écriture", "contre ecriture")
+
+
+def _structural_transaction_links(
+    transactions: list[Transaction],
+    targets: list[Transaction],
+) -> list[tuple[Transaction, Transaction, str]]:
+    """Match opposite entries with structural evidence.
+
+    Parameters
+    ----------
+    transactions : list[Transaction]
+        Available source transactions.
+    targets : list[Transaction]
+        Explicitly confirmed transactions.
+
+    Returns
+    -------
+    list[tuple[Transaction, Transaction, str]]
+        Target, linked transaction, and link kind.
+    """
+    links: list[tuple[Transaction, Transaction, str]] = []
+    seen: set[tuple[int, int]] = set()
+    for target in targets:
+        for candidate in transactions:
+            pair = (min(target.id, candidate.id), max(target.id, candidate.id))
+            if target.id == candidate.id or pair in seen:
+                continue
+            if abs((target.date - candidate.date).days) > 31 or round(target.amount + candidate.amount, 2) != 0:
+                continue
+            if target.account is not None and candidate.account is not None and target.account != candidate.account:
+                signal_type = "paired_transfer"
+            elif (
+                target.account is not None
+                and target.account == candidate.account
+                and any(marker in candidate.description.casefold() for marker in _COUNTER_ENTRY_MARKERS)
+            ):
+                signal_type = "counter_entry"
+            else:
+                continue
+            seen.add(pair)
+            links.append((target, candidate, signal_type))
+    return links
+
+
+def save_period_coverage_answer(
+    fact_repo: ObservationFactRepository,
+    advice_repo: AdviceRepository,
+    coverage_months: list[str],
+    complete: bool,
+    missing_elements: list[str],
+) -> None:
+    """Persist one exact-window coverage answer.
+
+    Parameters
+    ----------
+    advice_repo : AdviceRepository
+        Generated advice persistence.
+    fact_repo : ObservationFactRepository
+        Observation persistence.
+    coverage_months : list[str]
+        Exact confirmed months.
+    complete : bool
+        Complete and gap-free marker.
+    missing_elements : list[str]
+        Known omissions.
+    """
+    fact_repo.put_period_coverage(coverage_months, complete, missing_elements)
+    advice_repo.delete_all()
+
+
+def save_transaction_nature_answer(
+    fact_repo: ObservationFactRepository,
+    advice_repo: AdviceRepository,
+    transaction_repo: TransactionRepository,
+    transaction_ids: list[int],
+    nature: TransactionNature,
+    scope: Literal["occurrence", "series"],
+) -> None:
+    """Persist one occurrence or explicit-series meaning answer.
+
+    Parameters
+    ----------
+    fact_repo : ObservationFactRepository
+        Observation persistence.
+    advice_repo : AdviceRepository
+        Generated advice persistence.
+    transaction_repo : TransactionRepository
+        Source transaction persistence.
+    transaction_ids : list[int]
+        Explicitly confirmed occurrence IDs.
+    nature : TransactionNature
+        Confirmed financial nature.
+    scope : Literal["occurrence", "series"]
+        Narrow confirmation scope.
+
+    Raises
+    ------
+    TransactionNotFoundError
+        If an explicit occurrence no longer exists.
+    """
+    all_transactions = transaction_repo.get_all()
+    by_id = {transaction.id: transaction for transaction in all_transactions}
+    try:
+        selected_transactions = [by_id[transaction_id] for transaction_id in transaction_ids]
+    except KeyError as error:
+        raise TransactionNotFoundError(int(error.args[0])) from error
+    fact_repo.put_transaction_nature(
+        selected_transactions,
+        nature,
+        scope,
+        transaction_link_keys(fact_repo, all_transactions, selected_transactions),
+    )
+    advice_repo.delete_all()
+
+
+def transaction_link_keys(
+    fact_repo: ObservationFactRepository,
+    transactions: list[Transaction],
+    targets: list[Transaction],
+) -> list[str]:
+    """Return structural links acknowledged by current answer.
+
+    Parameters
+    ----------
+    fact_repo : ObservationFactRepository
+        Stable transaction-key provider.
+    transactions : list[Transaction]
+        Available source transactions.
+    targets : list[Transaction]
+        Explicitly confirmed transactions.
+
+    Returns
+    -------
+    list[str]
+        Stable linked-transaction keys.
+    """
+    return [fact_repo.transaction_key(linked) for _, linked, _ in _structural_transaction_links(transactions, targets)]
+
+
+def prepare_transaction_nature_context(
+    fact_repo: ObservationFactRepository,
+    transactions: list[Transaction],
+) -> tuple[list[TransactionNatureContext], list[TransactionNatureSignal]]:
+    """Load durable occurrence facts and structural contradictions.
+
+    Parameters
+    ----------
+    fact_repo : ObservationFactRepository
+        Observation persistence.
+    transactions : list[Transaction]
+        Available source transactions.
+
+    Returns
+    -------
+    tuple[list[TransactionNatureContext], list[TransactionNatureSignal]]
+        Active facts and new contradictions.
+    """
+    by_key = {fact_repo.transaction_key(transaction): transaction for transaction in transactions}
+    contexts: list[TransactionNatureContext] = []
+    signals: list[TransactionNatureSignal] = []
+    for fact in fact_repo.get_transaction_natures():
+        targets = [by_key[key] for key in fact.transaction_keys if key in by_key]
+        if not targets:
+            continue
+        new_links = [
+            link
+            for link in _structural_transaction_links(transactions, targets)
+            if fact_repo.transaction_key(link[1]) not in fact.acknowledged_links
+        ]
+        state = "to_confirm" if new_links else fact.state
+        contexts.append(
+            TransactionNatureContext(
+                fact_id=fact.id,
+                transaction_ids=[transaction.id for transaction in targets],
+                source_months=sorted({f"{transaction.date:%Y-%m}" for transaction in targets}),
+                nature=cast(Any, fact.nature),
+                scope=cast(Any, fact.scope),
+                state=cast(Any, state),
+                last_confirmed_at=fact.last_confirmed_at,
+            )
+        )
+        signals.extend(
+            TransactionNatureSignal(
+                signal_type=cast(Any, signal_type),
+                transaction_ids=[target.id],
+                linked_transaction_ids=[linked.id],
+                fact_id=fact.id,
+            )
+            for target, linked, signal_type in new_links
+        )
+    return contexts, signals
+
+
+def _period_coverage_context(
+    fact: PeriodCoverageFact,
+    evidence: list[ImportCoverageEvidence],
+) -> PeriodCoverageContext:
+    """Map persisted coverage and newer provenance.
+
+    Parameters
+    ----------
+    fact : PeriodCoverageFact
+        Exact-window coverage fact.
+    evidence : list[ImportCoverageEvidence]
+        Current import provenance.
+
+    Returns
+    -------
+    PeriodCoverageContext
+        Coverage context, reopened after newer source limits.
+    """
+    stale_issue = any(
+        item.issue is not None and item.revision > fact.source_revisions.get(f"{item.year:04d}-{item.month:02d}", 0)
+        for item in evidence
+    )
+    state: Literal["active", "corrected", "to_confirm"] = (
+        "to_confirm" if stale_issue else "corrected" if fact.state == "corrected" else "active"
+    )
+    return PeriodCoverageContext(
+        coverage_months=fact.coverage_months,
+        accounts=fact.accounts,
+        complete=fact.complete,
+        missing_elements=fact.missing_elements,
+        state=state,
+        last_confirmed_at=fact.last_confirmed_at,
+        provenance_issues=sorted(
+            {
+                item.issue
+                for item in evidence
+                if item.issue is not None
+                and item.revision > fact.source_revisions.get(f"{item.year:04d}-{item.month:02d}", 0)
+            }
+        ),
+    )
+
+
+def prepare_observation_context(
+    fact_repo: ObservationFactRepository,
+    transaction_repo: TransactionRepository,
+    generation_months: list[MonthData],
+) -> AdviceContext:
+    """Build observation coverage and transaction-meaning context.
+
+    Parameters
+    ----------
+    fact_repo : ObservationFactRepository
+        Coverage and meaning persistence.
+    transaction_repo : TransactionRepository
+        Source transaction persistence.
+    generation_months : list[MonthData]
+        Exact analyzed months.
+
+    Returns
+    -------
+    AdviceContext
+        Observation fields for advice generation.
+    """
+    analysis_months = [f"{month.year:04d}-{month.month:02d}" for month in generation_months]
+    period_coverage = fact_repo.get_period_coverage(analysis_months)
+    coverage_evidence = fact_repo.get_import_evidence(analysis_months)
+    provenance_issues = sorted({item.issue for item in coverage_evidence if item.issue is not None})
+    coverage_signals = (
+        [
+            PeriodCoverageSignal(
+                coverage_months=analysis_months,
+                provenance_issues=provenance_issues,
+                details=[detail for item in coverage_evidence for detail in item.issue_details],
+            )
+        ]
+        if provenance_issues
+        else []
+    )
+    analysis_month_set = set(analysis_months)
+    analysis_transactions = [
+        transaction
+        for transaction in transaction_repo.get_all()
+        if f"{transaction.month.year:04d}-{transaction.month.month:02d}" in analysis_month_set
+    ]
+    transaction_natures, transaction_nature_signals = prepare_transaction_nature_context(
+        fact_repo,
+        analysis_transactions,
+    )
+    return AdviceContext(
+        period_coverages=(
+            [_period_coverage_context(period_coverage, coverage_evidence)] if period_coverage is not None else []
+        ),
+        coverage_signals=coverage_signals,
+        transaction_natures=transaction_natures,
+        transaction_nature_signals=transaction_nature_signals,
+    )
+
+
+def enforce_observation_coverage(
+    advice: AdviceResponse,
+    period_coverages: list[PeriodCoverageContext],
+) -> AdviceResponse:
+    """Reject nonlocal evidence without complete coverage.
+
+    Parameters
+    ----------
+    advice : AdviceResponse
+        Generated decision outputs.
+    period_coverages : list[PeriodCoverageContext]
+        Confirmed exact-window coverage.
+
+    Returns
+    -------
+    AdviceResponse
+        Outputs with unsupported conclusions unresolved.
+    """
+    complete_months = {
+        month
+        for coverage in period_coverages
+        if coverage.state != "to_confirm" and coverage.complete
+        for month in coverage.coverage_months
+    }
+    outputs: list[DecisionOutput] = []
+
+    for output in advice.outputs:
+        if output.type == "clarification":
+            outputs.append(output)
+            continue
+        invalid = any(
+            observation.evidence_type != "presence" and not set(observation.source_months).issubset(complete_months)
+            for observation in output.trace.details.observations
+        )
+        if not invalid:
+            outputs.append(output)
+            continue
+        details = output.trace.details.model_copy(
+            update={
+                "limits": [
+                    *output.trace.details.limits,
+                    "Périmètre incomplet : absence, agrégat ou comparaison non étayé.",
+                ]
+            }
+        )
+        outputs.append(
+            UnresolvedOutput(
+                type="unresolved",
+                priority=output.priority,
+                conclusion="La couverture incomplète ne permet pas cette conclusion.",
+                trace=output.trace.model_copy(update={"details": details}),
+            )
+        )
+    return AdviceResponse(outputs=outputs)
+
+
 def resolve_clarification(
     advice: AdviceResponse,
     year: int,
@@ -921,6 +1279,9 @@ def resolve_clarification(
                                 period=f"{year}-{month:02d}",
                                 scope=output.subject,
                                 source="observed_data",
+                                evidence_type="presence",
+                                source_months=[f"{year}-{month:02d}"],
+                                transaction_ids=output.transaction_ids or [],
                             )
                         ],
                         limits=[limit],

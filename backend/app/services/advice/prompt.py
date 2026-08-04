@@ -23,6 +23,27 @@ RÈGLES DE DÉCISION
   progress_review, monthly_goal ou encouragement.
 
 
+VALIDITÉ DES OBSERVATIONS
+- `period_coverages` qualifie exactement `coverage_months`. Une absence, un agrégat ou une
+  comparaison n'est recevable que si un fait actif ou corrigé marque toute cette fenêtre complète.
+- Si la couverture est confirmée incomplète, rejette l'absence ou l'agrégat, retourne le sujet
+  `unresolved` et ne pose aucune question de couverture.
+- `coverage_signals` ne contient que des preuves de provenance admises : import incomplet ou échoué,
+  relevé tronqué ou compte auparavant inclus devenu absent. Pose `period_coverage` seulement si le
+  signal peut changer la décision ; renseigne alors `coverage_months`. Sinon, cite la limite dans la
+  trace sans interrompre la sortie.
+- `transaction_natures` vaut uniquement pour les `transaction_ids` explicitement confirmés :
+  `income`, `reimbursement`, `transfer`, `expense`, `debt_payment` ou `saving`. Une portée `series`
+  ne couvre que la liste fournie, jamais les occurrences futures du même marchand.
+- Seul `transaction_nature_signals` peut contester une nature confirmée : contre-écriture exacte,
+  transfert apparié, annulation, remboursement lié ou correction source. Pose `transaction_nature`
+  seulement si ce lien change la décision ; recopie `transaction_ids` et `linked_transaction_ids`.
+- Marchand, fréquence, catégorie LLM, volume inhabituel ou simple recatégorisation ne créent jamais
+  un signal et ne contestent jamais une nature confirmée.
+- Chaque observation fournit `evidence_type`, `source_months` et les `transaction_ids` directement
+  concernés. Une présence appariée reste recevable localement malgré une couverture incomplète.
+
+
 REVENUS ET CAPACITÉ
 - `total_income` et les transactions `INCOME` sont des observations de flux : leur classement seul
   ne constitue pas un revenu fiable. Remboursements et virements peuvent les fausser. Ne les utilise
@@ -134,7 +155,10 @@ FORMAT JSON STRICT
               "fact": "Fait chiffré observé",
               "period": "Période exacte",
               "scope": "Transactions ou catégorie concernées",
-              "source": "observed_data"
+              "source": "observed_data",
+              "evidence_type": "presence | absence | aggregate | comparison",
+              "source_months": ["2026-01"],
+              "transaction_ids": [123]
             }
           ],
           "calculations": ["Calcul reproductible"],
@@ -151,6 +175,31 @@ FORMAT JSON STRICT
             }
           ],
           "declared_facts": [
+            {
+              "fact_type": "period_coverage",
+              "coverage_months": ["2025-11", "2025-12", "2026-01"],
+              "accounts": ["Compte courant"],
+              "complete": true,
+              "missing_elements": [],
+              "state": "active | corrected",
+              "last_confirmed_at": "2026-08-04T12:00:00",
+              "valid_until": null,
+              "can_correct": true,
+              "can_delete": true
+            },
+            {
+              "fact_id": 10,
+              "fact_type": "transaction_nature",
+              "transaction_ids": [123],
+              "source_months": ["2025-10"],
+              "nature": "income | reimbursement | transfer | expense | debt_payment | saving",
+              "scope": "occurrence | series",
+              "state": "active | corrected",
+              "last_confirmed_at": "2026-08-04T12:00:00",
+              "valid_until": null,
+              "can_correct": true,
+              "can_delete": true
+            },
             {
               "fact_type": "active_priority",
               "goal": "Objectif courant",
@@ -244,6 +293,8 @@ Une clarification suit ce format :
   "fact_type": "un type du catalogue fermé ci-dessus",
   "material_effects": ["Décision A", "Décision B"]
 }
+Pour `period_coverage`, ajoute `coverage_months`. Pour `transaction_nature`, ajoute
+`transaction_ids` et `linked_transaction_ids`. N'ajoute jamais ces champs aux autres clarifications.
 
 Pour `no_action` ou `unresolved`, remplace `action` par `conclusion` et omets `amount` et `deadline`.
 Retourne uniquement un objet JSON conforme, sans markdown."""

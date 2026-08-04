@@ -19,13 +19,16 @@ import type {
   IncomeFactType,
   CashFlowResponse,
   CategorizeResponse,
+  CoverageIssue,
   GenerateAdviceResponse,
   GetAdviceResponse,
   HistoryResponse,
   ImportMode,
   MonthDetailResponse,
+  PeriodCoverageInput,
   MonthsListResponse,
   TransactionFilters,
+  TransactionNatureInput,
   UpdateTransactionPayload,
   UpdateTransactionResponse,
   UploadResponse,
@@ -93,10 +96,20 @@ export async function uploadCSV(file: File): Promise<UploadResponse> {
   return safeParseJson<UploadResponse>(response);
 }
 
+/**
+ * Categorize selected CSV months and record any known source limit.
+ * @param file - Bankin CSV export.
+ * @param months - Exact months to import.
+ * @param importMode - Replace or merge behavior.
+ * @param coverageIssue - Known incomplete or truncated source.
+ * @returns Categorization results and recorded coverage signals.
+ * @throws Invalid selection, network, API, or response failure.
+ */
 export async function categorize(
   file: File,
   months: string[],
   importMode: ImportMode,
+  coverageIssue?: CoverageIssue,
 ): Promise<CategorizeResponse> {
   // [>]: Validate months before making API call.
   if (months.length === 0) {
@@ -112,6 +125,7 @@ export async function categorize(
   url.searchParams.set("months_to_process", months.join(","));
   url.searchParams.set("import_mode", importMode);
 
+  if (coverageIssue) url.searchParams.set("coverage_issue", coverageIssue);
   let response: Response;
   try {
     response = await fetch(url.toString(), {
@@ -692,7 +706,7 @@ export async function deleteConstraintFact(factId: number): Promise<void> {
  * Generate advice with optional clarification answer.
  * @param year - Advice year.
  * @param month - Advice month.
- * @param options - Regeneration and active-priority answer.
+ * @param options - Regeneration, clarification, and fact answers.
  * @returns Current decision outputs.
  * @throws Network or API failure.
  */
@@ -708,6 +722,8 @@ export async function generateAdvice(
     commitmentFact?: CommitmentFactInput;
     incomeFact?: IncomeFactInput;
     constraintFact?: ConstraintFactInput;
+    periodCoverage?: PeriodCoverageInput;
+    transactionNature?: TransactionNatureInput;
     rememberFact?: boolean;
     clarificationAction?: "skip" | "unknown";
   } = {},
@@ -727,6 +743,8 @@ export async function generateAdvice(
         commitment_fact: options.commitmentFact,
         income_fact: options.incomeFact,
         constraint_fact: options.constraintFact,
+        period_coverage: options.periodCoverage,
+        transaction_nature: options.transactionNature,
         remember_fact:
           options.emergencyFundFact === undefined &&
           options.commitmentFact === undefined &&

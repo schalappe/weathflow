@@ -14,6 +14,7 @@ from app.repositories.constraint_fact import ConstraintFactRepository
 from app.repositories.emergency_fund_fact import EmergencyFundFactRepository
 from app.repositories.income_fact import IncomeFactRepository
 from app.repositories.month import MonthRepository
+from app.repositories.observation_fact import ObservationFactRepository
 from app.repositories.transaction import TransactionRepository
 from app.services.advice.generator import AdviceGenerator
 from app.services.upload.service import UploadService
@@ -131,6 +132,22 @@ def get_income_fact_repository(db: DbSession) -> IncomeFactRepository:
     return IncomeFactRepository(db)
 
 
+def get_observation_fact_repository(db: DbSession) -> ObservationFactRepository:
+    """Provide observation validity repository.
+
+    Parameters
+    ----------
+    db : DbSession
+        Request database transaction.
+
+    Returns
+    -------
+    ObservationFactRepository
+        Observation persistence.
+    """
+    return ObservationFactRepository(db)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Service Providers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -161,5 +178,6 @@ EmergencyFundRepo = Annotated[EmergencyFundFactRepository, Depends(get_emergency
 CommitmentRepo = Annotated[CommitmentFactRepository, Depends(get_commitment_fact_repository)]
 ConstraintRepo = Annotated[ConstraintFactRepository, Depends(get_constraint_fact_repository)]
 IncomeFactRepo = Annotated[IncomeFactRepository, Depends(get_income_fact_repository)]
+ObservationFactRepo = Annotated[ObservationFactRepository, Depends(get_observation_fact_repository)]
 UploadSvc = Annotated[UploadService, Depends(get_upload_service)]
 AdviceGen = Annotated[AdviceGenerator, Depends(get_advice_generator)]

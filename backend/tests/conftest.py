@@ -14,6 +14,11 @@ from app.db.models.advice import Advice  # noqa: F401
 from app.db.models.constraint_fact import ConstraintFact  # noqa: F401
 from app.db.models.emergency_fund_fact import EmergencyFundFact  # noqa: F401
 from app.db.models.month import Month  # noqa: F401
+from app.db.models.observation_fact import (  # noqa: F401
+    ImportCoverageEvidence,
+    PeriodCoverageFact,
+    TransactionNatureFact,
+)
 from app.db.models.transaction import Transaction  # noqa: F401
 
 

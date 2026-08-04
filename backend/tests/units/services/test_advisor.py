@@ -18,9 +18,10 @@ from app.services.advice.models import (
     FinancialLimitContext,
     IncomeFactContext,
     MonthData,
+    PeriodCoverageContext,
 )
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
-from app.services.advice.service import resolve_clarification, validate_income_usage
+from app.services.advice.service import enforce_observation_coverage, resolve_clarification, validate_income_usage
 from app.services.exceptions import AdviceAPIError, AdviceGenerationError, AdviceParseError, InsufficientDataError
 
 
@@ -55,6 +56,9 @@ def _decision_json(output_type: str = "recommendation") -> str:
                         "period": "2025-01 à 2025-03",
                         "scope": "CHOICE / Dining out",
                         "source": "observed_data",
+                        "evidence_type": "presence",
+                        "source_months": ["2025-01"],
+                        "transaction_ids": [],
                     }
                 ],
                 "calculations": ["240 - 120 = 120"],
@@ -85,6 +89,33 @@ def test_prompt_requires_selective_observed_decisions_without_quota() -> None:
     assert "observed_data" in ADVICE_SYSTEM_PROMPT
     assert "no_action" in ADVICE_SYSTEM_PROMPT
     assert "Exactement 3" not in ADVICE_SYSTEM_PROMPT
+
+
+@pytest.mark.parametrize("evidence_type", ["absence", "aggregate", "comparison"])
+def test_nonlocal_evidence_requires_confirmed_complete_coverage(evidence_type: str) -> None:
+    """Absence and derived evidence need complete exact-window coverage."""
+    payload = json.loads(_decision_json())
+    payload["outputs"][0]["trace"]["details"]["observations"][0]["evidence_type"] = evidence_type
+
+    result = enforce_observation_coverage(AdviceResponse.model_validate(payload), [])
+
+    assert result.outputs[0].type == "unresolved"
+
+
+def test_absence_is_usable_with_confirmed_complete_coverage() -> None:
+    """Complete exact-window coverage admits absence evidence."""
+    payload = json.loads(_decision_json())
+    payload["outputs"][0]["trace"]["details"]["observations"][0]["evidence_type"] = "absence"
+    coverage = PeriodCoverageContext(
+        coverage_months=["2025-01"],
+        complete=True,
+        state="active",
+        last_confirmed_at=datetime(2026, 8, 4),
+    )
+
+    result = enforce_observation_coverage(AdviceResponse.model_validate(payload), [coverage])
+
+    assert result.outputs[0].type == "recommendation"
 
 
 def test_clarification_requires_distinct_material_effects() -> None:

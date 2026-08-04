@@ -55,6 +55,9 @@ def _advice() -> AdviceResponse:
                                     "period": "2025-01 à 2025-03",
                                     "scope": "CHOICE / Dining out",
                                     "source": "observed_data",
+                                    "evidence_type": "presence",
+                                    "source_months": ["2025-01"],
+                                    "transaction_ids": [],
                                 }
                             ],
                             "calculations": ["240 - 120 = 120"],

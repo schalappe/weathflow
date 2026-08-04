@@ -76,8 +76,12 @@ import type {
   DecisionPriority,
   DeclaredFactCitation,
   DecisionTrace,
+  PeriodCoverageCitation,
+  PeriodCoverageInput,
   EligibilityInfo,
   RecommendationOutput,
+  TransactionNatureCitation,
+  TransactionNatureInput,
 } from "@/types";
 
 type PanelState = "loading" | "loaded" | "empty" | "error";
@@ -153,10 +157,34 @@ const incomeFrequencyLabels: Record<IncomeFrequency, string> = {
   yearly: "Annuelle",
 };
 
+const transactionNatureLabels: Record<
+  TransactionNatureInput["nature"],
+  string
+> = {
+  income: "Revenu",
+  reimbursement: "Remboursement",
+  transfer: "Transfert",
+  expense: "Dépense",
+  debt_payment: "Paiement de dette",
+  saving: "Épargne",
+};
+
 const constraintFactTypes: Record<ConstraintFactType, true> = {
   financial_limit: true,
   action_unavailability: true,
 };
+
+function isPeriodCoverageFact(
+  fact: DeclaredFactCitation,
+): fact is PeriodCoverageCitation {
+  return fact.fact_type === "period_coverage";
+}
+
+function isTransactionNatureFact(
+  fact: DeclaredFactCitation,
+): fact is TransactionNatureCitation {
+  return fact.fact_type === "transaction_nature";
+}
 
 function isConstraintFactType(
   factType: string,
@@ -521,6 +549,18 @@ export function AdvicePanelContent({
     [answerClarification],
   );
 
+  const handlePeriodCoverageAnswer = useCallback(
+    (coverage: PeriodCoverageInput) =>
+      answerClarification({ periodCoverage: coverage }),
+    [answerClarification],
+  );
+
+  const handleTransactionNatureAnswer = useCallback(
+    (fact: TransactionNatureInput) =>
+      answerClarification({ transactionNature: fact }),
+    [answerClarification],
+  );
+
   const handleClarificationAbstention = useCallback(
     (clarificationAction: "skip" | "unknown") =>
       answerClarification({ clarificationAction }),
@@ -722,6 +762,8 @@ export function AdvicePanelContent({
           onCommitmentAnswer={handleCommitmentAnswer}
           onIncomeAnswer={handleIncomeAnswer}
           onConstraintAnswer={handleConstraintAnswer}
+          onPeriodCoverageAnswer={handlePeriodCoverageAnswer}
+          onTransactionNatureAnswer={handleTransactionNatureAnswer}
           onClarificationAbstention={handleClarificationAbstention}
           onCorrectSession={reload}
         />
@@ -1966,6 +2008,16 @@ function DecisionTraceDetails({
                   {observation.period}
                 </p>
                 <p className="text-muted-foreground">{observation.scope}</p>
+                <Link
+                  href={`/?month=${observation.source_months[observation.source_months.length - 1]}${
+                    observation.transaction_ids[0]
+                      ? `&transaction=${observation.transaction_ids[0]}`
+                      : ""
+                  }`}
+                  className="mt-2 inline-block font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Voir les transactions
+                </Link>
               </li>
             ))}
           </ul>
@@ -1996,6 +2048,17 @@ function DecisionTraceDetails({
                         </p>
                       )}
                     </>
+                  ) : isPeriodCoverageFact(fact) ? (
+                    <p className="font-medium">
+                      Couverture {fact.complete ? "complète" : "incomplète"} —{" "}
+                      {fact.coverage_months.join(", ")}
+                    </p>
+                  ) : isTransactionNatureFact(fact) ? (
+                    <p className="font-medium">
+                      {transactionNatureLabels[fact.nature]} — transaction
+                      {fact.transaction_ids.length > 1 ? "s" : ""}{" "}
+                      {fact.transaction_ids.join(", ")}
+                    </p>
                   ) : isIncomeFact(fact) ? (
                     <>
                       <p className="font-medium">{incomeFactSummary(fact)}</p>
@@ -2024,9 +2087,11 @@ function DecisionTraceDetails({
                     Confirmé le {formatAdviceTimestamp(fact.last_confirmed_at)}
                   </p>
                   <p className="text-muted-foreground">
-                    {fact.valid_until
-                      ? `Valide jusqu’au ${new Date(fact.valid_until).toLocaleDateString("fr-FR")}`
-                      : "Valide pour cette session"}
+                    {isPeriodCoverageFact(fact) || isTransactionNatureFact(fact)
+                      ? "Portée limitée aux éléments confirmés"
+                      : fact.valid_until
+                        ? `Valide jusqu’au ${new Date(fact.valid_until).toLocaleDateString("fr-FR")}`
+                        : "Valide pour cette session"}
                   </p>
                   {fact.state === "session" ? (
                     <div className="flex flex-wrap gap-2 pt-2">
@@ -2052,15 +2117,19 @@ function DecisionTraceDetails({
                   ) : (
                     <a
                       href={
-                        fact.fact_type === "active_priority"
-                          ? "#active-priority-context"
-                          : isIncomeFact(fact)
-                            ? `#income-context-${fact.fact_type}`
-                            : isCommitmentFact(fact)
-                              ? `#commitment-context-${fact.fact_id}`
-                              : isConstraintFact(fact)
-                                ? `#constraint-context-${fact.fact_id}`
-                                : `#emergency-fund-context-${fact.fact_type}`
+                        isTransactionNatureFact(fact)
+                          ? `/?month=${fact.source_months[fact.source_months.length - 1]}&transaction=${fact.transaction_ids[0]}`
+                          : isPeriodCoverageFact(fact)
+                            ? "/import"
+                            : fact.fact_type === "active_priority"
+                              ? "#active-priority-context"
+                              : isIncomeFact(fact)
+                                ? `#income-context-${fact.fact_type}`
+                                : isCommitmentFact(fact)
+                                  ? `#commitment-context-${fact.fact_id}`
+                                  : isConstraintFact(fact)
+                                    ? `#constraint-context-${fact.fact_id}`
+                                    : `#emergency-fund-context-${fact.fact_type}`
                       }
                       className="inline-block font-medium text-primary underline-offset-4 hover:underline"
                     >
@@ -2125,6 +2194,8 @@ interface ClarificationCardProps {
     fact: ConstraintFactInput,
     rememberFact: boolean,
   ) => Promise<void>;
+  onPeriodCoverageAnswer: (coverage: PeriodCoverageInput) => Promise<void>;
+  onTransactionNatureAnswer: (fact: TransactionNatureInput) => Promise<void>;
   onAbstain: (action: "skip" | "unknown") => Promise<void>;
 }
 
@@ -2136,14 +2207,44 @@ function ClarificationCard({
   onCommitmentAnswer,
   onIncomeAnswer,
   onConstraintAnswer,
+  onPeriodCoverageAnswer,
+  onTransactionNatureAnswer,
   onAbstain,
 }: ClarificationCardProps) {
+  const [coverageComplete, setCoverageComplete] = useState(true);
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const submitter = (event.nativeEvent as SubmitEvent)
       .submitter as HTMLButtonElement | null;
     const remember = submitter?.value === "true";
+    if (output.fact_type === "period_coverage") {
+      const complete = data.get("complete") === "true";
+      await onPeriodCoverageAnswer({
+        coverage_months: output.coverage_months ?? [],
+        complete,
+        missing_elements: complete
+          ? []
+          : String(data.get("missing_elements"))
+              .split(",")
+              .map((item) => item.trim())
+              .filter(Boolean),
+      });
+      return;
+    }
+    if (output.fact_type === "transaction_nature") {
+      const scope = String(
+        data.get("scope"),
+      ) as TransactionNatureInput["scope"];
+      const transactionIds = output.transaction_ids ?? [];
+      await onTransactionNatureAnswer({
+        transaction_ids:
+          scope === "occurrence" ? transactionIds.slice(0, 1) : transactionIds,
+        nature: String(data.get("nature")) as TransactionNatureInput["nature"],
+        scope,
+      });
+      return;
+    }
     if (output.fact_type === "active_priority") {
       await onPriorityAnswer(
         {
@@ -2179,6 +2280,10 @@ function ClarificationCard({
     }
   }
 
+  const isObservationClarification =
+    output.fact_type === "period_coverage" ||
+    output.fact_type === "transaction_nature";
+
   return (
     <article className="space-y-4 rounded-xl border border-primary/30 bg-primary/5 p-5">
       <div className="flex flex-wrap items-center gap-2">
@@ -2197,14 +2302,89 @@ function ClarificationCard({
           <li key={effect}>{effect}</li>
         ))}
       </ul>
-      <Alert>
-        <AlertDescription>
-          Votre réponse sera réutilisée pour vos prochains conseils. Choisissez
-          « Cette fois seulement » pour la limiter à cette session.
-        </AlertDescription>
-      </Alert>
+      {isObservationClarification ? (
+        <Alert>
+          <AlertDescription>
+            Réponse durable, limitée à cette période ou aux transactions
+            listées.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Alert>
+          <AlertDescription>
+            Votre réponse sera réutilisée pour vos prochains conseils.
+            Choisissez « Cette fois seulement » pour la limiter à cette session.
+          </AlertDescription>
+        </Alert>
+      )}
       <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
-        {output.fact_type === "active_priority" ? (
+        {output.fact_type === "period_coverage" ? (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="coverage-complete">Couverture</Label>
+              <select
+                id="coverage-complete"
+                name="complete"
+                value={coverageComplete ? "true" : "false"}
+                onChange={(event) =>
+                  setCoverageComplete(event.target.value === "true")
+                }
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              >
+                <option value="true">Complète et sans trou</option>
+                <option value="false">Incomplète</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="coverage-missing">
+                Éléments manquants si incomplète
+              </Label>
+              <Input
+                id="coverage-missing"
+                name="missing_elements"
+                required={!coverageComplete}
+                placeholder="Compte joint, 12–18 octobre"
+              />
+            </div>
+          </>
+        ) : output.fact_type === "transaction_nature" ? (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="transaction-nature">Nature</Label>
+              <select
+                id="transaction-nature"
+                name="nature"
+                defaultValue="expense"
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              >
+                <option value="income">Revenu</option>
+                <option value="reimbursement">Remboursement</option>
+                <option value="transfer">Transfert</option>
+                <option value="expense">Dépense</option>
+                <option value="debt_payment">Paiement de dette</option>
+                <option value="saving">Épargne</option>
+              </select>
+            </div>
+            {output.transaction_ids && output.transaction_ids.length > 1 ? (
+              <div className="space-y-2">
+                <Label htmlFor="transaction-scope">Portée</Label>
+                <select
+                  id="transaction-scope"
+                  name="scope"
+                  defaultValue="occurrence"
+                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                >
+                  <option value="occurrence">Cette occurrence</option>
+                  <option value="series">
+                    Uniquement les occurrences listées
+                  </option>
+                </select>
+              </div>
+            ) : (
+              <input type="hidden" name="scope" value="occurrence" />
+            )}
+          </>
+        ) : output.fact_type === "active_priority" ? (
           <>
             <div className="space-y-2">
               <Label htmlFor="priority-goal">Objectif courant</Label>
@@ -2256,17 +2436,21 @@ function ClarificationCard({
             value="true"
             disabled={isSubmitting}
           >
-            Répondre et réutiliser
+            {isObservationClarification
+              ? "Confirmer"
+              : "Répondre et réutiliser"}
           </Button>
-          <Button
-            type="submit"
-            name="remember"
-            value="false"
-            variant="outline"
-            disabled={isSubmitting}
-          >
-            Cette fois seulement
-          </Button>
+          {!isObservationClarification && (
+            <Button
+              type="submit"
+              name="remember"
+              value="false"
+              variant="outline"
+              disabled={isSubmitting}
+            >
+              Cette fois seulement
+            </Button>
+          )}
         </div>
       </form>
       <div className="flex flex-wrap gap-2">
@@ -2348,6 +2532,8 @@ interface AdviceContentProps {
     fact: ConstraintFactInput,
     rememberFact: boolean,
   ) => Promise<void>;
+  onPeriodCoverageAnswer: (coverage: PeriodCoverageInput) => Promise<void>;
+  onTransactionNatureAnswer: (fact: TransactionNatureInput) => Promise<void>;
   onClarificationAbstention: (action: "skip" | "unknown") => Promise<void>;
   onCorrectSession: () => void;
 }
@@ -2364,6 +2550,8 @@ function AdviceContent({
   onCommitmentAnswer,
   onIncomeAnswer,
   onConstraintAnswer,
+  onPeriodCoverageAnswer,
+  onTransactionNatureAnswer,
   onClarificationAbstention,
   onCorrectSession,
 }: AdviceContentProps) {
@@ -2374,7 +2562,7 @@ function AdviceContent({
         {advice.outputs.map((output, index) =>
           output.type === "clarification" ? (
             <ClarificationCard
-              key={index}
+              key={`${index}-${output.fact_type}`}
               output={output}
               isSubmitting={isRegenerating}
               onPriorityAnswer={onPriorityAnswer}
@@ -2382,6 +2570,8 @@ function AdviceContent({
               onCommitmentAnswer={onCommitmentAnswer}
               onIncomeAnswer={onIncomeAnswer}
               onConstraintAnswer={onConstraintAnswer}
+              onPeriodCoverageAnswer={onPeriodCoverageAnswer}
+              onTransactionNatureAnswer={onTransactionNatureAnswer}
               onAbstain={onClarificationAbstention}
             />
           ) : (
