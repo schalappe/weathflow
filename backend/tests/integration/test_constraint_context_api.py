@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from typing import cast
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -84,6 +85,90 @@ def test_financial_limit_is_user_controlled_for_ninety_days(
     deleted = client.delete(f"/api/advice/context/constraints/{fact['fact_id']}")
     assert deleted.status_code == 204
     assert client.get("/api/advice/context/constraints").json() == {"facts": []}
+
+
+@pytest.mark.normative_scenarios("V-CHOICE")
+@patch("app.api.deps.AdviceGenerator")
+def test_observed_behavior_never_contests_choices_or_constraints(
+    mock_generator_class: MagicMock,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Observed spending leaves declared floor and constraints active."""
+    _create_month(db_session, 2025, 9)
+    _create_month(db_session, 2025, 10)
+    client.put(
+        "/api/advice/context/emergency-fund/safety_floor",
+        json={"amount": 5_400},
+    )
+    client.post(
+        "/api/advice/context/constraints",
+        json={
+            "fact_type": "financial_limit",
+            "scope_type": "expense",
+            "scope": "Logement",
+            "limit_type": "floor",
+            "amount": 1_000,
+        },
+    )
+    client.post(
+        "/api/advice/context/constraints",
+        json={
+            "fact_type": "action_unavailability",
+            "action": "Déménager",
+            "review_date": (date.today() + timedelta(days=30)).isoformat(),
+        },
+    )
+    mock_generator = MagicMock()
+
+    def generated_advice(*args: object) -> dict[str, object]:
+        context = cast(AdviceContext, args[2])
+        assert [(fact.fact_type, fact.state) for fact in context.emergency_fund_facts] == [
+            ("safety_floor", "active")
+        ]
+        assert {fact.fact_type: fact.state for fact in context.constraint_facts} == {
+            "financial_limit": "active",
+            "action_unavailability": "active",
+        }
+        return {
+            "outputs": [
+                {
+                    "type": "no_action",
+                    "priority": "low",
+                    "conclusion": "Le comportement observé ne modifie aucun choix déclaré.",
+                    "trace": {
+                        "summary": "Les choix déclarés restent présumés vrais.",
+                        "details": {
+                            "observations": [
+                                {
+                                    "fact": "Les dépenses observées diffèrent des choix déclarés.",
+                                    "period": "2025-09 à 2025-10",
+                                    "scope": "Dépenses du foyer",
+                                    "source": "observed_data",
+                                    "evidence_type": "presence",
+                                    "source_months": ["2025-09", "2025-10"],
+                                    "transaction_ids": [],
+                                }
+                            ],
+                        },
+                    },
+                }
+            ]
+        }
+
+    mock_generator.generate_advice.side_effect = generated_advice
+    mock_generator_class.return_value = mock_generator
+
+    response = client.post("/api/advice/generate", json={"year": 2025, "month": 10})
+
+    assert response.status_code == 200
+    assert [output["type"] for output in response.json()["advice"]["outputs"]] == ["no_action"]
+    assert {fact["state"] for fact in client.get("/api/advice/context/emergency-fund").json()["facts"]} == {
+        "active"
+    }
+    assert {fact["state"] for fact in client.get("/api/advice/context/constraints").json()["facts"]} == {
+        "active"
+    }
 
 
 def test_unavailability_expires_on_its_review_date(client: TestClient) -> None:

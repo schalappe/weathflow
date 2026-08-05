@@ -98,6 +98,7 @@ describe("AdvicePanel decision outputs", () => {
           priority: "medium",
           conclusion: "Le niveau de réserve liquide ne peut pas être conclu.",
           trace: recommendation.trace,
+          conditional_branches: [],
         },
       ],
     });
@@ -123,6 +124,98 @@ describe("AdvicePanel decision outputs", () => {
     expect(
       screen.getAllByText("240 € - 120 € = 120 € d'écart mensuel."),
     ).toHaveLength(3);
+  });
+
+  it("renders selective abstention with uncertainty effects and explanatory branches", async () => {
+    const payment = createMockRecommendationOutput();
+    payment.action = "Payer le minimum exigible du prêt auto.";
+    payment.trace.uncertainty = {
+      state: "robust_despite_limit",
+      effect: "Le revenu incertain ne change pas le paiement minimum exigible.",
+    };
+    const unresolved = {
+      type: "unresolved" as const,
+      priority: "medium" as const,
+      conclusion: "Trajectoire d'épargne : sujet non conclu.",
+      trace: {
+        ...payment.trace,
+        uncertainty: {
+          state: "unresolved" as const,
+          effect: "Le revenu manquant empêche de calculer une capacité soutenable.",
+        },
+      },
+      conditional_branches: [
+        {
+          condition: "le revenu couvre les obligations",
+          effect: "une capacité d'épargne peut exister",
+        },
+        {
+          condition: "le revenu ne couvre pas les obligations",
+          effect: "la trajectoire reste suspendue",
+        },
+      ],
+    };
+    mockGetAdvice.mockResolvedValue(
+      loaded(createMockAdviceData({ outputs: [payment, unresolved] })),
+    );
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    expect(
+      await screen.findByText("Robuste malgré une limite explicite"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Le revenu incertain ne change pas le paiement minimum exigible.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Branches explicatives")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Si le revenu couvre les obligations, une capacité d'épargne peut exister.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Abstention totale")).not.toBeInTheDocument();
+  });
+
+  it("announces total abstention without recommendation or no-action conclusion", async () => {
+    const trace = createMockRecommendationOutput().trace;
+    const unresolved = {
+      type: "unresolved" as const,
+      priority: "high" as const,
+      conclusion: "Budget mensuel : sujet non conclu.",
+      trace: {
+        ...trace,
+        uncertainty: {
+          state: "unresolved" as const,
+          effect: "La couverture insuffisante empêche toute conclusion robuste.",
+        },
+      },
+      conditional_branches: [
+        {
+          condition: "tous les comptes sont couverts",
+          effect: "les agrégats peuvent être réévalués",
+        },
+        {
+          condition: "un compte manque",
+          effect: "les agrégats restent insuffisants pour conclure",
+        },
+      ],
+    };
+    mockGetAdvice.mockResolvedValue(
+      loaded(createMockAdviceData({ outputs: [unresolved] })),
+    );
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    expect(await screen.findByText("Abstention totale")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Aucune recommandation ni conclusion sans action n’est suffisamment étayée.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Recommandation")).not.toBeInTheDocument();
+    expect(screen.queryByText("Conclusion sans action")).not.toBeInTheDocument();
   });
 
   it("shows declared priority status, validity, and correction link in its output", async () => {
@@ -378,6 +471,7 @@ describe("AdvicePanel decision outputs", () => {
             priority: "medium",
             conclusion: "Trajectoire d'épargne : aucune action robuste.",
             trace: recommendation.trace,
+            conditional_branches: [],
           },
         ],
       }),
@@ -500,6 +594,7 @@ describe("AdvicePanel decision outputs", () => {
             priority: "high",
             conclusion: "Plancher de sécurité : sujet non conclu.",
             trace: recommendation.trace,
+            conditional_branches: [],
           },
         ],
         clarification_trace: trace(3, "quota_reached"),
@@ -1051,6 +1146,7 @@ describe("AdvicePanel decision outputs", () => {
             priority: "medium",
             conclusion: "Aucune action faisable n’est étayée.",
             trace,
+            conditional_branches: [],
           },
         ],
       }),

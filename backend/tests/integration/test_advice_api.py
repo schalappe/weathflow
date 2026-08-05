@@ -3,6 +3,7 @@
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -481,6 +482,7 @@ def test_generation_requires_history(client: TestClient, db_session: Session) ->
     assert "Not enough historical data" in response.json()["detail"]
 
 
+@pytest.mark.normative_scenarios("S-06")
 @patch.dict("os.environ", MOCK_API_KEY_ENV)
 @patch("app.api.deps.AdviceGenerator")
 def test_four_simultaneous_clarifications_are_ordered_and_capped(
@@ -644,3 +646,155 @@ def test_decision_lever_precedes_display_priority(
     assert response.status_code == 200
     question = next(output for output in response.json()["advice"]["outputs"] if output["type"] == "clarification")
     assert question["fact_type"] == "active_priority"
+
+
+@pytest.mark.normative_scenarios("S-07")
+@patch.dict("os.environ", MOCK_API_KEY_ENV)
+@patch("app.api.deps.AdviceGenerator")
+def test_skipped_savings_question_keeps_robust_minimum_payment(
+    mock_generator_class: MagicMock,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Skipped savings fact preserves independent payment and local abstention."""
+    _create_month(db_session, 2025, 9)
+    _create_month(db_session, 2025, 10)
+    payment = _advice().model_dump(mode="json")["outputs"][0]
+    payment.update(
+        {
+            "action": "Payer le minimum exigible du prêt auto.",
+            "amount": 120,
+            "trace": {
+                **payment["trace"],
+                "uncertainty": {
+                    "state": "robust_despite_limit",
+                    "effect": "Le revenu incertain ne change pas le paiement minimum exigible.",
+                },
+            },
+        }
+    )
+    savings_question = {
+        "type": "clarification",
+        "priority": "medium",
+        "subject": "Trajectoire d'épargne",
+        "observation": "Le revenu habituel n'est pas établi.",
+        "possible_effect": "L'incertitude empêche de calculer une capacité d'épargne soutenable.",
+        "question": "Quel est votre revenu disponible habituel ?",
+        "fact_type": "usual_disposable_income",
+        "material_effects": ["Capacité positive", "Capacité nulle"],
+        "conditional_branches": [
+            {
+                "condition": "le revenu couvre les dépenses et obligations connues",
+                "effect": "une capacité d'épargne peut exister",
+            },
+            {
+                "condition": "le revenu ne les couvre pas",
+                "effect": "la trajectoire d'épargne reste suspendue",
+            },
+        ],
+    }
+    mock_generator = MagicMock()
+    mock_generator.generate_advice.return_value = {"outputs": [payment, savings_question]}
+    mock_generator_class.return_value = mock_generator
+
+    first = client.post("/api/advice/generate", json={"year": 2025, "month": 10})
+    skipped = client.post(
+        "/api/advice/generate",
+        json={"year": 2025, "month": 10, "clarification_action": "skip"},
+    )
+
+    assert first.status_code == 200
+    assert skipped.status_code == 200
+    outputs = skipped.json()["advice"]["outputs"]
+    assert [output["type"] for output in outputs] == ["recommendation", "unresolved"]
+    assert outputs[0]["action"] == "Payer le minimum exigible du prêt auto."
+    assert outputs[0]["trace"]["uncertainty"] == {
+        "state": "robust_despite_limit",
+        "effect": "Le revenu incertain ne change pas le paiement minimum exigible.",
+    }
+    assert outputs[1]["trace"]["uncertainty"]["state"] == "unresolved"
+    assert outputs[1]["trace"]["uncertainty"]["effect"] == savings_question["possible_effect"]
+    assert outputs[1]["conditional_branches"] == savings_question["conditional_branches"]
+    assert "action" not in outputs[1]
+    assert "amount" not in outputs[1]
+
+
+@pytest.mark.normative_scenarios("S-08")
+@patch.dict("os.environ", MOCK_API_KEY_ENV)
+@patch("app.api.deps.AdviceGenerator")
+def test_skipped_coverage_question_produces_total_abstention(
+    mock_generator_class: MagicMock,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """No robust decision after skip returns only explanatory abstention."""
+    _create_month(db_session, 2025, 9)
+    _create_month(db_session, 2025, 10)
+    coverage_question = {
+        "type": "clarification",
+        "priority": "high",
+        "subject": "Budget mensuel",
+        "observation": "La période peut omettre un compte.",
+        "possible_effect": "La couverture insuffisante peut inverser la conclusion budgétaire.",
+        "question": "La période couvre-t-elle tous vos comptes ?",
+        "fact_type": "period_coverage",
+        "coverage_months": ["2025-09", "2025-10"],
+        "material_effects": ["Couverture complète", "Couverture incomplète"],
+        "conditional_branches": [
+            {
+                "condition": "tous les comptes sont couverts",
+                "effect": "les agrégats peuvent être réévalués",
+            },
+            {
+                "condition": "un compte manque",
+                "effect": "les agrégats restent insuffisants pour conclure",
+            },
+        ],
+    }
+    mock_generator = MagicMock()
+    mock_generator.generate_advice.return_value = {"outputs": [coverage_question]}
+    mock_generator_class.return_value = mock_generator
+
+    client.post("/api/advice/generate", json={"year": 2025, "month": 10})
+    response = client.post(
+        "/api/advice/generate",
+        json={"year": 2025, "month": 10, "clarification_action": "skip"},
+    )
+
+    assert response.status_code == 200
+    outputs = response.json()["advice"]["outputs"]
+    assert [output["type"] for output in outputs] == ["unresolved"]
+    assert outputs[0]["trace"]["uncertainty"] == {
+        "state": "unresolved",
+        "effect": coverage_question["possible_effect"],
+    }
+    assert outputs[0]["conditional_branches"] == coverage_question["conditional_branches"]
+    assert all(output["type"] not in {"recommendation", "no_action"} for output in outputs)
+
+
+@patch.dict("os.environ", MOCK_API_KEY_ENV)
+@patch("app.api.deps.AdviceGenerator")
+def test_total_abstention_preserves_explicit_uncertainty_effect(
+    mock_generator_class: MagicMock,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Generated abstention keeps its observable uncertainty effect."""
+    _create_month(db_session, 2025, 9)
+    _create_month(db_session, 2025, 10)
+    output = _advice("unresolved").model_dump(mode="json")["outputs"][0]
+    output["trace"]["uncertainty"] = {
+        "state": "unresolved",
+        "effect": "Le périmètre manquant peut inverser les agrégats.",
+    }
+    mock_generator = MagicMock()
+    mock_generator.generate_advice.return_value = {"outputs": [output]}
+    mock_generator_class.return_value = mock_generator
+
+    response = client.post("/api/advice/generate", json={"year": 2025, "month": 10})
+
+    assert response.status_code == 200
+    assert response.json()["advice"]["outputs"][0]["trace"]["uncertainty"] == {
+        "state": "unresolved",
+        "effect": "Le périmètre manquant peut inverser les agrégats.",
+    }

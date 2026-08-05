@@ -563,8 +563,24 @@ export interface IncomeNormalization {
   normalized_amount: number;
 }
 
+export type DecisionUncertaintyState =
+  | "supported"
+  | "robust_despite_limit"
+  | "unresolved";
+
+export interface DecisionUncertainty {
+  state: DecisionUncertaintyState;
+  effect: string;
+}
+
+export interface ConditionalBranch {
+  condition: string;
+  effect: string;
+}
+
 export interface DecisionTrace {
   summary: string;
+  uncertainty: DecisionUncertainty;
   details: {
     observations: ObservedFact[];
     calculations: string[];
@@ -598,6 +614,7 @@ export interface NoActionOutput extends DecisionOutputBase {
 export interface UnresolvedOutput extends DecisionOutputBase {
   type: "unresolved";
   conclusion: string;
+  conditional_branches: ConditionalBranch[];
 }
 
 export interface MaterialContradiction {
@@ -648,6 +665,7 @@ export interface ClarificationOutput {
   linked_transaction_ids?: number[];
   transitions?: string[];
   contradiction?: MaterialContradiction;
+  conditional_branches?: ConditionalBranch[];
 }
 
 export type DecisionLever =

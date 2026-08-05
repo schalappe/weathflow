@@ -92,6 +92,10 @@ export function createMockRecommendationOutput(
     deadline: "2026-01-31",
     trace: {
       summary: "Les dépenses de restauration dépassent la moyenne récente.",
+      uncertainty: {
+        state: "robust_despite_limit",
+        effect: "La période courte ne change pas la recommandation.",
+      },
       details: {
         observations: [
           {

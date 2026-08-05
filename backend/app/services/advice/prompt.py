@@ -18,6 +18,15 @@ RÈGLES DE DÉCISION
 - Si aucun écart matériel ne justifie d'action, retourne une conclusion `no_action`.
 - Si les faits ne permettent pas de conclure, retourne `unresolved` et nomme la limite.
 - Sépare observations, faits déclarés, calculs, conventions contestables et limites.
+- Chaque sortie décidée renseigne `trace.uncertainty` avec exactement un état :
+  - `supported` si aucune incertitude matérielle ne change la sortie ;
+  - `robust_despite_limit` si la sortie reste valide malgré une limite explicitée ;
+  - `unresolved` si le sujet ne peut pas être conclu.
+  `effect` nomme ce que l'incertitude change ou ne change pas.
+- Pour une abstention, `conditional_branches` peut expliquer les issues avec `condition` et `effect`,
+  sans action priorisée, montant ni échéance. Ne transforme jamais ces branches en recommandation.
+- Si aucune recommandation ni conclusion `no_action` n'est robuste, retourne uniquement des sorties
+  `unresolved`. N'expose aucun score de confiance ni raisonnement interne brut.
 - Chaque observation cite fait, période, périmètre et source fixe `observed_data`.
 - Fournis montant ou échéance seulement si `calculations` permet de les reproduire.
 - N'utilise aucun ancien champ : analysis, problem_areas, spending_patterns, recommendations,
@@ -150,6 +159,10 @@ FORMAT JSON STRICT
       "income_dependent": true,
       "trace": {
         "summary": "Résumé visible reliant faits et décision",
+        "uncertainty": {
+          "state": "supported | robust_despite_limit | unresolved",
+          "effect": "Effet observable de l'incertitude restante"
+        },
         "details": {
           "observations": [
             {
@@ -294,10 +307,22 @@ Une clarification suit ce format :
   "decision_lever": "action_or_priority | amount | deadline | abstention",
   "answer_ease": "easy | moderate | hard",
   "fact_type": "un type du catalogue fermé ci-dessus",
-  "material_effects": ["Décision A", "Décision B"]
+  "material_effects": ["Décision A", "Décision B"],
+  "conditional_branches": [
+    {
+      "condition": "Condition factuelle sans montant",
+      "effect": "Conséquence explicative sans action priorisée"
+    },
+    {
+      "condition": "Condition factuelle alternative",
+      "effect": "Conséquence explicative alternative"
+    }
+  ]
 }
 Pour `period_coverage`, ajoute `coverage_months`. Pour `transaction_nature`, ajoute
 `transaction_ids` et `linked_transaction_ids`. N'ajoute jamais ces champs aux autres clarifications.
 
-Pour `no_action` ou `unresolved`, remplace `action` par `conclusion` et omets `amount` et `deadline`.
+Pour `no_action`, remplace `action` par `conclusion` et omets `amount`, `deadline` et
+`conditional_branches`. Pour `unresolved`, remplace `action` par `conclusion`, omets `amount` et
+`deadline`, fixe `trace.uncertainty.state` à `unresolved` et conserve les branches explicatives utiles.
 Retourne uniquement un objet JSON conforme, sans markdown."""

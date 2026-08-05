@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from typing import cast
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -311,6 +312,7 @@ def test_correction_and_deletion_invalidate_only_dependent_advice(
     assert [advice.month_id for advice in db_session.query(Advice).all()] == [months[1].id]
 
 
+@pytest.mark.normative_scenarios("V-FRESH")
 def test_dated_and_volatile_facts_expire_without_disappearing(
     client: TestClient,
     db_session: Session,
@@ -360,6 +362,7 @@ def test_dated_and_volatile_facts_expire_without_disappearing(
     }
 
 
+@pytest.mark.normative_scenarios("V-STOCK")
 @patch("app.api.deps.AdviceGenerator")
 def test_transactions_alone_never_create_debt_or_obligation_facts(
     mock_generator_class: MagicMock,

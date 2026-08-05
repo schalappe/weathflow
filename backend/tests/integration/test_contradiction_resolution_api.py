@@ -222,6 +222,7 @@ def _obligation_dependent_advice(*args: object) -> dict[str, object]:
     }
 
 
+@pytest.mark.normative_scenarios("S-03", "V-FLOW-DOWN")
 @patch("app.api.deps.AdviceGenerator")
 def test_material_income_drop_blocks_only_dependent_output(
     mock_generator_class: MagicMock,
@@ -438,6 +439,7 @@ def test_nonrecurring_income_does_not_mask_recurring_series(
     assert conflict["observed_value"] == 2_300
 
 
+@pytest.mark.normative_scenarios("V-FLOW-UP")
 @patch("app.api.deps.AdviceGenerator")
 def test_favorable_income_requires_three_complete_cycles(
     mock_generator_class: MagicMock,
@@ -592,6 +594,7 @@ def test_non_salary_date_coincidence_does_not_pair_one_off_income(
     assert all(output["type"] != "clarification" for output in response.json()["advice"]["outputs"])
 
 
+@pytest.mark.normative_scenarios("V-ONEOFF")
 @patch("app.api.deps.AdviceGenerator")
 def test_labeled_one_off_income_opens_direct_clarification(
     mock_generator_class: MagicMock,
@@ -858,6 +861,7 @@ def test_favorable_obligation_requires_three_cycles(
     assert conflict["contradiction"]["period"] == ["2025-08", "2025-09", "2025-10"]
 
 
+@pytest.mark.normative_scenarios("S-04")
 @patch("app.api.deps.AdviceGenerator")
 def test_confirm_acknowledges_cycles_without_reopening(
     mock_generator_class: MagicMock,
@@ -1033,6 +1037,7 @@ def test_abstention_neutralizes_contested_income(
         assert fact.state == expected_state
 
 
+@pytest.mark.normative_scenarios("V-REOPEN")
 @patch("app.api.deps.AdviceGenerator")
 def test_only_fully_post_confirmation_series_reopens_income_conflict(
     mock_generator_class: MagicMock,

@@ -1979,6 +1979,12 @@ const outputLabels: Record<DecisionOutput["type"], string> = {
   clarification: "Clarification",
 };
 
+const uncertaintyLabels = {
+  supported: "Étayé",
+  robust_despite_limit: "Robuste malgré une limite explicite",
+  unresolved: "Sujet non conclu",
+} as const;
+
 const priorityLabels: Record<DecisionPriority, string> = {
   high: t.advice.priorities.high,
   medium: t.advice.priorities.medium,
@@ -2694,14 +2700,35 @@ function DecisionOutputCard({
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="secondary">{outputLabels[output.type]}</Badge>
         <Badge variant="outline">{priorityLabels[output.priority]}</Badge>
+        <Badge variant="outline">
+          {uncertaintyLabels[output.trace.uncertainty.state]}
+        </Badge>
       </div>
       <h5 className="font-semibold leading-relaxed">{title}</h5>
+      {output.trace.summary !== output.trace.uncertainty.effect && (
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {output.trace.summary}
+        </p>
+      )}
       <p className="text-sm leading-relaxed text-muted-foreground">
-        {output.trace.summary}
+        {output.trace.uncertainty.effect}
       </p>
       {output.type === "recommendation" && (
         <RecommendationMetadata output={output} />
       )}
+      {output.type === "unresolved" &&
+        output.conditional_branches.length > 0 && (
+          <section className="space-y-2">
+            <h6 className="text-sm font-medium">Branches explicatives</h6>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+              {output.conditional_branches.map((branch) => (
+                <li key={`${branch.condition}-${branch.effect}`}>
+                  Si {branch.condition}, {branch.effect}.
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       <DecisionTraceDetails
         trace={output.trace}
         onCorrectSession={onCorrectSession}
@@ -2762,9 +2789,29 @@ function AdviceContent({
   onClarificationAbstention,
   onCorrectSession,
 }: AdviceContentProps) {
+  const decidedOutputs = advice.outputs.filter(
+    (output) => output.type !== "clarification",
+  );
+  const isTotalAbstention =
+    !advice.outputs.some((output) => output.type === "clarification") &&
+    decidedOutputs.length > 0 &&
+    decidedOutputs.every((output) => output.type === "unresolved");
+
   return (
     <div className="space-y-6">
       {regenerateError && <ErrorAlert error={regenerateError} />}
+      {isTotalAbstention && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <span className="block font-medium text-foreground">
+              Abstention totale
+            </span>
+            Aucune recommandation ni conclusion sans action n’est suffisamment
+            étayée.
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="space-y-4">
         {advice.outputs.map((output, index) =>
           output.type === "clarification" ? (

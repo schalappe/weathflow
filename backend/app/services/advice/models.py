@@ -751,6 +751,20 @@ class DecisionTraceDetails(DecisionModel):
     transitions: list[str] = Field(default_factory=list)
 
 
+class DecisionUncertainty(DecisionModel):
+    """Observable uncertainty effect."""
+
+    state: Literal["supported", "robust_despite_limit", "unresolved"]
+    effect: str = Field(min_length=1)
+
+
+class ConditionalBranch(DecisionModel):
+    """Non-prescriptive abstention branch."""
+
+    condition: str = Field(min_length=1)
+    effect: str = Field(min_length=1)
+
+
 class DecisionTrace(DecisionModel):
     """Two-level decision trace.
 
@@ -764,6 +778,12 @@ class DecisionTrace(DecisionModel):
 
     summary: str = Field(min_length=1)
     details: DecisionTraceDetails
+    uncertainty: DecisionUncertainty = Field(
+        default=DecisionUncertainty(
+            state="supported",
+            effect="Aucune incertitude matérielle ne change cette sortie.",
+        )
+    )
 
 
 class RecommendationOutput(DecisionModel):
@@ -857,6 +877,7 @@ class UnresolvedOutput(DecisionModel):
     priority: Literal["high", "medium", "low"]
     conclusion: str = Field(min_length=1)
     trace: DecisionTrace
+    conditional_branches: list[ConditionalBranch] = Field(default_factory=list)
 
 
 class MaterialContradiction(DecisionModel):
@@ -981,6 +1002,7 @@ class ClarificationOutput(DecisionModel):
     linked_transaction_ids: list[int] | None = None
     transitions: list[str] = Field(default_factory=list)
     contradiction: MaterialContradiction | None = None
+    conditional_branches: list[ConditionalBranch] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def require_distinct_effects(self) -> Self:
@@ -1012,6 +1034,8 @@ class ClarificationOutput(DecisionModel):
                 raise ValueError("contradiction transaction ids must match evidence")
         elif self.transaction_ids is not None or self.linked_transaction_ids is not None:
             raise ValueError("transaction links require transaction nature or contradiction")
+        if self.conditional_branches and len(self.conditional_branches) < 2:
+            raise ValueError("conditional branches require at least two alternatives")
         return self
 
 
@@ -1107,6 +1131,37 @@ class AdviceResponse(AdviceDraft):
     """
 
     clarification_trace: ClarificationTrace = Field(default_factory=ClarificationTrace)
+
+    @model_validator(mode="after")
+    def classify_decision_uncertainty(self) -> Self:
+        """Set one observable state per decided output."""
+        outputs: list[DecisionOutput] = []
+        for output in self.outputs:
+            if output.type == "clarification":
+                outputs.append(output)
+                continue
+            uncertainty = output.trace.uncertainty
+            if output.type == "unresolved":
+                uncertainty = DecisionUncertainty(
+                    state="unresolved",
+                    effect=uncertainty.effect if uncertainty.state == "unresolved" else output.trace.summary,
+                )
+            elif output.trace.details.limits and uncertainty.state == "supported":
+                uncertainty = DecisionUncertainty(
+                    state="robust_despite_limit",
+                    effect="Les limites explicites ne changent pas cette sortie.",
+                )
+            elif uncertainty.state == "unresolved":
+                raise ValueError("decided output cannot be unresolved")
+            outputs.append(
+                output.model_copy(
+                    update={
+                        "trace": output.trace.model_copy(update={"uncertainty": uncertainty}),
+                    }
+                )
+            )
+        object.__setattr__(self, "outputs", outputs)
+        return self
 
     @model_validator(mode="after")
     def allow_one_clarification(self) -> Self:

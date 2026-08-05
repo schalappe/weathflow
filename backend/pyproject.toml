@@ -56,3 +56,7 @@ warn_required_dynamic_aliases = true
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
+
+markers = [
+    "normative_scenarios(*owners): end-to-end owners from the advice specification",
+]

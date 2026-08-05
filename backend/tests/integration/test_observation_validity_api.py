@@ -3,6 +3,7 @@
 from datetime import date
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -246,6 +247,7 @@ def test_aggregate_on_incomplete_coverage_becomes_unresolved_without_question(
     assert all(item["type"] != "clarification" for item in response.json()["advice"]["outputs"])
 
 
+@pytest.mark.normative_scenarios("V-PROV")
 @patch.dict("os.environ", MOCK_API_KEY_ENV)
 @patch("app.api.deps.AdviceGenerator")
 @patch("app.services.upload.service.TransactionCategorizer")
@@ -320,6 +322,7 @@ def test_truncated_import_can_trigger_scoped_coverage_clarification(
     assert confirmed_context.coverage_signals == []
 
 
+@pytest.mark.normative_scenarios("V-TRANS")
 @patch.dict("os.environ", MOCK_API_KEY_ENV)
 @patch("app.api.deps.AdviceGenerator")
 def test_new_counter_entry_reopens_only_confirmed_transaction_occurrence(
@@ -486,6 +489,7 @@ def test_new_counter_entry_reopens_only_confirmed_transaction_occurrence(
     assert reopened.json()["advice"]["outputs"][0]["transaction_ids"] == [debit.id]
 
 
+@pytest.mark.normative_scenarios("S-02")
 @patch.dict("os.environ", MOCK_API_KEY_ENV)
 @patch("app.api.deps.AdviceGenerator")
 def test_category_merchant_frequency_and_volume_do_not_expand_or_contest_series(

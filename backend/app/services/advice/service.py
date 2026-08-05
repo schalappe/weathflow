@@ -1616,6 +1616,7 @@ def _unresolved_clarification(
         type="unresolved",
         priority=output.priority,
         conclusion=f"{output.subject} : sujet non conclu.",
+        conditional_branches=output.conditional_branches,
         trace=DecisionTrace(
             summary=output.possible_effect,
             details=DecisionTraceDetails(
@@ -2506,6 +2507,7 @@ def resolve_clarification(
                 type="unresolved",
                 priority=output.priority,
                 conclusion=f"{output.subject} : aucune action robuste sans {label}.",
+                conditional_branches=output.conditional_branches,
                 trace=DecisionTrace(
                     summary=output.possible_effect,
                     details=DecisionTraceDetails(

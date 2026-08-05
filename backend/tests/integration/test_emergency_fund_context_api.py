@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -77,6 +78,7 @@ def test_emergency_fund_facts_are_stored_distinctly_and_remain_user_controlled(
     assert {fact["fact_type"] for fact in remaining} == {"liquid_reserve", "safety_floor"}
 
 
+@pytest.mark.normative_scenarios("S-01")
 @patch("app.api.deps.AdviceGenerator")
 def test_canonical_emergency_fund_trajectory_reaches_generation_and_trace(
     mock_generator_class: MagicMock,
@@ -309,6 +311,7 @@ def test_reserve_and_allocation_meeting_floor_produce_no_action(
     assert output["trace"]["details"]["calculations"] == ["5 400 € - 2 000 € - 3 400 € = 0 €."]
 
 
+@pytest.mark.normative_scenarios("S-05", "V-FRESH")
 def test_emergency_fund_freshness_expires_positions_and_floor_independently(
     client: TestClient,
     db_session: Session,
@@ -344,6 +347,7 @@ def test_emergency_fund_freshness_expires_positions_and_floor_independently(
     assert {fact["state"] for fact in facts} == {"to_confirm"}
 
 
+@pytest.mark.normative_scenarios("V-STOCK")
 @patch("app.api.deps.AdviceGenerator")
 def test_transactions_alone_never_create_emergency_fund_context(
     mock_generator_class: MagicMock,
