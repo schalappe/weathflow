@@ -179,6 +179,10 @@ def test_skip_replaces_persisted_question_with_unresolved_output(
     )
     mock_generator_class.return_value = mock_generator
     client.post("/api/advice/generate", json={"year": 2025, "month": 10})
+    rejected_delete = client.post(
+        "/api/advice/generate",
+        json={"year": 2025, "month": 10, "clarification_action": "delete"},
+    )
 
     skipped = client.post(
         "/api/advice/generate",
@@ -186,6 +190,7 @@ def test_skip_replaces_persisted_question_with_unresolved_output(
     )
     reloaded = client.get("/api/advice/2025/10")
 
+    assert rejected_delete.status_code == 422
     assert skipped.status_code == 200
     assert [output["type"] for output in skipped.json()["advice"]["outputs"]] == [
         "recommendation",

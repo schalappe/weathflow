@@ -76,9 +76,13 @@ class IncomeFactRepository:
             fact = IncomeFact(state="active", **values)
             self._db.add(fact)
         else:
-            for field in ("amount", "frequency", "expected_date"):
+            unchanged = all(
+                getattr(fact, field) == values.get(field)
+                for field in ("amount", "label", "frequency", "expected_date")
+            )
+            for field in ("amount", "label", "frequency", "expected_date"):
                 setattr(fact, field, values.get(field))
-            fact.state = "corrected"
+            fact.state = "active" if unchanged else "corrected"
         fact.last_confirmed_at = now
         fact.valid_until = (
             now + timedelta(days=90)

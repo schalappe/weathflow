@@ -9,6 +9,9 @@ from sqlalchemy.orm import Session
 from app.db.enums import MoneyMapType
 from app.db.models.month import Month
 from app.db.models.transaction import Transaction
+from app.repositories.observation_fact import ObservationFactRepository
+from app.repositories.transaction import TransactionRepository
+from app.services.advice.service import month_to_month_data, prepare_observation_context
 from app.services.categorization.models import CategorizationResult
 from tests.integration.fixtures.csv_builder import CSVBuilder, combine_csvs
 
@@ -250,6 +253,7 @@ def test_truncated_import_can_trigger_scoped_coverage_clarification(
     mock_categorizer_class: MagicMock,
     mock_generator_class: MagicMock,
     client: TestClient,
+    db_session: Session,
 ) -> None:
     """Truncated import provenance reaches material advice clarification."""
     categorizer = MagicMock()
@@ -305,6 +309,15 @@ def test_truncated_import_can_trigger_scoped_coverage_clarification(
     context = mock_generator.generate_advice.call_args.args[2]
     assert context.coverage_signals[0].provenance_issues == ["truncated_statement"]
     assert response.json()["advice"]["outputs"][0]["fact_type"] == "period_coverage"
+    observation_repo = ObservationFactRepository(db_session)
+    observation_repo.put_period_coverage(["2025-09", "2025-10"], False, ["Fin de relevé inconnue"])
+    months = db_session.query(Month).order_by(Month.year, Month.month).all()
+    confirmed_context = prepare_observation_context(
+        observation_repo,
+        TransactionRepository(db_session),
+        [month_to_month_data(month) for month in months],
+    )
+    assert confirmed_context.coverage_signals == []
 
 
 @patch.dict("os.environ", MOCK_API_KEY_ENV)

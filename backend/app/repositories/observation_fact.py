@@ -6,7 +6,12 @@ from hashlib import sha256
 from sqlalchemy.orm import Session
 
 from app.db.models.base import utc_now
-from app.db.models.observation_fact import ImportCoverageEvidence, PeriodCoverageFact, TransactionNatureFact
+from app.db.models.observation_fact import (
+    ContradictionAcknowledgement,
+    ImportCoverageEvidence,
+    PeriodCoverageFact,
+    TransactionNatureFact,
+)
 from app.db.models.transaction import Transaction
 
 
@@ -282,3 +287,54 @@ class ObservationFactRepository:
         self._db.commit()
         self._db.refresh(fact)
         return fact
+
+    def get_contradiction_acknowledgement(
+        self,
+        fact_key: str,
+    ) -> ContradictionAcknowledgement | None:
+        """Return latest evidence acknowledgement.
+
+        Parameters
+        ----------
+        fact_key : str
+            Declared fact identity.
+
+        Returns
+        -------
+        ContradictionAcknowledgement | None
+            Stored acknowledgement when present.
+        """
+        return (
+            self._db.query(ContradictionAcknowledgement)
+            .filter(ContradictionAcknowledgement.fact_key == fact_key)
+            .first()
+        )
+
+    def acknowledge_contradiction(
+        self,
+        fact_key: str,
+        observation_keys: Sequence[str],
+    ) -> ContradictionAcknowledgement:
+        """Replace acknowledged evidence after explicit resolution.
+
+        Parameters
+        ----------
+        fact_key : str
+            Declared fact identity.
+        observation_keys : Sequence[str]
+            Evidence identities accepted by the user.
+
+        Returns
+        -------
+        ContradictionAcknowledgement
+            Stored acknowledgement.
+        """
+        acknowledgement = self.get_contradiction_acknowledgement(fact_key)
+        if acknowledgement is None:
+            acknowledgement = ContradictionAcknowledgement(fact_key=fact_key)
+            self._db.add(acknowledgement)
+        acknowledgement.observation_keys = sorted(set(observation_keys))
+        acknowledgement.confirmed_at = utc_now().replace(tzinfo=None)
+        self._db.commit()
+        self._db.refresh(acknowledgement)
+        return acknowledgement

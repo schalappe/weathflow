@@ -5,9 +5,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from sqlalchemy import text
+from sqlalchemy import create_engine, inspect, text
 
-from app.db.database import DATABASE_PATH, engine, init_db
+from app.db.database import DATABASE_PATH, _ensure_income_fact_label, engine, init_db
 
 
 class TestDatabaseConfiguration(unittest.TestCase):
@@ -51,6 +51,19 @@ class TestDatabaseConfiguration(unittest.TestCase):
             init_db()
 
             self.assertTrue(test_db_path.parent.exists())
+
+    def test_legacy_income_fact_gains_pairing_label(self) -> None:
+        """Existing SQLite income facts gain the nullable label column."""
+        legacy_engine = create_engine("sqlite://")
+        with legacy_engine.begin() as connection:
+            connection.execute(
+                text("CREATE TABLE income_fact (fact_type VARCHAR(40) PRIMARY KEY, amount FLOAT NOT NULL)")
+            )
+            _ensure_income_fact_label(connection)
+            _ensure_income_fact_label(connection)
+            columns = {column["name"] for column in inspect(connection).get_columns("income_fact")}
+
+        self.assertEqual(columns, {"fact_type", "amount", "label"})
 
 
 if __name__ == "__main__":

@@ -211,14 +211,14 @@ def test_expected_income_is_matched_to_observed_transaction_once(
             Transaction(
                 month_id=current.id,
                 date=today,
-                description="Prime exceptionnelle A",
+                description="Prime exceptionnelle B",
                 amount=1_500,
                 money_map_type="INCOME",
             ),
             Transaction(
                 month_id=current.id,
                 date=today,
-                description="Prime exceptionnelle B",
+                description="Prime exceptionnelle A",
                 amount=1_500,
                 money_map_type="INCOME",
             ),
@@ -251,7 +251,7 @@ def test_expected_income_is_matched_to_observed_transaction_once(
                                 }
                             ],
                             "calculations": ["1 500 € déclarés = 1 500 € observés ; contribution totale 1 500 €."],
-                            "conventions": ["Correspondance exacte par montant et date."],
+                            "conventions": ["Correspondance exacte par libellé, montant et date."],
                             "income_normalizations": [
                                 {
                                     "fact_type": "expected_one_off_income",
@@ -285,6 +285,7 @@ def test_expected_income_is_matched_to_observed_transaction_once(
             "month": today.month,
             "income_fact": {
                 "fact_type": "expected_one_off_income",
+                "label": "Prime exceptionnelle A",
                 "amount": 1_500,
                 "expected_date": today.isoformat(),
             },

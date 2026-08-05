@@ -1,7 +1,8 @@
 """Advice storage and generation-data services."""
 
-from datetime import UTC
+from datetime import UTC, date, datetime, timedelta
 from math import isclose
+from statistics import median
 from typing import Any, Literal, cast
 
 from loguru import logger
@@ -25,6 +26,7 @@ from app.services.advice.models import (
     ActionUnavailabilityContext,
     AdviceContext,
     AdviceResponse,
+    ClarificationOutput,
     CommitmentFactContext,
     ConstraintFactContext,
     DecisionOutput,
@@ -34,6 +36,7 @@ from app.services.advice.models import (
     FinancialLimitContext,
     IncomeFactCitation,
     IncomeFactContext,
+    MaterialContradiction,
     MonthData,
     ObservedFact,
     PeriodCoverageContext,
@@ -134,6 +137,7 @@ def _extract_all_transactions(transactions: list[Transaction]) -> dict[str, list
                 description=transaction.description,
                 amount=abs(transaction.amount),
                 date=transaction.date,
+                account=transaction.account,
                 subcategory=transaction.money_map_subcategory,
             )
             for transaction in sorted(items, key=lambda item: abs(item.amount), reverse=True)
@@ -338,6 +342,7 @@ def prepare_commitment_context(
     advice_repo: AdviceRepository,
     answer: CommitmentFactContext | None,
     remember: bool,
+    target_fact_id: int | None = None,
 ) -> list[CommitmentFactContext]:
     """Apply an optional answer to stored commitment context.
 
@@ -351,6 +356,8 @@ def prepare_commitment_context(
         Request-scoped fact.
     remember : bool
         Persist the answer when true.
+    target_fact_id : int | None
+        Exact contradicted fact to replace.
 
     Returns
     -------
@@ -361,9 +368,19 @@ def prepare_commitment_context(
     if answer is None:
         return contexts
     matching = next(
-        (context for context in contexts if context.fact_type == answer.fact_type and context.label == answer.label),
+        (
+            context
+            for context in contexts
+            if (
+                context.fact_id == target_fact_id
+                if target_fact_id is not None
+                else context.fact_type == answer.fact_type and context.label == answer.label
+            )
+        ),
         None,
     )
+    if target_fact_id is not None and matching is None:
+        raise RuntimeError("contradicted commitment disappeared during update")
     matching_id = matching.fact_id if matching is not None else None
     contexts = [context for context in contexts if context is not matching]
     if remember:
@@ -403,6 +420,7 @@ def income_fact_context(fact: IncomeFact) -> IncomeFactContext:
             "fact_type": fact.fact_type,
             "amount": fact.amount,
             "frequency": fact.frequency,
+            "label": fact.label,
             "expected_date": fact.expected_date,
             "state": fact.state,
             "last_confirmed_at": fact.last_confirmed_at.replace(tzinfo=UTC),
@@ -511,7 +529,7 @@ def prepare_income_context(
         return contexts
     contexts = [context for context in contexts if context.fact_type != answer.fact_type]
     if remember:
-        fields = {"fact_type", "amount", "frequency", "expected_date"}
+        fields = {"fact_type", "amount", "label", "frequency", "expected_date"}
         contexts.append(
             income_fact_context(
                 put_income_fact(
@@ -691,7 +709,11 @@ def deduplicate_expected_income(
                 matching = [
                     (index, transaction)
                     for index, transaction in enumerate(incomes)
-                    if transaction.date == context.expected_date and transaction.amount == context.amount
+                    if context.label is not None
+                    and transaction.date == context.expected_date
+                    and transaction.amount == context.amount
+                    and " ".join(transaction.description.casefold().split())
+                    == " ".join(context.label.casefold().split())
                 ]
                 match_index = min(matching, key=lambda item: item[1].transaction_id)[0] if matching else None
                 if match_index is None:
@@ -716,6 +738,932 @@ def deduplicate_expected_income(
                 break
         updated_contexts.append(context.model_copy(update={"matched_transaction": matched}))
     return updated_contexts, updated_months
+
+
+_RecurringFrequency = Literal["weekly", "biweekly", "monthly", "quarterly", "yearly"]
+_RecurringSignal = Literal[
+    "recurring_income_lower",
+    "recurring_income_higher",
+    "recurring_obligation_higher",
+    "recurring_obligation_lower",
+]
+_OneOffSignal = Literal["one_off_income_mismatch", "one_off_obligation_mismatch"]
+
+
+def _cycle_start(value: date, frequency: _RecurringFrequency) -> date:
+    """Return calendar start of a recurring cycle.
+
+    Parameters
+    ----------
+    value : date
+        Transaction date.
+    frequency : _RecurringFrequency
+        Declared cadence.
+
+    Returns
+    -------
+    date
+        Stable cycle start.
+    """
+    if frequency in {"weekly", "biweekly"}:
+        week_start = value - timedelta(days=value.weekday())
+        if frequency == "weekly":
+            return week_start
+        epoch = date(1970, 1, 5)
+        return week_start - timedelta(weeks=((week_start - epoch).days // 7) % 2)
+    if frequency == "monthly":
+        return value.replace(day=1)
+    if frequency == "quarterly":
+        return date(value.year, (value.month - 1) // 3 * 3 + 1, 1)
+    return date(value.year, 1, 1)
+
+
+def _cycle_key(value: date, frequency: _RecurringFrequency) -> str:
+    """Return stable recurring-cycle key.
+
+    Parameters
+    ----------
+    value : date
+        Transaction date.
+    frequency : _RecurringFrequency
+        Declared cadence.
+
+    Returns
+    -------
+    str
+        Cycle key.
+    """
+    start = _cycle_start(value, frequency)
+    if frequency in {"weekly", "biweekly"}:
+        return start.isoformat()
+    if frequency == "monthly":
+        return start.strftime("%Y-%m")
+    if frequency == "quarterly":
+        return f"{start.year:04d}-Q{(start.month - 1) // 3 + 1}"
+    return f"{start.year:04d}"
+
+
+def _cycle_key_start(key: str, frequency: _RecurringFrequency) -> date:
+    """Recover a cycle start from its stable key.
+
+    Parameters
+    ----------
+    key : str
+        Stable cycle key.
+    frequency : _RecurringFrequency
+        Declared cadence.
+
+    Returns
+    -------
+    date
+        Cycle start.
+    """
+    if frequency in {"weekly", "biweekly"}:
+        return date.fromisoformat(key)
+    if frequency == "monthly":
+        return date.fromisoformat(f"{key}-01")
+    if frequency == "quarterly":
+        year, quarter = key.split("-Q")
+        return date(int(year), (int(quarter) - 1) * 3 + 1, 1)
+    return date(int(key), 1, 1)
+
+
+def _cycle_months(value: date, frequency: _RecurringFrequency) -> set[str]:
+    """Return months requiring complete coverage for one cycle.
+
+    Parameters
+    ----------
+    value : date
+        Transaction date inside the cycle.
+    frequency : _RecurringFrequency
+        Declared cadence.
+
+    Returns
+    -------
+    set[str]
+        Covered calendar months.
+    """
+    start = _cycle_start(value, frequency)
+    if frequency in {"weekly", "biweekly"}:
+        end = start + timedelta(days=6 if frequency == "weekly" else 13)
+        return {start.strftime("%Y-%m"), end.strftime("%Y-%m")}
+    if frequency == "monthly":
+        return {start.strftime("%Y-%m")}
+    if frequency == "quarterly":
+        return {f"{start.year:04d}-{month:02d}" for month in range(start.month, start.month + 3)}
+    return {f"{start.year:04d}-{month:02d}" for month in range(1, 13)}
+
+
+def _cycle_starts_are_consecutive(starts: list[date], frequency: _RecurringFrequency) -> bool:
+    """Check starts occupy consecutive declared cycles.
+
+    Parameters
+    ----------
+    starts : list[date]
+        Selected cycle starts.
+    frequency : _RecurringFrequency
+        Declared cadence.
+
+    Returns
+    -------
+    bool
+        Whether every adjacent cycle is consecutive.
+    """
+    for left, right in zip(starts, starts[1:], strict=False):
+        if frequency in {"weekly", "biweekly"}:
+            expected_days = 7 if frequency == "weekly" else 14
+            if (right - left).days != expected_days:
+                return False
+        else:
+            left_month = left.year * 12 + left.month - 1
+            right_month = right.year * 12 + right.month - 1
+            step = {"monthly": 1, "quarterly": 3, "yearly": 12}[frequency]
+            if right_month - left_month != step:
+                return False
+    return True
+
+
+def _complete_cycle_starts(complete_months: set[str], frequency: _RecurringFrequency) -> list[date]:
+    """Return declared cycles fully covered by imported months.
+
+    Parameters
+    ----------
+    complete_months : set[str]
+        Complete calendar months.
+    frequency : _RecurringFrequency
+        Declared cadence.
+
+    Returns
+    -------
+    list[date]
+        Ordered fully covered cycle starts.
+    """
+    if not complete_months:
+        return []
+    month_starts = sorted(date.fromisoformat(f"{month}-01") for month in complete_months)
+    if frequency in {"weekly", "biweekly"}:
+        cursor = _cycle_start(month_starts[0], frequency)
+        next_month = (month_starts[-1].replace(day=28) + timedelta(days=4)).replace(day=1)
+        last_day = next_month - timedelta(days=1)
+        step = timedelta(days=7 if frequency == "weekly" else 14)
+        candidates: list[date] = []
+        while cursor <= last_day:
+            candidates.append(cursor)
+            cursor += step
+    else:
+        candidates = sorted({_cycle_start(month, frequency) for month in month_starts})
+    return [start for start in candidates if _cycle_months(start, frequency) <= complete_months]
+
+
+def _select_adverse_series(
+    samples: list[TransactionSample],
+    frequency: _RecurringFrequency,
+    declared_value: float,
+    complete_months: set[str],
+    checks: list[tuple[int, Literal["higher", "lower"], _RecurringSignal]],
+) -> tuple[_RecurringSignal, float, list[TransactionSample], list[str]] | None:
+    """Select the shortest complete adverse series.
+
+    Parameters
+    ----------
+    samples : list[TransactionSample]
+        Candidate observations.
+    frequency : _RecurringFrequency
+        Declared cadence.
+    declared_value : float
+        Confirmed amount.
+    complete_months : set[str]
+        Months with complete, gap-free coverage.
+    checks : list[tuple[int, Literal["higher", "lower"], _RecurringSignal]]
+        Threshold checks in priority order.
+
+    Returns
+    -------
+    tuple[_RecurringSignal, float, list[TransactionSample], list[str]] | None
+        Signal, median, samples, and cycle keys when admitted.
+    """
+    cycle_starts = _complete_cycle_starts(complete_months, frequency)
+    grouped: dict[str, list[TransactionSample]] = {_cycle_key(start, frequency): [] for start in cycle_starts}
+    for sample in sorted(samples, key=lambda item: item.date):
+        key = _cycle_key(sample.date, frequency)
+        if key in grouped:
+            grouped[key].append(sample)
+    cycles = [(start, grouped[_cycle_key(start, frequency)]) for start in cycle_starts]
+    for count, direction, signal in checks:
+        selected_cycles = cycles[-count:]
+        starts = [start for start, _ in selected_cycles]
+        if len(selected_cycles) != count or not _cycle_starts_are_consecutive(starts, frequency):
+            continue
+        observed_value = float(
+            median(sum(abs(sample.amount) for sample in cycle_samples) for _, cycle_samples in selected_cycles)
+        )
+        if (
+            direction == "higher"
+            and observed_value > declared_value * 1.2
+            or (direction == "lower" and observed_value < declared_value * 0.8)
+        ):
+            selected_samples = [sample for _, cycle_samples in selected_cycles for sample in cycle_samples]
+            return (
+                signal,
+                observed_value,
+                selected_samples,
+                [_cycle_key(start, frequency) for start in starts],
+            )
+    return None
+
+
+def _contradiction_from_series(
+    *,
+    fact_type: IncomeFactType | CommitmentFactType,
+    fact_id: int | None,
+    declared_value: float,
+    last_confirmed_at: datetime,
+    frequency: _RecurringFrequency,
+    label: str | None,
+    scope: str,
+    series: tuple[_RecurringSignal, float, list[TransactionSample], list[str]],
+    transaction_repo: TransactionRepository,
+    observation_repo: ObservationFactRepository,
+) -> MaterialContradiction | None:
+    """Build contradiction from durable source transactions.
+
+    Parameters
+    ----------
+    fact_type : IncomeFactType | CommitmentFactType
+        Declared fact kind.
+    fact_id : int | None
+        Commitment identity when applicable.
+    declared_value : float
+        Confirmed amount.
+    last_confirmed_at : datetime
+        Last explicit confirmation.
+    frequency : _RecurringFrequency
+        Declared cadence.
+    label : str | None
+        Commitment label.
+    scope : str
+        Human-readable evidence scope.
+    series : tuple[_RecurringSignal, float, list[TransactionSample], list[str]]
+        Admitted adverse series.
+    transaction_repo : TransactionRepository
+        Source transaction access.
+    observation_repo : ObservationFactRepository
+        Acknowledgement access.
+
+    Returns
+    -------
+    MaterialContradiction | None
+        New unacknowledged contradiction.
+    """
+    signal, observed_value, samples, cycle_keys = series
+    transactions = [
+        transaction
+        for sample in samples
+        if (transaction := transaction_repo.get_by_id(sample.transaction_id)) is not None
+    ]
+    if len(transactions) != len(samples):
+        return None
+    observed_cycles = {_cycle_key(sample.date, frequency) for sample in samples}
+    observation_keys = [
+        *[observation_repo.transaction_key(transaction) for transaction in transactions],
+        *[
+            f"missing-cycle:{fact_type}:{fact_id or ''}:{cycle_key}"
+            for cycle_key in cycle_keys
+            if cycle_key not in observed_cycles
+        ],
+    ]
+    acknowledgement = observation_repo.get_contradiction_acknowledgement(f"{fact_type}:{fact_id or ''}")
+    acknowledged = acknowledgement.observation_keys if acknowledgement is not None else []
+    if acknowledgement is not None and (
+        set(observation_keys) <= set(acknowledged)
+        or any(
+            _cycle_key_start(cycle_key, frequency) <= acknowledgement.confirmed_at.date() for cycle_key in cycle_keys
+        )
+    ):
+        return None
+    return MaterialContradiction(
+        fact_id=fact_id,
+        declared_value=declared_value,
+        last_confirmed_at=last_confirmed_at,
+        signal=signal,
+        observed_value=observed_value,
+        period=cycle_keys,
+        scope=scope,
+        affected_subject="Conseil dépendant du fait déclaré",
+        label=label,
+        frequency=frequency,
+        transaction_ids=[transaction.id for transaction in transactions],
+        observation_keys=observation_keys,
+        acknowledged_observations=acknowledged,
+    )
+
+
+def _detect_income_contradiction(
+    contexts: list[IncomeFactContext],
+    months: list[MonthData],
+    complete_months: set[str],
+    transaction_repo: TransactionRepository,
+    observation_repo: ObservationFactRepository,
+) -> MaterialContradiction | None:
+    """Detect an admitted recurring-income contradiction.
+
+    Parameters
+    ----------
+    contexts : list[IncomeFactContext]
+        Declared income facts.
+    months : list[MonthData]
+        Observed monthly data.
+    complete_months : set[str]
+        Months with complete, gap-free coverage.
+    transaction_repo : TransactionRepository
+        Source transaction access.
+    observation_repo : ObservationFactRepository
+        Acknowledgement access.
+
+    Returns
+    -------
+    MaterialContradiction | None
+        First admitted income contradiction.
+    """
+    income = next(
+        (
+            fact
+            for fact in contexts
+            if fact.fact_type == "usual_disposable_income"
+            and fact.frequency is not None
+            and fact.state in {"active", "corrected"}
+        ),
+        None,
+    )
+    if income is None:
+        return None
+    frequency = cast(_RecurringFrequency, income.frequency)
+    candidates = [sample for month in months for sample in (month.transactions or {}).get("INCOME", [])]
+    observed_cycles: dict[str, set[str]] = {}
+    for sample in candidates:
+        label = " ".join(sample.description.casefold().split())
+        observed_cycles.setdefault(label, set()).add(_cycle_key(sample.date, frequency))
+    recurring_labels = {label for label, cycles in observed_cycles.items() if len(cycles) >= 2}
+    samples = [sample for sample in candidates if " ".join(sample.description.casefold().split()) in recurring_labels]
+    series = _select_adverse_series(
+        samples,
+        frequency,
+        income.amount,
+        complete_months,
+        [(2, "lower", "recurring_income_lower"), (3, "higher", "recurring_income_higher")],
+    )
+    if series is None:
+        return None
+    frequency_label = {
+        "weekly": "hebdomadaire",
+        "biweekly": "bimensuel",
+        "monthly": "mensuel",
+        "quarterly": "trimestriel",
+        "yearly": "annuel",
+    }[frequency]
+    return _contradiction_from_series(
+        fact_type=income.fact_type,
+        fact_id=None,
+        declared_value=income.amount,
+        last_confirmed_at=income.last_confirmed_at,
+        frequency=frequency,
+        label=None,
+        scope=f"Revenu disponible habituel {frequency_label}",
+        series=series,
+        transaction_repo=transaction_repo,
+        observation_repo=observation_repo,
+    )
+
+
+def _detect_commitment_contradiction(
+    contexts: list[CommitmentFactContext],
+    months: list[MonthData],
+    complete_months: set[str],
+    transaction_repo: TransactionRepository,
+    observation_repo: ObservationFactRepository,
+) -> MaterialContradiction | None:
+    """Detect an admitted recurring-obligation contradiction.
+
+    Parameters
+    ----------
+    contexts : list[CommitmentFactContext]
+        Declared commitments.
+    months : list[MonthData]
+        Observed monthly data.
+    complete_months : set[str]
+        Months with complete, gap-free coverage.
+    transaction_repo : TransactionRepository
+        Source transaction access.
+    observation_repo : ObservationFactRepository
+        Acknowledgement access.
+
+    Returns
+    -------
+    MaterialContradiction | None
+        First admitted commitment contradiction.
+    """
+    for commitment in contexts:
+        if (
+            commitment.fact_type != "recurring_obligation"
+            or commitment.frequency is None
+            or commitment.amount is None
+            or commitment.state not in {"active", "corrected"}
+        ):
+            continue
+        frequency = commitment.frequency
+        normalized_label = " ".join(commitment.label.casefold().split())
+        samples = [
+            sample
+            for month in months
+            for category, month_samples in (month.transactions or {}).items()
+            for sample in month_samples
+            if category not in {"INCOME", "EXCLUDED"}
+            and " ".join(sample.description.casefold().split()) == normalized_label
+        ]
+        series = _select_adverse_series(
+            samples,
+            frequency,
+            commitment.amount,
+            complete_months,
+            [(2, "higher", "recurring_obligation_higher"), (3, "lower", "recurring_obligation_lower")],
+        )
+        if series is None:
+            continue
+        frequency_label = {
+            "weekly": "hebdomadaire",
+            "biweekly": "bimensuelle",
+            "monthly": "mensuelle",
+            "quarterly": "trimestrielle",
+            "yearly": "annuelle",
+        }[frequency]
+        return _contradiction_from_series(
+            fact_type=commitment.fact_type,
+            fact_id=commitment.fact_id,
+            declared_value=commitment.amount,
+            last_confirmed_at=commitment.last_confirmed_at,
+            frequency=frequency,
+            label=commitment.label,
+            scope=f"Obligation récurrente {frequency_label} : {commitment.label}",
+            series=series,
+            transaction_repo=transaction_repo,
+            observation_repo=observation_repo,
+        )
+    return None
+
+
+def _contradiction_from_event(
+    *,
+    fact_type: IncomeFactType | CommitmentFactType,
+    fact_id: int | None,
+    declared_value: float,
+    last_confirmed_at: datetime,
+    label: str | None,
+    event_date: date,
+    scope: str,
+    signal: _OneOffSignal,
+    sample: TransactionSample,
+    transaction_repo: TransactionRepository,
+    observation_repo: ObservationFactRepository,
+) -> MaterialContradiction | None:
+    """Build contradiction from one explicitly paired event.
+
+    Parameters
+    ----------
+    fact_type : IncomeFactType | CommitmentFactType
+        Declared fact kind.
+    fact_id : int | None
+        Commitment identity when applicable.
+    declared_value : float
+        Confirmed amount.
+    last_confirmed_at : datetime
+        Last explicit confirmation.
+    label : str | None
+        Commitment label when applicable.
+    event_date : date
+        Declared event date.
+    scope : str
+        Human-readable evidence scope.
+    signal : _OneOffSignal
+        Admitted event signal.
+    sample : TransactionSample
+        Paired observed event.
+    transaction_repo : TransactionRepository
+        Source transaction access.
+    observation_repo : ObservationFactRepository
+        Acknowledgement access.
+
+    Returns
+    -------
+    MaterialContradiction | None
+        New unacknowledged contradiction.
+    """
+    transaction = transaction_repo.get_by_id(sample.transaction_id)
+    if transaction is None:
+        return None
+    observation_key = observation_repo.transaction_key(transaction)
+    acknowledgement = observation_repo.get_contradiction_acknowledgement(f"{fact_type}:{fact_id or ''}")
+    acknowledged = acknowledgement.observation_keys if acknowledgement is not None else []
+    if observation_key in acknowledged:
+        return None
+    return MaterialContradiction(
+        fact_id=fact_id,
+        declared_value=declared_value,
+        last_confirmed_at=last_confirmed_at,
+        signal=signal,
+        observed_value=abs(sample.amount),
+        period=[event_date.isoformat()],
+        scope=scope,
+        affected_subject="Conseil dépendant du fait déclaré",
+        label=label,
+        event_date=event_date,
+        transaction_ids=[transaction.id],
+        observation_keys=[observation_key],
+        acknowledged_observations=acknowledged,
+    )
+
+
+def _detect_one_off_income_contradiction(
+    contexts: list[IncomeFactContext],
+    months: list[MonthData],
+    transaction_repo: TransactionRepository,
+    observation_repo: ObservationFactRepository,
+) -> MaterialContradiction | None:
+    """Detect an exactly paired one-off income mismatch.
+
+    Parameters
+    ----------
+    contexts : list[IncomeFactContext]
+        Declared income facts.
+    months : list[MonthData]
+        Observed monthly data.
+    transaction_repo : TransactionRepository
+        Source transaction access.
+    observation_repo : ObservationFactRepository
+        Acknowledgement access.
+
+    Returns
+    -------
+    MaterialContradiction | None
+        Admitted one-off income contradiction.
+    """
+    income = next(
+        (
+            fact
+            for fact in contexts
+            if fact.fact_type == "expected_one_off_income"
+            and fact.label is not None
+            and fact.expected_date is not None
+            and fact.state in {"active", "corrected"}
+        ),
+        None,
+    )
+    if income is None:
+        return None
+    label = income.label
+    event_date = income.expected_date
+    if label is None or event_date is None:
+        return None
+    normalized_label = " ".join(label.casefold().split())
+    samples = [
+        sample
+        for month in months
+        for sample in (month.transactions or {}).get("INCOME", [])
+        if sample.date == event_date and " ".join(sample.description.casefold().split()) == normalized_label
+    ]
+    if len(samples) != 1 or abs(abs(samples[0].amount) - income.amount) <= income.amount * 0.2:
+        return None
+    return _contradiction_from_event(
+        fact_type=income.fact_type,
+        fact_id=None,
+        declared_value=income.amount,
+        last_confirmed_at=income.last_confirmed_at,
+        label=label,
+        event_date=event_date,
+        scope=f"Entrée exceptionnelle attendue : {label}",
+        signal="one_off_income_mismatch",
+        sample=samples[0],
+        transaction_repo=transaction_repo,
+        observation_repo=observation_repo,
+    )
+
+
+def _detect_one_off_commitment_contradiction(
+    contexts: list[CommitmentFactContext],
+    months: list[MonthData],
+    transaction_repo: TransactionRepository,
+    observation_repo: ObservationFactRepository,
+) -> MaterialContradiction | None:
+    """Detect an exactly paired one-off obligation mismatch.
+
+    Parameters
+    ----------
+    contexts : list[CommitmentFactContext]
+        Declared commitments.
+    months : list[MonthData]
+        Observed monthly data.
+    transaction_repo : TransactionRepository
+        Source transaction access.
+    observation_repo : ObservationFactRepository
+        Acknowledgement access.
+
+    Returns
+    -------
+    MaterialContradiction | None
+        Admitted one-off obligation contradiction.
+    """
+    for commitment in contexts:
+        if (
+            commitment.fact_type != "one_off_obligation"
+            or commitment.amount is None
+            or commitment.due_date is None
+            or commitment.state not in {"active", "corrected"}
+        ):
+            continue
+        normalized_label = " ".join(commitment.label.casefold().split())
+        samples = [
+            sample
+            for month in months
+            for category, month_samples in (month.transactions or {}).items()
+            for sample in month_samples
+            if category not in {"INCOME", "EXCLUDED"}
+            and sample.date == commitment.due_date
+            and " ".join(sample.description.casefold().split()) == normalized_label
+        ]
+        if len(samples) != 1 or abs(abs(samples[0].amount) - commitment.amount) <= commitment.amount * 0.2:
+            continue
+        return _contradiction_from_event(
+            fact_type=commitment.fact_type,
+            fact_id=commitment.fact_id,
+            declared_value=commitment.amount,
+            last_confirmed_at=commitment.last_confirmed_at,
+            label=commitment.label,
+            event_date=commitment.due_date,
+            scope=f"Obligation ponctuelle à échéance : {commitment.label}",
+            signal="one_off_obligation_mismatch",
+            sample=samples[0],
+            transaction_repo=transaction_repo,
+            observation_repo=observation_repo,
+        )
+    return None
+
+
+def apply_material_contradictions(
+    advice: AdviceResponse,
+    income_contexts: list[IncomeFactContext],
+    commitment_contexts: list[CommitmentFactContext],
+    months: list[MonthData],
+    coverages: list[PeriodCoverageContext],
+    transaction_repo: TransactionRepository,
+    observation_repo: ObservationFactRepository,
+) -> AdviceResponse:
+    """Replace fact-dependent output when admitted evidence contradicts it.
+
+    Parameters
+    ----------
+    advice : AdviceResponse
+        Generated decision outputs.
+    income_contexts : list[IncomeFactContext]
+        Declared income facts.
+    commitment_contexts : list[CommitmentFactContext]
+        Declared obligations.
+    months : list[MonthData]
+        Observed monthly data.
+    coverages : list[PeriodCoverageContext]
+        Exact coverage facts.
+    transaction_repo : TransactionRepository
+        Source transaction access.
+    observation_repo : ObservationFactRepository
+        Evidence and acknowledgement access.
+
+    Returns
+    -------
+    AdviceResponse
+        Advice with at most one material clarification.
+    """
+    ordered = sorted(months, key=lambda item: (item.year, item.month))
+    observed_accounts = {
+        f"{month.year:04d}-{month.month:02d}": {
+            sample.account
+            for samples in (month.transactions or {}).values()
+            for sample in samples
+            if sample.account is not None
+        }
+        for month in ordered
+    }
+    complete_months = {
+        month
+        for coverage in coverages
+        if coverage.complete and not coverage.missing_elements and not coverage.provenance_issues
+        for month in coverage.coverage_months
+        if not coverage.accounts or observed_accounts.get(month, set()) <= set(coverage.accounts)
+    }
+    family: Literal["income", "commitment"] = "income"
+    contradiction = _detect_income_contradiction(
+        income_contexts,
+        ordered,
+        complete_months,
+        transaction_repo,
+        observation_repo,
+    )
+    if contradiction is None:
+        contradiction = _detect_one_off_income_contradiction(
+            income_contexts,
+            ordered,
+            transaction_repo,
+            observation_repo,
+        )
+    if contradiction is None:
+        family = "commitment"
+        contradiction = _detect_commitment_contradiction(
+            commitment_contexts,
+            ordered,
+            complete_months,
+            transaction_repo,
+            observation_repo,
+        )
+    if contradiction is None:
+        contradiction = _detect_one_off_commitment_contradiction(
+            commitment_contexts,
+            ordered,
+            transaction_repo,
+            observation_repo,
+        )
+    if contradiction is None:
+        return advice
+    fact_type: IncomeFactType | CommitmentFactType = (
+        "expected_one_off_income"
+        if contradiction.signal == "one_off_income_mismatch"
+        else "one_off_obligation"
+        if contradiction.signal == "one_off_obligation_mismatch"
+        else "usual_disposable_income"
+        if family == "income"
+        else "recurring_obligation"
+    )
+    dependent_indexes = [
+        index
+        for index, output in enumerate(advice.outputs)
+        if output.type != "clarification"
+        and any(
+            family == "income"
+            and isinstance(fact, IncomeFactCitation)
+            and fact.fact_type == fact_type
+            or family == "commitment"
+            and isinstance(fact, CommitmentFactContext)
+            and fact.fact_id == contradiction.fact_id
+            for fact in output.trace.details.declared_facts
+        )
+    ]
+    if not dependent_indexes:
+        return advice
+    dependent_index = dependent_indexes[0]
+    dependent = advice.outputs[dependent_index]
+    affected_subject = getattr(dependent, "subject", None) or contradiction.affected_subject
+    contradiction = contradiction.model_copy(update={"affected_subject": affected_subject})
+    clarification = ClarificationOutput(
+        type="clarification",
+        priority=dependent.priority,
+        subject=affected_subject,
+        observation=(
+            f"Une opération appariée montre {contradiction.observed_value:g} € "
+            f"contre {contradiction.declared_value:g} € déclarés."
+            if contradiction.signal.startswith("one_off_")
+            else f"{len(contradiction.period)} cycles complets et consécutifs montrent "
+            f"{contradiction.observed_value:g} € contre {contradiction.declared_value:g} € déclarés."
+        ),
+        possible_effect=f"{affected_subject} doit être recalculé si la valeur observée devient la référence.",
+        question=(
+            f"La valeur déclarée de {contradiction.declared_value:g} € est-elle toujours exacte "
+            f"depuis sa confirmation du {contradiction.last_confirmed_at.date().isoformat()} ?"
+        ),
+        fact_type=fact_type,
+        material_effects=[
+            f"Conserver {contradiction.declared_value:,.0f} € pour le {affected_subject.lower()}.".replace(",", " "),
+            f"Recalculer le {affected_subject.lower()} depuis {contradiction.observed_value:,.0f} €.".replace(
+                ",", " "
+            ),
+        ],
+        transaction_ids=contradiction.transaction_ids,
+        contradiction=contradiction,
+    )
+    outputs = [
+        clarification if index == dependent_index else output
+        for index, output in enumerate(advice.outputs)
+        if index not in dependent_indexes or index == dependent_index
+    ]
+    return AdviceResponse(outputs=outputs)
+
+
+def record_advice_transition(advice: AdviceResponse, transition: str) -> AdviceResponse:
+    """Append a lifecycle transition to surviving outputs.
+
+    Parameters
+    ----------
+    advice : AdviceResponse
+        Resolved decision outputs.
+    transition : str
+        User-visible transition.
+
+    Returns
+    -------
+    AdviceResponse
+        Outputs with transition trace.
+    """
+    outputs: list[DecisionOutput] = []
+    for output in advice.outputs:
+        if output.type == "clarification":
+            outputs.append(output.model_copy(update={"transitions": [*output.transitions, transition]}))
+            continue
+        details = output.trace.details.model_copy(
+            update={"transitions": [*output.trace.details.transitions, transition]}
+        )
+        outputs.append(output.model_copy(update={"trace": output.trace.model_copy(update={"details": details})}))
+    return AdviceResponse(outputs=outputs)
+
+
+def plan_contradiction_resolution(
+    question: ClarificationOutput,
+    answers: list[tuple[str, float | None]],
+    remember: bool,
+) -> tuple[str, tuple[str, list[str]] | None, int | None] | None:
+    """Plan one valid contradiction answer.
+
+    Parameters
+    ----------
+    question : ClarificationOutput
+        Pending material contradiction.
+    answers : list[tuple[str, float | None]]
+        Submitted fact kinds and amounts.
+    remember : bool
+        Persist the resolution.
+
+    Returns
+    -------
+    tuple[str, tuple[str, list[str]] | None, int | None] | None
+        Transition, acknowledgement, target fact, or ``None`` when mismatched.
+    """
+    contradiction = question.contradiction
+    answer_amount = next(
+        (amount for fact_type, amount in answers if fact_type == question.fact_type),
+        None,
+    )
+    if contradiction is None or answer_amount is None:
+        return None
+    if not remember:
+        return (
+            "Contradiction résolue pour cette session : ancien fait rendu à confirmer.",
+            None,
+            contradiction.fact_id,
+        )
+    acknowledgement = (
+        f"{question.fact_type}:{contradiction.fact_id or ''}",
+        contradiction.observation_keys,
+    )
+    transition = (
+        "Contradiction confirmée : fait maintenu actif et observations acquittées."
+        if answer_amount == contradiction.declared_value
+        else "Contradiction corrigée : valeur remplacée et observations acquittées."
+    )
+    return transition, acknowledgement, contradiction.fact_id
+
+
+def neutralize_contested_fact(
+    question: ClarificationOutput,
+    action: Literal["skip", "unknown", "delete"],
+    income_repo: IncomeFactRepository,
+    commitment_repo: CommitmentFactRepository,
+    advice_repo: AdviceRepository,
+) -> None:
+    """Neutralize or delete a contested fact after abstention.
+
+    Parameters
+    ----------
+    question : ClarificationOutput
+        Pending material contradiction.
+    action : Literal["skip", "unknown", "delete"]
+        Requested lifecycle transition.
+    income_repo : IncomeFactRepository
+        Declared income persistence.
+    commitment_repo : CommitmentFactRepository
+        Declared commitment persistence.
+    advice_repo : AdviceRepository
+        Stored dependent advice.
+    """
+    contradiction = question.contradiction
+    if contradiction is None:
+        return
+    if question.fact_type in {"usual_disposable_income", "expected_one_off_income"}:
+        fact_type = cast(IncomeFactType, question.fact_type)
+        if action == "delete":
+            income_repo.delete(fact_type)
+        else:
+            income_repo.mark_to_confirm(fact_type)
+        advice_repo.delete_depending_on_declared_fact(fact_type)
+    elif question.fact_type in {"recurring_obligation", "one_off_obligation"} and contradiction.fact_id is not None:
+        if action == "delete":
+            commitment_repo.delete(contradiction.fact_id)
+        else:
+            commitment_repo.mark_to_confirm(contradiction.fact_id)
+        advice_repo.delete_depending_on_commitment(contradiction.fact_id, question.fact_type)
 
 
 def validate_income_usage(
@@ -1129,13 +2077,22 @@ def prepare_observation_context(
     analysis_months = [f"{month.year:04d}-{month.month:02d}" for month in generation_months]
     period_coverage = fact_repo.get_period_coverage(analysis_months)
     coverage_evidence = fact_repo.get_import_evidence(analysis_months)
-    provenance_issues = sorted({item.issue for item in coverage_evidence if item.issue is not None})
+    new_coverage_evidence = (
+        coverage_evidence
+        if period_coverage is None
+        else [
+            item
+            for item in coverage_evidence
+            if item.revision > period_coverage.source_revisions.get(f"{item.year:04d}-{item.month:02d}", 0)
+        ]
+    )
+    provenance_issues = sorted({item.issue for item in new_coverage_evidence if item.issue is not None})
     coverage_signals = (
         [
             PeriodCoverageSignal(
                 coverage_months=analysis_months,
                 provenance_issues=provenance_issues,
-                details=[detail for item in coverage_evidence for detail in item.issue_details],
+                details=[detail for item in new_coverage_evidence for detail in item.issue_details],
             )
         ]
         if provenance_issues
@@ -1221,7 +2178,7 @@ def resolve_clarification(
     advice: AdviceResponse,
     year: int,
     month: int,
-    action: Literal["skip", "unknown"],
+    action: Literal["skip", "unknown", "delete"],
 ) -> AdviceResponse:
     """Replace declared-fact question with persisted abstention.
 
@@ -1233,8 +2190,8 @@ def resolve_clarification(
         Advice year.
     month : int
         Advice month.
-    action : Literal["skip", "unknown"]
-        User abstention.
+    action : Literal["skip", "unknown", "delete"]
+        User abstention or deletion.
 
     Returns
     -------
@@ -1242,10 +2199,17 @@ def resolve_clarification(
         Same outputs with question replaced in place.
     """
     outputs: list[DecisionOutput] = []
+    transition: str | None = None
     for output in advice.outputs:
         if output.type != "clarification":
             outputs.append(output)
             continue
+        if output.contradiction is not None:
+            transition = {
+                "skip": "Contradiction passée : fait rendu à confirmer et neutralisé.",
+                "unknown": "Contradiction inconnue : fait rendu à confirmer et neutralisé.",
+                "delete": "Contradiction supprimée : fait supprimé sans ancienne valeur réactivable.",
+            }[action]
         label = {
             "active_priority": "priorité active",
             "liquid_reserve": "réserve liquide non affectée",
@@ -1265,6 +2229,7 @@ def resolve_clarification(
             if action == "skip"
             else f"Information inconnue ({label}) selon la réponse explicite."
         )
+        evidence_periods = output.contradiction.period if output.contradiction is not None else [f"{year}-{month:02d}"]
         outputs.append(
             UnresolvedOutput(
                 type="unresolved",
@@ -1276,11 +2241,11 @@ def resolve_clarification(
                         observations=[
                             ObservedFact(
                                 fact=output.observation,
-                                period=f"{year}-{month:02d}",
+                                period=" à ".join(evidence_periods),
                                 scope=output.subject,
                                 source="observed_data",
                                 evidence_type="presence",
-                                source_months=[f"{year}-{month:02d}"],
+                                source_months=evidence_periods,
                                 transaction_ids=output.transaction_ids or [],
                             )
                         ],
@@ -1289,4 +2254,5 @@ def resolve_clarification(
                 ),
             )
         )
-    return AdviceResponse(outputs=outputs)
+    resolved = AdviceResponse(outputs=outputs)
+    return record_advice_transition(resolved, transition) if transition is not None else resolved

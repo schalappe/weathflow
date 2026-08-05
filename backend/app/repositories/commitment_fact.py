@@ -98,9 +98,10 @@ class CommitmentFactRepository:
             fact = CommitmentFact(state="active", **values)
             self._db.add(fact)
         else:
+            unchanged = all(getattr(fact, field) == value for field, value in values.items())
             for field, value in values.items():
                 setattr(fact, field, value)
-            fact.state = "corrected"
+            fact.state = "active" if unchanged else "corrected"
         fact.last_confirmed_at = now
         fact.valid_until = self._valid_until(values, now)
         self._db.commit()

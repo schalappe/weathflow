@@ -708,6 +708,7 @@ describe("AdvicePanel decision outputs", () => {
     recommendation.trace.details.declared_facts = [
       {
         fact_type: "expected_one_off_income",
+        label: "Prime annuelle",
         amount: 1_500,
         frequency: null,
         expected_date: "2026-08-15",
@@ -742,6 +743,7 @@ describe("AdvicePanel decision outputs", () => {
       await screen.findByLabelText("Montant de l’entrée exceptionnelle"),
       "1500",
     );
+    await user.type(screen.getByLabelText("Libellé attendu"), "Prime annuelle");
     await user.type(screen.getByLabelText("Date attendue"), "2026-08-15");
     await user.click(
       screen.getByRole("button", { name: "Répondre et réutiliser" }),
@@ -751,6 +753,7 @@ describe("AdvicePanel decision outputs", () => {
       regenerate: true,
       incomeFact: {
         fact_type: "expected_one_off_income",
+        label: "Prime annuelle",
         amount: 1_500,
         expected_date: "2026-08-15",
       },
@@ -1061,5 +1064,92 @@ describe("AdvicePanel decision outputs", () => {
     expect(
       await screen.findByRole("link", { name: "Voir les transactions" }),
     ).toHaveAttribute("href", "/?month=2025-12&transaction=17");
+  });
+  it("shows and confirms a material contradiction without hiding independent advice", async () => {
+    const user = userEvent.setup();
+    const independent = createMockRecommendationOutput({
+      action: "Conserver la réserve disponible.",
+      income_dependent: false,
+    });
+    const clarification = {
+      type: "clarification" as const,
+      priority: "high" as const,
+      subject: "Montant soutenable",
+      observation:
+        "2 cycles complets et consécutifs montrent 2300 € contre 3000 € déclarés.",
+      possible_effect: "Le montant soutenable doit être recalculé.",
+      question: "Votre revenu habituel est-il toujours de 3000 € ?",
+      fact_type: "usual_disposable_income" as const,
+      material_effects: [
+        "Conserver 3 000 € pour le montant soutenable.",
+        "Recalculer le montant soutenable depuis 2 300 €.",
+      ],
+      transaction_ids: [41, 42],
+      contradiction: {
+        declared_value: 3_000,
+        last_confirmed_at: "2026-08-01T12:00:00Z",
+        signal: "recurring_income_lower" as const,
+        observed_value: 2_300,
+        period: ["2026-06", "2026-07"],
+        scope: "Revenu disponible habituel mensuel",
+        affected_subject: "Montant soutenable",
+        transaction_ids: [41, 42],
+        observation_keys: ["first", "second"],
+        acknowledged_observations: [],
+        resolution_options: [
+          "confirm" as const,
+          "correct" as const,
+          "session" as const,
+          "unknown" as const,
+          "skip" as const,
+          "delete" as const,
+        ],
+        frequency: "monthly" as const,
+      },
+    };
+    mockGetAdvice.mockResolvedValue(
+      loaded(createMockAdviceData({ outputs: [independent, clarification] })),
+    );
+    mockGenerateAdvice.mockResolvedValue({
+      success: true,
+      advice: createMockAdviceData({ outputs: [independent] }),
+      generated_at: "2026-08-05T12:00:00Z",
+      is_valid: true,
+      was_cached: false,
+    });
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    expect(await screen.findByText(independent.action)).toBeInTheDocument();
+    expect(screen.getByText("Valeur déclarée")).toBeInTheDocument();
+    expect(screen.getByText("Dernière confirmation")).toBeInTheDocument();
+    expect(screen.getByText("Signal")).toBeInTheDocument();
+    expect(screen.getByText("Période")).toBeInTheDocument();
+    expect(screen.getByText("Périmètre")).toBeInTheDocument();
+    expect(screen.getByText("Sujet affecté")).toBeInTheDocument();
+    const confirm = screen.getByRole("button", {
+      name: /Confirmer.*3.*000.*€/,
+    });
+    expect(confirm).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Corriger" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Cette fois seulement" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Supprimer" }),
+    ).toBeInTheDocument();
+
+    await user.click(confirm);
+    expect(mockGenerateAdvice).toHaveBeenCalledWith(2025, 12, {
+      regenerate: true,
+      incomeFact: {
+        fact_type: "usual_disposable_income",
+        amount: 3_000,
+        frequency: "monthly",
+      },
+      rememberFact: true,
+    });
   });
 });

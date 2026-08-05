@@ -352,6 +352,7 @@ export interface UsualDisposableIncomeInput {
 
 export interface ExpectedOneOffIncomeInput {
   fact_type: "expected_one_off_income";
+  label?: string;
   amount: number;
   expected_date: string;
 }
@@ -571,6 +572,7 @@ export interface DecisionTrace {
     limits: string[];
     income_normalizations: IncomeNormalization[];
     declared_facts: DeclaredFactCitation[];
+    transitions?: string[];
   };
 }
 
@@ -598,6 +600,37 @@ export interface UnresolvedOutput extends DecisionOutputBase {
   conclusion: string;
 }
 
+export interface MaterialContradiction {
+  fact_id?: number;
+  label?: string;
+  frequency?: IncomeFrequency;
+  event_date?: string;
+  declared_value: number;
+  last_confirmed_at: string;
+  signal:
+    | "recurring_income_lower"
+    | "recurring_income_higher"
+    | "recurring_obligation_higher"
+    | "recurring_obligation_lower"
+    | "one_off_income_mismatch"
+    | "one_off_obligation_mismatch";
+  observed_value: number;
+  period: string[];
+  scope: string;
+  affected_subject: string;
+  transaction_ids: number[];
+  observation_keys: string[];
+  acknowledged_observations: string[];
+  resolution_options: (
+    | "confirm"
+    | "correct"
+    | "session"
+    | "unknown"
+    | "skip"
+    | "delete"
+  )[];
+}
+
 export interface ClarificationOutput {
   type: "clarification";
   priority: DecisionPriority;
@@ -611,6 +644,8 @@ export interface ClarificationOutput {
   coverage_months?: string[];
   transaction_ids?: number[];
   linked_transaction_ids?: number[];
+  transitions?: string[];
+  contradiction?: MaterialContradiction;
 }
 
 export type DecisionOutput =

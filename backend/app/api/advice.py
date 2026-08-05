@@ -192,6 +192,9 @@ def generate_advice(
                 )
                 if previous_question is not None:
                     previous_question_count = previous_question.question_number
+        contradiction_transition: str | None = None
+        contradiction_acknowledgement: tuple[str, list[str]] | None = None
+        contradiction_fact_id: int | None = None
         if answer_count > 1:
             raise HTTPException(status_code=422, detail="Answer one clarification at a time.")
         if request.period_coverage is not None:
@@ -227,6 +230,21 @@ def generate_advice(
             if existing_advice is None:
                 raise HTTPException(status_code=409, detail="No clarification to resolve.")
             current_advice = AdviceData.model_validate_json(existing_advice.advice_text)
+            pending_question = next(
+                (output for output in current_advice.outputs if output.type == "clarification"),
+                None,
+            )
+            if pending_question is None:
+                raise HTTPException(status_code=409, detail="No clarification to resolve.")
+            if request.clarification_action == "delete" and pending_question.contradiction is None:
+                raise HTTPException(status_code=422, detail="Only a contradicted fact can be deleted here.")
+            advice_service.neutralize_contested_fact(
+                pending_question,
+                request.clarification_action,
+                income_repo,
+                commitment_repo,
+                advice_repo,
+            )
             resolved_advice = advice_service.resolve_clarification(
                 current_advice,
                 request.year,
@@ -246,6 +264,20 @@ def generate_advice(
                 is_valid=True,
                 was_cached=False,
             )
+
+        if previous_question is not None and previous_question.contradiction is not None and answer_count:
+            resolution = advice_service.plan_contradiction_resolution(
+                previous_question,
+                [
+                    (answer.fact_type, getattr(answer, "amount", None))
+                    for answer in (request.income_fact, request.commitment_fact)
+                    if answer is not None
+                ],
+                request.remember_fact,
+            )
+            if resolution is None:
+                raise HTTPException(status_code=409, detail="Answer must match the pending contradiction.")
+            contradiction_transition, contradiction_acknowledgement, contradiction_fact_id = resolution
 
         stored_priority = priority_repo.get()
         if stored_priority is not None and stored_priority.state == "to_confirm" and request.active_priority is None:
@@ -278,6 +310,7 @@ def generate_advice(
             advice_repo,
             _session_commitment_context(request.commitment_fact) if request.commitment_fact is not None else None,
             request.remember_fact,
+            contradiction_fact_id,
         )
         income_contexts = advice_service.prepare_income_context(
             income_repo,
@@ -291,6 +324,8 @@ def generate_advice(
             _session_constraint_context(request.constraint_fact) if request.constraint_fact is not None else None,
             request.remember_fact,
         )
+        if contradiction_acknowledgement is not None:
+            observation_repo.acknowledge_contradiction(*contradiction_acknowledgement)
         if request.period_coverage is not None:
             advice_service.save_period_coverage_answer(
                 observation_repo,
@@ -397,12 +432,26 @@ def generate_advice(
             )
             if repeats_answered_question or (not has_next_question and not cites_answer):
                 raise AdviceParseError(advice_response.model_dump_json())
+        advice_response = advice_service.apply_material_contradictions(
+            advice_response,
+            income_contexts,
+            commitment_contexts,
+            generation_months,
+            generation_context.period_coverages,
+            transaction_repo,
+            observation_repo,
+        )
         advice_response = _apply_clarification_limit(
             advice_response,
             previous_question_count,
             request.year,
             request.month,
         )
+        if contradiction_transition is not None:
+            advice_response = advice_service.record_advice_transition(
+                advice_response,
+                contradiction_transition,
+            )
 
         session_only_answer = (
             request.active_priority is not None

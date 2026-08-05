@@ -3,7 +3,7 @@
 from collections.abc import Generator
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import Connection, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config.settings import get_settings
@@ -40,6 +40,21 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def _ensure_income_fact_label(connection: Connection) -> None:
+    """Add the nullable one-off pairing label to legacy SQLite data.
+
+    Parameters
+    ----------
+    connection : Connection
+        Active database connection.
+    """
+    inspector = inspect(connection)
+    if "income_fact" not in inspector.get_table_names():
+        return
+    if "label" not in {column["name"] for column in inspector.get_columns("income_fact")}:
+        connection.execute(text("ALTER TABLE income_fact ADD COLUMN label VARCHAR(200)"))
+
+
 def init_db() -> None:
     """
     Initialize the database by creating all tables.
@@ -63,3 +78,5 @@ def init_db() -> None:
 
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    with engine.begin() as connection:
+        _ensure_income_fact_label(connection)

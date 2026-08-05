@@ -157,6 +157,18 @@ const incomeFrequencyLabels: Record<IncomeFrequency, string> = {
   yearly: "Annuelle",
 };
 
+const contradictionSignalLabels: Record<
+  NonNullable<ClarificationOutput["contradiction"]>["signal"],
+  string
+> = {
+  recurring_income_lower: "Revenu récurrent inférieur",
+  recurring_income_higher: "Revenu récurrent supérieur",
+  recurring_obligation_higher: "Obligation récurrente supérieure",
+  recurring_obligation_lower: "Obligation récurrente inférieure",
+  one_off_income_mismatch: "Entrée exceptionnelle appariée différente",
+  one_off_obligation_mismatch: "Obligation ponctuelle appariée différente",
+};
+
 const transactionNatureLabels: Record<
   TransactionNatureInput["nature"],
   string
@@ -242,6 +254,7 @@ function incomeInputFromForm(
   data: FormData,
 ): IncomeFactInput {
   const amount = Number(data.get("amount"));
+  const label = String(data.get("label"));
   return factType === "usual_disposable_income"
     ? {
         fact_type: factType,
@@ -250,6 +263,7 @@ function incomeInputFromForm(
       }
     : {
         fact_type: factType,
+        ...(label ? { label } : {}),
         amount,
         expected_date: String(data.get("expected_date")),
       };
@@ -258,7 +272,7 @@ function incomeInputFromForm(
 function incomeFactSummary(fact: IncomeFactInput): string {
   return fact.fact_type === "usual_disposable_income"
     ? `${incomeFactLabels[fact.fact_type]} — ${formatCurrency(fact.amount)} / ${incomeFrequencyLabels[fact.frequency].toLowerCase()}`
-    : `${incomeFactLabels[fact.fact_type]} — ${formatCurrency(fact.amount)} le ${new Date(`${fact.expected_date}T00:00:00`).toLocaleDateString("fr-FR")}`;
+    : `${incomeFactLabels[fact.fact_type]}${fact.label ? ` (${fact.label})` : ""} — ${formatCurrency(fact.amount)} le ${new Date(`${fact.expected_date}T00:00:00`).toLocaleDateString("fr-FR")}`;
 }
 
 function isCommitmentFactType(
@@ -562,7 +576,7 @@ export function AdvicePanelContent({
   );
 
   const handleClarificationAbstention = useCallback(
-    (clarificationAction: "skip" | "unknown") =>
+    (clarificationAction: "skip" | "unknown" | "delete") =>
       answerClarification({ clarificationAction }),
     [answerClarification],
   );
@@ -1091,20 +1105,35 @@ function IncomeFields({
           </select>
         </div>
       ) : (
-        <div className="space-y-2">
-          <Label htmlFor={`${idPrefix}-expected-date`}>Date attendue</Label>
-          <Input
-            id={`${idPrefix}-expected-date`}
-            name="expected_date"
-            type="date"
-            defaultValue={
-              defaultValue?.fact_type === "expected_one_off_income"
-                ? defaultValue.expected_date
-                : undefined
-            }
-            required
-          />
-        </div>
+        <>
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-label`}>Libellé attendu</Label>
+            <Input
+              id={`${idPrefix}-label`}
+              name="label"
+              defaultValue={
+                defaultValue?.fact_type === "expected_one_off_income"
+                  ? defaultValue.label
+                  : undefined
+              }
+              placeholder="Ex. Prime annuelle"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-expected-date`}>Date attendue</Label>
+            <Input
+              id={`${idPrefix}-expected-date`}
+              name="expected_date"
+              type="date"
+              defaultValue={
+                defaultValue?.fact_type === "expected_one_off_income"
+                  ? defaultValue.expected_date
+                  : undefined
+              }
+              required
+            />
+          </div>
+        </>
       )}
     </div>
   );
@@ -2160,6 +2189,11 @@ function DecisionTraceDetails({
           icon={<Scale className="h-4 w-4" />}
         />
         <TraceList
+          title="Transitions"
+          items={trace.details.transitions ?? []}
+          icon={<RefreshCw className="h-4 w-4" />}
+        />
+        <TraceList
           title={t.advice.limits}
           items={trace.details.limits}
           icon={<AlertCircle className="h-4 w-4" />}
@@ -2196,7 +2230,7 @@ interface ClarificationCardProps {
   ) => Promise<void>;
   onPeriodCoverageAnswer: (coverage: PeriodCoverageInput) => Promise<void>;
   onTransactionNatureAnswer: (fact: TransactionNatureInput) => Promise<void>;
-  onAbstain: (action: "skip" | "unknown") => Promise<void>;
+  onAbstain: (action: "skip" | "unknown" | "delete") => Promise<void>;
 }
 
 function ClarificationCard({
@@ -2218,6 +2252,58 @@ function ClarificationCard({
     const submitter = (event.nativeEvent as SubmitEvent)
       .submitter as HTMLButtonElement | null;
     const remember = submitter?.value === "true";
+    if (output.contradiction) {
+      const resolution = submitter?.value;
+      const amount =
+        resolution === "confirm"
+          ? output.contradiction.declared_value
+          : Number(data.get("amount"));
+      const rememberResolution = resolution !== "session";
+      if (output.fact_type === "usual_disposable_income") {
+        await onIncomeAnswer(
+          {
+            fact_type: output.fact_type,
+            amount,
+            frequency: output.contradiction.frequency!,
+          },
+          rememberResolution,
+        );
+      } else if (output.fact_type === "recurring_obligation") {
+        await onCommitmentAnswer(
+          {
+            fact_type: output.fact_type,
+            label: output.contradiction.label ?? output.subject,
+            amount,
+            frequency: output.contradiction.frequency!,
+            end_date: null,
+          },
+          rememberResolution,
+        );
+      } else if (output.fact_type === "expected_one_off_income") {
+        await onIncomeAnswer(
+          {
+            fact_type: output.fact_type,
+            ...(output.contradiction.label
+              ? { label: output.contradiction.label }
+              : {}),
+            amount,
+            expected_date: output.contradiction.event_date!,
+          },
+          rememberResolution,
+        );
+      } else if (output.fact_type === "one_off_obligation") {
+        await onCommitmentAnswer(
+          {
+            fact_type: output.fact_type,
+            label: output.contradiction.label ?? output.subject,
+            amount,
+            due_date: output.contradiction.event_date!,
+          },
+          rememberResolution,
+        );
+      }
+      return;
+    }
     if (output.fact_type === "period_coverage") {
       const complete = data.get("complete") === "true";
       await onPeriodCoverageAnswer({
@@ -2297,6 +2383,41 @@ function ClarificationCard({
           {output.possible_effect}
         </p>
       </div>
+      {output.contradiction && (
+        <dl className="grid gap-3 rounded-lg border bg-background/70 p-4 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="font-medium">Valeur déclarée</dt>
+            <dd>{formatCurrency(output.contradiction.declared_value)}</dd>
+          </div>
+          <div>
+            <dt className="font-medium">Dernière confirmation</dt>
+            <dd>
+              {formatAdviceTimestamp(output.contradiction.last_confirmed_at)}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-medium">Signal</dt>
+            <dd>{contradictionSignalLabels[output.contradiction.signal]}</dd>
+          </div>
+          <div>
+            <dt className="font-medium">Période</dt>
+            <dd>{output.contradiction.period.join(" → ")}</dd>
+          </div>
+          <div>
+            <dt className="font-medium">Périmètre</dt>
+            <dd>{output.contradiction.scope}</dd>
+          </div>
+          <div>
+            <dt className="font-medium">Sujet affecté</dt>
+            <dd>{output.contradiction.affected_subject}</dd>
+          </div>
+        </dl>
+      )}
+      {(output.transitions ?? []).map((transition) => (
+        <Alert key={transition}>
+          <AlertDescription>{transition}</AlertDescription>
+        </Alert>
+      ))}
       <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
         {output.material_effects.map((effect) => (
           <li key={effect}>{effect}</li>
@@ -2318,7 +2439,20 @@ function ClarificationCard({
         </Alert>
       )}
       <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
-        {output.fact_type === "period_coverage" ? (
+        {output.contradiction ? (
+          <div className="space-y-2">
+            <Label htmlFor="contradiction-amount">Nouvelle valeur</Label>
+            <Input
+              id="contradiction-amount"
+              name="amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              defaultValue={output.contradiction.observed_value}
+              required
+            />
+          </div>
+        ) : output.fact_type === "period_coverage" ? (
           <>
             <div className="space-y-2">
               <Label htmlFor="coverage-complete">Couverture</Label>
@@ -2430,26 +2564,58 @@ function ClarificationCard({
           </div>
         )}
         <div className="flex flex-wrap items-end gap-2">
-          <Button
-            type="submit"
-            name="remember"
-            value="true"
-            disabled={isSubmitting}
-          >
-            {isObservationClarification
-              ? "Confirmer"
-              : "Répondre et réutiliser"}
-          </Button>
-          {!isObservationClarification && (
-            <Button
-              type="submit"
-              name="remember"
-              value="false"
-              variant="outline"
-              disabled={isSubmitting}
-            >
-              Cette fois seulement
-            </Button>
+          {output.contradiction ? (
+            <>
+              <Button
+                type="submit"
+                name="resolution"
+                value="confirm"
+                disabled={isSubmitting}
+              >
+                Confirmer {formatCurrency(output.contradiction.declared_value)}
+              </Button>
+              <Button
+                type="submit"
+                name="resolution"
+                value="correct"
+                disabled={isSubmitting}
+              >
+                Corriger
+              </Button>
+              <Button
+                type="submit"
+                name="resolution"
+                value="session"
+                variant="outline"
+                disabled={isSubmitting}
+              >
+                Cette fois seulement
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="submit"
+                name="remember"
+                value="true"
+                disabled={isSubmitting}
+              >
+                {isObservationClarification
+                  ? "Confirmer"
+                  : "Répondre et réutiliser"}
+              </Button>
+              {!isObservationClarification && (
+                <Button
+                  type="submit"
+                  name="remember"
+                  value="false"
+                  variant="outline"
+                  disabled={isSubmitting}
+                >
+                  Cette fois seulement
+                </Button>
+              )}
+            </>
           )}
         </div>
       </form>
@@ -2470,6 +2636,16 @@ function ClarificationCard({
         >
           Passer
         </Button>
+        {output.contradiction && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onAbstain("delete")}
+            disabled={isSubmitting}
+          >
+            Supprimer
+          </Button>
+        )}
       </div>
     </article>
   );
@@ -2534,7 +2710,9 @@ interface AdviceContentProps {
   ) => Promise<void>;
   onPeriodCoverageAnswer: (coverage: PeriodCoverageInput) => Promise<void>;
   onTransactionNatureAnswer: (fact: TransactionNatureInput) => Promise<void>;
-  onClarificationAbstention: (action: "skip" | "unknown") => Promise<void>;
+  onClarificationAbstention: (
+    action: "skip" | "unknown" | "delete",
+  ) => Promise<void>;
   onCorrectSession: () => void;
 }
 

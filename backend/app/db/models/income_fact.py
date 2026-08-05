@@ -15,6 +15,7 @@ class IncomeFact(Base):
 
     fact_type: Mapped[str] = mapped_column(String(40), primary_key=True)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
+    label: Mapped[str | None] = mapped_column(String(200))
     frequency: Mapped[str | None] = mapped_column(String(20))
     expected_date: Mapped[date | None] = mapped_column(Date)
     state: Mapped[str] = mapped_column(String(20), nullable=False)

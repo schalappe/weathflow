@@ -32,8 +32,8 @@ class GenerateAdviceRequest(BaseModel):
         Emergency-fund clarification answer.
     remember_fact : bool
         Reuse emergency-fund answer after current session.
-    clarification_action : Literal["skip", "unknown"] | None
-        Resolve question without storing a fact.
+    clarification_action : Literal["skip", "unknown", "delete"] | None
+        Resolve or delete the questioned fact.
     """
 
     year: int = Field(ge=2000, le=2100)
@@ -48,7 +48,7 @@ class GenerateAdviceRequest(BaseModel):
     period_coverage: PeriodCoverageInput | None = None
     transaction_nature: TransactionNatureInput | None = None
     remember_fact: bool = True
-    clarification_action: Literal["skip", "unknown"] | None = None
+    clarification_action: Literal["skip", "unknown", "delete"] | None = None
 
 
 class PeriodCoverageInput(BaseModel):
@@ -266,6 +266,7 @@ class ExpectedOneOffIncomeInput(BaseModel):
     """Dated expected income."""
 
     fact_type: Literal["expected_one_off_income"]
+    label: str | None = Field(default=None, min_length=1, max_length=200)
     amount: float = Field(gt=0, allow_inf_nan=False)
     expected_date: date
 

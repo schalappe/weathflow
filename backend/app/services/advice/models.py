@@ -22,6 +22,8 @@ class TransactionSample(FrozenModel):
         Stable observed identifier.
     amount : float
         Absolute amount.
+    account : str | None
+        Source account.
     subcategory : str | None
         Money Map subcategory.
     date : date
@@ -32,6 +34,7 @@ class TransactionSample(FrozenModel):
     description: str
     amount: float
     date: date
+    account: str | None = None
     subcategory: str | None = None
 
 
@@ -350,6 +353,7 @@ class IncomeFactContext(DecisionModel):
     """Declared income available to generation."""
 
     fact_type: IncomeFactType
+    label: str | None = Field(default=None, min_length=1, max_length=200)
     amount: float = Field(gt=0, allow_inf_nan=False)
     frequency: Literal["weekly", "biweekly", "monthly", "quarterly", "yearly"] | None = None
     expected_date: date | None = None
@@ -722,6 +726,7 @@ class DecisionTraceDetails(DecisionModel):
     limits: list[str] = Field(default_factory=list)
     income_normalizations: list[IncomeNormalization] = Field(default_factory=list)
     declared_facts: list[DeclaredFactCitation] = Field(default_factory=list)
+    transitions: list[str] = Field(default_factory=list)
 
 
 class DecisionTrace(DecisionModel):
@@ -832,6 +837,83 @@ class UnresolvedOutput(DecisionModel):
     trace: DecisionTrace
 
 
+class MaterialContradiction(DecisionModel):
+    """Decision-changing mismatch.
+
+    Attributes
+    ----------
+    fact_id : int | None
+        Commitment identity when applicable.
+    label : str | None
+        Commitment label when applicable.
+    frequency : Literal["weekly", "biweekly", "monthly", "quarterly", "yearly"] | None
+        Declared cadence when recurring.
+    event_date : date | None
+        Declared date when one-off.
+    declared_value : float
+        Last confirmed amount.
+    last_confirmed_at : datetime
+        Last explicit confirmation.
+    signal : Literal
+        Admitted contradiction signal.
+    observed_value : float
+        Median or direct observed amount.
+    period : list[str]
+        Exact admitted cycles or event.
+    scope : str
+        Compared financial object.
+    affected_subject : str
+        Decision output blocked by doubt.
+    transaction_ids : list[int]
+        Source transactions.
+    observation_keys : list[str]
+        Stable evidence identities.
+    acknowledged_observations : list[str]
+        Previously accepted evidence identities.
+    resolution_options : list[Literal]
+        Closed resolution catalog.
+    """
+
+    fact_id: int | None = Field(default=None, exclude_if=lambda value: value is None)
+    label: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    frequency: Literal["weekly", "biweekly", "monthly", "quarterly", "yearly"] | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
+    event_date: date | None = Field(default=None, exclude_if=lambda value: value is None)
+    declared_value: float
+    last_confirmed_at: datetime
+    signal: Literal[
+        "recurring_income_lower",
+        "recurring_income_higher",
+        "recurring_obligation_higher",
+        "recurring_obligation_lower",
+        "one_off_income_mismatch",
+        "one_off_obligation_mismatch",
+    ]
+    observed_value: float
+    period: list[str] = Field(min_length=1)
+    scope: str = Field(min_length=1)
+    affected_subject: str = Field(min_length=1)
+    transaction_ids: list[int] = Field(default_factory=list)
+    observation_keys: list[str] = Field(min_length=1)
+    acknowledged_observations: list[str] = Field(default_factory=list)
+    resolution_options: list[Literal["confirm", "correct", "session", "unknown", "skip", "delete"]] = Field(
+        default=["confirm", "correct", "session", "unknown", "skip", "delete"]
+    )
+
+    @model_validator(mode="after")
+    def require_resolution_fields(self) -> Self:
+        """Require fields needed to submit every advertised resolution."""
+        if self.signal.startswith("recurring_") and self.frequency is None:
+            raise ValueError("recurring contradiction requires frequency")
+        if self.signal.startswith("one_off_") and self.event_date is None:
+            raise ValueError("one-off contradiction requires event_date")
+        if "obligation" in self.signal and (self.fact_id is None or self.label is None):
+            raise ValueError("obligation contradiction requires fact_id and label")
+        return self
+
+
 class ClarificationOutput(DecisionModel):
     """Material question for one closed-catalog fact.
 
@@ -884,6 +966,8 @@ class ClarificationOutput(DecisionModel):
     coverage_months: list[str] | None = None
     transaction_ids: list[int] | None = None
     linked_transaction_ids: list[int] | None = None
+    transitions: list[str] = Field(default_factory=list)
+    contradiction: MaterialContradiction | None = None
 
     @model_validator(mode="after")
     def require_distinct_effects(self) -> Self:
@@ -910,8 +994,11 @@ class ClarificationOutput(DecisionModel):
                 raise ValueError("transaction nature clarification requires transaction_ids")
             if not self.linked_transaction_ids:
                 raise ValueError("transaction nature clarification requires linked_transaction_ids")
+        elif self.contradiction is not None:
+            if self.transaction_ids != self.contradiction.transaction_ids or self.linked_transaction_ids is not None:
+                raise ValueError("contradiction transaction ids must match evidence")
         elif self.transaction_ids is not None or self.linked_transaction_ids is not None:
-            raise ValueError("transaction links only apply to transaction nature")
+            raise ValueError("transaction links require transaction nature or contradiction")
         return self
 
 

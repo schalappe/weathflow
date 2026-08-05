@@ -110,3 +110,25 @@ class TransactionNatureFact(Base):
     state: Mapped[str] = mapped_column(String(20), nullable=False)
     last_confirmed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     acknowledged_links: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+
+
+class ContradictionAcknowledgement(Base):
+    """Persist acknowledged evidence for one declared fact.
+
+    Attributes
+    ----------
+    fact_key : str
+        Declared fact identity.
+    observation_keys : list[str]
+        Evidence identities accepted by the user.
+    confirmed_at : datetime
+        Latest explicit resolution.
+    """
+
+    __tablename__ = "contradiction_acknowledgement"
+    __table_args__ = (UniqueConstraint("fact_key", name="uq_contradiction_fact"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    fact_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    observation_keys: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    confirmed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

@@ -725,7 +725,7 @@ export async function generateAdvice(
     periodCoverage?: PeriodCoverageInput;
     transactionNature?: TransactionNatureInput;
     rememberFact?: boolean;
-    clarificationAction?: "skip" | "unknown";
+    clarificationAction?: "skip" | "unknown" | "delete";
   } = {},
 ): Promise<GenerateAdviceResponse> {
   let response: Response;
