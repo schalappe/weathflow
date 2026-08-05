@@ -12,6 +12,7 @@ from app.services.advice.models import (
     ActionUnavailabilityContext,
     ActivePriorityContext,
     AdviceContext,
+    AdviceDraft,
     AdviceResponse,
     CommitmentFactContext,
     EmergencyFundFactContext,
@@ -150,7 +151,7 @@ def test_generate_advice_returns_strict_decision_output() -> None:
 
     result = generator.generate_advice(_month(month=2), [_month(month=1)])
 
-    assert isinstance(result, AdviceResponse)
+    assert isinstance(result, AdviceDraft)
     assert result.outputs[0].type == "recommendation"
 
 
@@ -219,7 +220,7 @@ def test_prompt_keeps_expired_priority_visible_but_inactive() -> None:
     )
 
     assert '"state": "to_confirm"' in prompt
-    assert "peut changer l'action" in prompt
+    assert "dont la réponse peut" in prompt
     assert "reste visible mais inactif" in prompt
 
 

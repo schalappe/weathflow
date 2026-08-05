@@ -79,7 +79,7 @@ def test_accepts_no_action_without_invented_recommendation() -> None:
 
     payload = advice.model_dump(mode="json")
     assert payload["outputs"][0]["type"] == "no_action"
-    assert set(payload) == {"outputs"}
+    assert set(payload) == {"outputs", "clarification_trace"}
     assert (
         not {
             "problem_areas",

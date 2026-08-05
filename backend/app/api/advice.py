@@ -1,6 +1,7 @@
 """FastAPI router for Advice API endpoints."""
 
 from datetime import UTC, datetime, time
+from typing import Literal
 
 from fastapi import HTTPException, Path, Response, status
 from loguru import logger
@@ -57,16 +58,12 @@ from app.services.advice.models import (
     ActionUnavailabilityContext,
     ActivePriorityContext,
     AdviceContext,
-    ClarificationOutput,
+    AdviceDraft,
     CommitmentFactContext,
     ConstraintFactContext,
-    DecisionOutput,
-    DecisionTrace,
-    DecisionTraceDetails,
     EmergencyFundFactContext,
     FinancialLimitContext,
     IncomeFactContext,
-    ObservedFact,
     UnresolvedOutput,
 )
 from app.services.data import months as months_service
@@ -180,18 +177,16 @@ def generate_advice(
                 request.transaction_nature,
             )
         )
-        previous_question_count = 0
-        previous_question: ClarificationOutput | None = None
-        if answer_count:
+        previous_data: AdviceData | None = None
+        if answer_count or request.clarification_action is not None:
             previous_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
             if previous_advice is not None:
                 previous_data = AdviceData.model_validate_json(previous_advice.advice_text)
-                previous_question = next(
-                    (output for output in previous_data.outputs if output.type == "clarification"),
-                    None,
-                )
-                if previous_question is not None:
-                    previous_question_count = previous_question.question_number
+        previous_question, previous_trace = advice_service.clarification_session_state(previous_data)
+        previous_outcome: Literal["answered", "skipped", "unknown"] | None = (
+            "answered" if answer_count and previous_question is not None else None
+        )
+        carried_output: UnresolvedOutput | None = None
         contradiction_transition: str | None = None
         contradiction_acknowledgement: tuple[str, list[str]] | None = None
         contradiction_fact_id: int | None = None
@@ -226,43 +221,21 @@ def generate_advice(
                     status_code=422,
                     detail="A clarification cannot be answered and skipped together.",
                 )
-            existing_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
-            if existing_advice is None:
+            if previous_data is None or previous_question is None:
                 raise HTTPException(status_code=409, detail="No clarification to resolve.")
-            current_advice = AdviceData.model_validate_json(existing_advice.advice_text)
-            pending_question = next(
-                (output for output in current_advice.outputs if output.type == "clarification"),
-                None,
-            )
-            if pending_question is None:
-                raise HTTPException(status_code=409, detail="No clarification to resolve.")
-            if request.clarification_action == "delete" and pending_question.contradiction is None:
+            if request.clarification_action == "delete" and previous_question.contradiction is None:
                 raise HTTPException(status_code=422, detail="Only a contradicted fact can be deleted here.")
-            advice_service.neutralize_contested_fact(
-                pending_question,
-                request.clarification_action,
-                income_repo,
-                commitment_repo,
-                advice_repo,
-            )
-            resolved_advice = advice_service.resolve_clarification(
-                current_advice,
-                request.year,
-                request.month,
-                request.clarification_action,
-            )
-            advice_json = advice_service.advice_response_to_json(resolved_advice)
-            stored_advice = advice_service.create_or_update_advice(
-                advice_repo,
-                month_record.id,
-                advice_json,
-            )
-            return GenerateAdviceResponse(
-                success=True,
-                advice=resolved_advice,
-                generated_at=stored_advice.generated_at,
-                is_valid=True,
-                was_cached=False,
+            carried_output, contradiction_transition, previous_outcome = (
+                advice_service.resolve_progressive_clarification(
+                    previous_data,
+                    previous_question,
+                    request.clarification_action,
+                    request.year,
+                    request.month,
+                    income_repo,
+                    commitment_repo,
+                    advice_repo,
+                )
             )
 
         if previous_question is not None and previous_question.contradiction is not None and answer_count:
@@ -344,7 +317,7 @@ def generate_advice(
                 request.transaction_nature.scope,
             )
 
-        if not request.regenerate and not answer_count:
+        if not request.regenerate and not answer_count and request.clarification_action is None:
             existing_advice = advice_service.get_advice_by_month_id(advice_repo, month_record.id)
             if existing_advice:
                 return GenerateAdviceResponse(
@@ -375,6 +348,10 @@ def generate_advice(
             transaction_repo,
             generation_months,
         )
+        asked_fact_types, clarifications_remaining = advice_service.clarification_budget(
+            previous_trace,
+            previous_outcome,
+        )
         generation_context = AdviceContext(
             period_coverages=observation_context.period_coverages,
             coverage_signals=observation_context.coverage_signals,
@@ -385,10 +362,11 @@ def generate_advice(
             commitment_facts=commitment_contexts,
             income_facts=income_contexts,
             constraint_facts=constraint_contexts,
-            clarifications_remaining=max(0, 3 - previous_question_count),
+            asked_fact_types=asked_fact_types,
+            clarifications_remaining=clarifications_remaining,
         )
         advice_response = generator.generate_advice(current_data, history_data, generation_context)
-        advice_response = AdviceData.model_validate(advice_response)
+        advice_response = AdviceDraft.model_validate(advice_response)
         advice_service.validate_income_usage(
             advice_response,
             income_contexts,
@@ -441,11 +419,13 @@ def generate_advice(
             transaction_repo,
             observation_repo,
         )
-        advice_response = _apply_clarification_limit(
+        advice_response = advice_service.finalize_clarification_flow(
             advice_response,
-            previous_question_count,
+            previous_trace,
+            previous_outcome,
             request.year,
             request.month,
+            carried_output,
         )
         if contradiction_transition is not None:
             advice_response = advice_service.record_advice_transition(
@@ -714,69 +694,6 @@ def _prepare_emergency_fund_context(
         fact_repo.mark_to_confirm(answer.fact_type)
         contexts.append(_session_emergency_fund_fact_context(answer))
     return contexts
-
-
-def _apply_clarification_limit(
-    advice: AdviceData,
-    previous_count: int,
-    year: int,
-    month: int,
-) -> AdviceData:
-    """Count questions and replace a fourth question with an unresolved output.
-
-    Parameters
-    ----------
-    advice : AdviceData
-        Newly generated decision outputs.
-    previous_count : int
-        Questions already shown in this flow.
-    year : int
-        Advice year.
-    month : int
-        Advice month.
-
-    Returns
-    -------
-    AdviceData
-        Advice with bounded clarification count.
-    """
-    clarification = next(
-        (output for output in advice.outputs if output.type == "clarification"),
-        None,
-    )
-    if clarification is None:
-        return advice
-    if previous_count < 3:
-        next_question = clarification.model_copy(update={"question_number": previous_count + 1})
-        outputs: list[DecisionOutput] = [
-            next_question if output.type == "clarification" else output for output in advice.outputs
-        ]
-        return AdviceData(outputs=outputs)
-
-    unresolved = UnresolvedOutput(
-        type="unresolved",
-        priority=clarification.priority,
-        conclusion=f"{clarification.subject} : information manquante après trois clarifications.",
-        trace=DecisionTrace(
-            summary=clarification.possible_effect,
-            details=DecisionTraceDetails(
-                observations=[
-                    ObservedFact(
-                        fact=clarification.observation,
-                        period=f"{year}-{month:02d}",
-                        scope=clarification.subject,
-                        source="observed_data",
-                        evidence_type="presence",
-                        source_months=[f"{year}-{month:02d}"],
-                        transaction_ids=clarification.transaction_ids or [],
-                    )
-                ],
-                limits=["Plafond de trois questions atteint."],
-            ),
-        ),
-    )
-    outputs = [unresolved if output.type == "clarification" else output for output in advice.outputs]
-    return AdviceData(outputs=outputs)
 
 
 @router.get("/context/active-priority", response_model=ActivePriorityResponse)

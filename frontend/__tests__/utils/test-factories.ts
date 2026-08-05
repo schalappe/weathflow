@@ -125,6 +125,11 @@ export function createMockAdviceData(
 ): AdviceData {
   return {
     outputs: [createMockRecommendationOutput()],
+    clarification_trace: {
+      questions_consumed: 0,
+      questions: [],
+      stop_reason: "no_remaining_decision_impact",
+    },
     ...overrides,
   };
 }

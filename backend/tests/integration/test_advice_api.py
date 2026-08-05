@@ -198,7 +198,7 @@ def test_skip_replaces_persisted_question_with_unresolved_output(
     ]
     assert reloaded.json()["advice"]["outputs"][1]["type"] == "unresolved"
     assert client.get("/api/advice/context/active-priority").json() == {"priority": None}
-    assert mock_generator.generate_advice.call_count == 1
+    assert mock_generator.generate_advice.call_count == 2
 
 
 @patch.dict("os.environ", MOCK_API_KEY_ENV)
@@ -319,6 +319,18 @@ def test_first_session_priority_keeps_clarification_for_correction(
     reloaded = client.get("/api/advice/2025/10")
 
     assert answered.status_code == 200
+    assert answered.json()["advice"]["clarification_trace"] == {
+        "questions_consumed": 1,
+        "questions": [
+            {
+                "question_number": 1,
+                "fact_type": "active_priority",
+                "decision_lever": "action_or_priority",
+                "outcome": "answered",
+            }
+        ],
+        "stop_reason": "no_remaining_decision_impact",
+    }
     assert reloaded.status_code == 200
     assert reloaded.json()["exists"] is True
     assert reloaded.json()["advice"]["outputs"][1]["type"] == "clarification"
@@ -386,7 +398,7 @@ def test_no_material_gap_persists_only_no_action_output(
     client: TestClient,
     db_session: Session,
 ) -> None:
-    """No material gap stores no-action without historical quota fields."""
+    """No material gap stores explicit zero-question trace."""
     month = _create_month(db_session, 2025, 10)
     _create_month(db_session, 2025, 9)
     mock_generator = MagicMock()
@@ -398,9 +410,13 @@ def test_no_material_gap_persists_only_no_action_output(
     assert response.status_code == 200
     payload = response.json()["advice"]
     assert [output["type"] for output in payload["outputs"]] == ["no_action"]
-    assert set(payload) == {"outputs"}
+    assert payload["clarification_trace"] == {
+        "questions_consumed": 0,
+        "questions": [],
+        "stop_reason": "no_remaining_decision_impact",
+    }
     stored = db_session.query(Advice).filter(Advice.month_id == month.id).one()
-    assert set(json.loads(stored.advice_text)) == {"outputs"}
+    assert set(json.loads(stored.advice_text)) == {"outputs", "clarification_trace"}
 
 
 @patch.dict("os.environ", MOCK_API_KEY_ENV)
@@ -432,7 +448,7 @@ def test_regeneration_replaces_historical_contract(
     assert response.status_code == 200
     assert db_session.query(Advice).filter(Advice.month_id == month.id).count() == 1
     stored = db_session.query(Advice).filter(Advice.month_id == month.id).one()
-    assert set(json.loads(stored.advice_text)) == {"outputs"}
+    assert set(json.loads(stored.advice_text)) == {"outputs", "clarification_trace"}
 
 
 @patch.dict("os.environ", MOCK_API_KEY_ENV)
@@ -463,3 +479,168 @@ def test_generation_requires_history(client: TestClient, db_session: Session) ->
 
     assert response.status_code == 400
     assert "Not enough historical data" in response.json()["detail"]
+
+
+@patch.dict("os.environ", MOCK_API_KEY_ENV)
+@patch("app.api.deps.AdviceGenerator")
+def test_four_simultaneous_clarifications_are_ordered_and_capped(
+    mock_generator_class: MagicMock,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Canonical queue shows coverage, obligation, then income; floor stays unresolved."""
+    _create_month(db_session, 2025, 9)
+    _create_month(db_session, 2025, 10)
+    robust_output = _advice().model_dump(mode="json")["outputs"][0]
+
+    def clarification(
+        fact_type: str,
+        subject: str,
+        question: str,
+        answer_ease: str,
+    ) -> dict[str, object]:
+        """Build one canonical candidate."""
+        return {
+            "type": "clarification",
+            "priority": "high",
+            "decision_lever": "amount",
+            "answer_ease": answer_ease,
+            "subject": subject,
+            "observation": "Une capacité mensuelle de 600 € est observée.",
+            "possible_effect": "La réponse change le montant recommandé.",
+            "question": question,
+            "fact_type": fact_type,
+            "material_effects": ["Aucune action", "Affecter 600 €"],
+            **({"coverage_months": ["2025-09", "2025-10"]} if fact_type == "period_coverage" else {}),
+        }
+
+    draft = {
+        "outputs": [
+            robust_output,
+            clarification(
+                "safety_floor",
+                "Plancher de sécurité",
+                "Quel plancher souhaitez-vous protéger ?",
+                "moderate",
+            ),
+            clarification(
+                "usual_disposable_income",
+                "Revenu habituel",
+                "Quel est votre revenu disponible habituel ?",
+                "easy",
+            ),
+            clarification(
+                "recurring_obligation",
+                "Obligation récurrente",
+                "Quel montant devez-vous payer chaque mois ?",
+                "moderate",
+            ),
+            clarification(
+                "period_coverage",
+                "Couverture",
+                "Les deux mois couvrent-ils tous vos comptes ?",
+                "easy",
+            ),
+        ]
+    }
+    mock_generator = MagicMock()
+    mock_generator.generate_advice.return_value = draft
+    mock_generator_class.return_value = mock_generator
+
+    responses = [client.post("/api/advice/generate", json={"year": 2025, "month": 10})]
+    for _ in range(3):
+        responses.append(
+            client.post(
+                "/api/advice/generate",
+                json={"year": 2025, "month": 10, "clarification_action": "skip"},
+            )
+        )
+
+    expected_questions = [
+        "period_coverage",
+        "recurring_obligation",
+        "usual_disposable_income",
+    ]
+    for index, response in enumerate(responses[:3], start=1):
+        assert response.status_code == 200
+        outputs = response.json()["advice"]["outputs"]
+        assert sum(output["type"] == "clarification" for output in outputs) == 1
+        assert (
+            next(output for output in outputs if output["type"] == "clarification")["fact_type"]
+            == (expected_questions[index - 1])
+        )
+        assert any(output["type"] == "recommendation" for output in outputs)
+        trace = response.json()["advice"]["clarification_trace"]
+        assert trace["questions_consumed"] == index
+        assert [question["fact_type"] for question in trace["questions"]] == expected_questions[:index]
+        assert trace["stop_reason"] == "question_pending"
+
+    final_advice = responses[3].json()["advice"]
+    assert responses[3].status_code == 200
+    assert all(output["type"] != "clarification" for output in final_advice["outputs"])
+    assert any(output["type"] == "recommendation" for output in final_advice["outputs"])
+    assert any(
+        output["type"] == "unresolved" and "Plancher de sécurité" in output["conclusion"]
+        for output in final_advice["outputs"]
+    )
+    assert final_advice["clarification_trace"] == {
+        "questions_consumed": 3,
+        "questions": [
+            {
+                "question_number": index,
+                "fact_type": fact_type,
+                "decision_lever": "amount",
+                "outcome": "skipped",
+            }
+            for index, fact_type in enumerate(expected_questions, start=1)
+        ],
+        "stop_reason": "quota_reached",
+    }
+    assert mock_generator.generate_advice.call_count == 4
+
+
+@patch.dict("os.environ", MOCK_API_KEY_ENV)
+@patch("app.api.deps.AdviceGenerator")
+def test_decision_lever_precedes_display_priority(
+    mock_generator_class: MagicMock,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Action-changing question precedes higher-display-priority amount question."""
+    _create_month(db_session, 2025, 9)
+    _create_month(db_session, 2025, 10)
+    common = {
+        "type": "clarification",
+        "subject": "Trajectoire d'épargne",
+        "observation": "600 € restent disponibles.",
+        "possible_effect": "La réponse change le conseil.",
+        "material_effects": ["Aucune action", "Affecter 600 €"],
+        "answer_ease": "easy",
+    }
+    mock_generator = MagicMock()
+    mock_generator.generate_advice.return_value = {
+        "outputs": [
+            {
+                **common,
+                "priority": "high",
+                "decision_lever": "amount",
+                "question": "La période couvre-t-elle tous vos comptes ?",
+                "fact_type": "period_coverage",
+                "coverage_months": ["2025-09", "2025-10"],
+            },
+            {
+                **common,
+                "priority": "medium",
+                "decision_lever": "action_or_priority",
+                "question": "Quelle est votre priorité active ?",
+                "fact_type": "active_priority",
+            },
+        ]
+    }
+    mock_generator_class.return_value = mock_generator
+
+    response = client.post("/api/advice/generate", json={"year": 2025, "month": 10})
+
+    assert response.status_code == 200
+    question = next(output for output in response.json()["advice"]["outputs"] if output["type"] == "clarification")
+    assert question["fact_type"] == "active_priority"

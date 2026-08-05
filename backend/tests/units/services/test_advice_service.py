@@ -149,6 +149,6 @@ class TestAdviceSerialization(DatabaseTestCase):
         """Storage JSON contains new contract only."""
         payload = json.loads(service.advice_response_to_json(_advice()))
 
-        self.assertEqual(set(payload), {"outputs"})
+        self.assertEqual(set(payload), {"outputs", "clarification_trace"})
         self.assertEqual(payload["outputs"][0]["type"], "recommendation")
         self.assertNotIn("problem_areas", payload)

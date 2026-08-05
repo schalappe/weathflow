@@ -75,6 +75,7 @@ import type {
   DecisionOutput,
   DecisionPriority,
   DeclaredFactCitation,
+  DeclaredFactType,
   DecisionTrace,
   PeriodCoverageCitation,
   PeriodCoverageInput,
@@ -156,6 +157,31 @@ const incomeFrequencyLabels: Record<IncomeFrequency, string> = {
   quarterly: "Trimestrielle",
   yearly: "Annuelle",
 };
+
+const clarificationFactLabels: Record<DeclaredFactType, string> = {
+  period_coverage: "Couverture de la période",
+  transaction_nature: "Nature de la transaction",
+  active_priority: "Priorité active",
+  ...emergencyFundFactLabels,
+  ...commitmentFactLabels,
+  ...incomeFactLabels,
+  financial_limit: "Limite financière",
+  action_unavailability: "Indisponibilité d’action",
+};
+
+const clarificationOutcomeLabels = {
+  pending: "en attente",
+  answered: "répondue",
+  skipped: "passée",
+  unknown: "inconnue",
+} as const;
+
+const clarificationStopLabels = {
+  question_pending: "Une réponse peut encore changer le conseil.",
+  no_remaining_decision_impact:
+    "Arrêt : aucune réponse restante ne peut changer le conseil.",
+  quota_reached: "Arrêt : plafond de trois questions atteint.",
+} as const;
 
 const contradictionSignalLabels: Record<
   NonNullable<ClarificationOutput["contradiction"]>["signal"],
@@ -2375,6 +2401,9 @@ function ClarificationCard({
       <div className="flex flex-wrap items-center gap-2">
         <Badge>Clarification</Badge>
         <Badge variant="outline">{priorityLabels[output.priority]}</Badge>
+        <Badge variant="outline">
+          Question {output.question_number ?? 1} sur 3
+        </Badge>
       </div>
       <div className="space-y-2">
         <h5 className="font-semibold">{output.question}</h5>
@@ -2761,6 +2790,30 @@ function AdviceContent({
           ),
         )}
       </div>
+      {advice.clarification_trace.questions_consumed > 0 && (
+        <aside
+          aria-label="Trace des clarifications"
+          className="space-y-2 rounded-lg border bg-muted/20 p-4 text-sm"
+        >
+          <p className="font-medium">
+            {advice.clarification_trace.questions_consumed} question
+            {advice.clarification_trace.questions_consumed > 1 ? "s" : ""} sur 3
+            consommée
+            {advice.clarification_trace.questions_consumed > 1 ? "s" : ""}
+          </p>
+          <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+            {advice.clarification_trace.questions.map((question) => (
+              <li key={question.question_number}>
+                {clarificationFactLabels[question.fact_type]} —{" "}
+                {clarificationOutcomeLabels[question.outcome]}
+              </li>
+            ))}
+          </ol>
+          <p className="text-muted-foreground">
+            {clarificationStopLabels[advice.clarification_trace.stop_reason]}
+          </p>
+        </aside>
+      )}
       <Separator />
       <div className="flex items-center justify-between gap-4">
         {generatedAt && (

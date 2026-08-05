@@ -8,7 +8,7 @@ from anthropic import Anthropic
 from loguru import logger
 from pydantic import ValidationError
 
-from app.services.advice.models import AdviceContext, AdviceResponse, MonthData
+from app.services.advice.models import AdviceContext, AdviceDraft, MonthData
 from app.services.advice.prompt import ADVICE_SYSTEM_PROMPT
 from app.services.exceptions import (
     AdviceAPIError,
@@ -23,7 +23,7 @@ class AdviceGenerator:
 
     Notes
     -----
-    Model output must satisfy strict AdviceResponse contract.
+    Model output must satisfy strict AdviceDraft contract.
     """
 
     MIN_MONTHS_REQUIRED: ClassVar[int] = 2
@@ -84,7 +84,7 @@ class AdviceGenerator:
         current_month: MonthData,
         history: list[MonthData],
         context: AdviceContext | None = None,
-    ) -> AdviceResponse:
+    ) -> AdviceDraft:
         """
         Generate personalized financial advice based on historical data.
 
@@ -99,8 +99,8 @@ class AdviceGenerator:
 
         Returns
         -------
-        AdviceResponse
-            Decision outputs backed by traced facts.
+        AdviceDraft
+            Candidate decision outputs.
 
         Raises
         ------
@@ -296,7 +296,7 @@ class AdviceGenerator:
 
         return response_text
 
-    def _parse_response(self, response_text: str) -> AdviceResponse:
+    def _parse_response(self, response_text: str) -> AdviceDraft:
         """Parse strict decision JSON.
 
         Parameters
@@ -306,8 +306,8 @@ class AdviceGenerator:
 
         Returns
         -------
-        AdviceResponse
-            Validated decision outputs.
+        AdviceDraft
+            Validated candidate outputs.
 
         Raises
         ------
@@ -320,7 +320,7 @@ class AdviceGenerator:
             cleaned = "\n".join(lines[1:]).rsplit("```", 1)[0].strip()
 
         try:
-            return AdviceResponse.model_validate_json(cleaned)
+            return AdviceDraft.model_validate_json(cleaned)
         except ValidationError as error:
             logger.error("Invalid advice response: {}", error)
             raise AdviceParseError(response_text) from error

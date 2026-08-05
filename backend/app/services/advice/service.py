@@ -25,8 +25,12 @@ from app.services.advice.models import (
     ActionUnavailabilityCitation,
     ActionUnavailabilityContext,
     AdviceContext,
+    AdviceDraft,
     AdviceResponse,
+    ClarificationFactType,
     ClarificationOutput,
+    ClarificationTrace,
+    ClarificationTraceEntry,
     CommitmentFactContext,
     ConstraintFactContext,
     DecisionOutput,
@@ -1408,20 +1412,20 @@ def _detect_one_off_commitment_contradiction(
 
 
 def apply_material_contradictions(
-    advice: AdviceResponse,
+    advice: AdviceDraft,
     income_contexts: list[IncomeFactContext],
     commitment_contexts: list[CommitmentFactContext],
     months: list[MonthData],
     coverages: list[PeriodCoverageContext],
     transaction_repo: TransactionRepository,
     observation_repo: ObservationFactRepository,
-) -> AdviceResponse:
+) -> AdviceDraft:
     """Replace fact-dependent output when admitted evidence contradicts it.
 
     Parameters
     ----------
-    advice : AdviceResponse
-        Generated decision outputs.
+    advice : AdviceDraft
+        Candidate decision outputs.
     income_contexts : list[IncomeFactContext]
         Declared income facts.
     commitment_contexts : list[CommitmentFactContext]
@@ -1437,8 +1441,8 @@ def apply_material_contradictions(
 
     Returns
     -------
-    AdviceResponse
-        Advice with at most one material clarification.
+    AdviceDraft
+        Advice with admitted contradiction candidates.
     """
     ordered = sorted(months, key=lambda item: (item.year, item.month))
     observed_accounts = {
@@ -1522,6 +1526,8 @@ def apply_material_contradictions(
     clarification = ClarificationOutput(
         type="clarification",
         priority=dependent.priority,
+        decision_lever="amount",
+        answer_ease="easy",
         subject=affected_subject,
         observation=(
             f"Une opération appariée montre {contradiction.observed_value:g} € "
@@ -1550,7 +1556,269 @@ def apply_material_contradictions(
         for index, output in enumerate(advice.outputs)
         if index not in dependent_indexes or index == dependent_index
     ]
-    return AdviceResponse(outputs=outputs)
+    return AdviceDraft(outputs=outputs)
+
+
+_DECISION_LEVER_PRIORITY = {"action_or_priority": 0, "amount": 1, "deadline": 2, "abstention": 3}
+_ANSWER_EASE_PRIORITY = {"easy": 0, "moderate": 1, "hard": 2}
+_DATA_VALIDITY_FACTS = {"period_coverage", "transaction_nature"}
+_OBLIGATION_FACTS = {"recurring_obligation", "one_off_obligation", "debt_position", "debt_terms"}
+
+
+def _clarification_order(output: ClarificationOutput) -> tuple[int, int, int, str]:
+    """Build deterministic queue key.
+
+    Parameters
+    ----------
+    output : ClarificationOutput
+        Candidate question.
+
+    Returns
+    -------
+    tuple[int, int, int, str]
+        Lever, tie-breaker, effort, stable fact type.
+    """
+    tie_breaker = 0 if output.fact_type in _DATA_VALIDITY_FACTS else 1 if output.fact_type in _OBLIGATION_FACTS else 2
+    return (
+        _DECISION_LEVER_PRIORITY[output.decision_lever],
+        tie_breaker,
+        _ANSWER_EASE_PRIORITY[output.answer_ease],
+        output.fact_type,
+    )
+
+
+def _unresolved_clarification(
+    output: ClarificationOutput,
+    year: int,
+    month: int,
+    limit: str,
+) -> UnresolvedOutput:
+    """Convert blocked candidate to non-action output.
+
+    Parameters
+    ----------
+    output : ClarificationOutput
+        Candidate question.
+    year : int
+        Advice year.
+    month : int
+        Advice month.
+    limit : str
+        Auditable stop limit.
+
+    Returns
+    -------
+    UnresolvedOutput
+        Blocked subject without action.
+    """
+    period = f"{year}-{month:02d}"
+    return UnresolvedOutput(
+        type="unresolved",
+        priority=output.priority,
+        conclusion=f"{output.subject} : sujet non conclu.",
+        trace=DecisionTrace(
+            summary=output.possible_effect,
+            details=DecisionTraceDetails(
+                observations=[
+                    ObservedFact(
+                        fact=output.observation,
+                        period=period,
+                        scope=output.subject,
+                        source="observed_data",
+                        evidence_type="presence",
+                        source_months=[period],
+                        transaction_ids=output.transaction_ids or [],
+                    )
+                ],
+                limits=[limit],
+            ),
+        ),
+    )
+
+
+def clarification_session_state(
+    advice: AdviceResponse | None,
+) -> tuple[ClarificationOutput | None, ClarificationTrace]:
+    """Read pending question and trace.
+
+    Parameters
+    ----------
+    advice : AdviceResponse | None
+        Stored session response.
+
+    Returns
+    -------
+    tuple[ClarificationOutput | None, ClarificationTrace]
+        Pending question and trace; empty when absent.
+    """
+    if advice is None:
+        return None, ClarificationTrace()
+    question = next((output for output in advice.outputs if output.type == "clarification"), None)
+    return question, advice.clarification_trace
+
+
+def clarification_budget(
+    trace: ClarificationTrace,
+    outcome: Literal["answered", "skipped", "unknown"] | None,
+) -> tuple[list[ClarificationFactType], int]:
+    """Build generation exclusions and remaining quota.
+
+    Parameters
+    ----------
+    trace : ClarificationTrace
+        Stored session trace.
+    outcome : Literal["answered", "skipped", "unknown"] | None
+        Current pending-question result.
+
+    Returns
+    -------
+    tuple[list[ClarificationFactType], int]
+        Consumed fact types and remaining quota.
+    """
+    questions = list(trace.questions)
+    if outcome is not None and questions and questions[-1].outcome == "pending":
+        questions[-1] = questions[-1].model_copy(update={"outcome": outcome})
+    return [question.fact_type for question in questions], max(0, 3 - len(questions))
+
+
+def resolve_progressive_clarification(
+    advice: AdviceResponse,
+    question: ClarificationOutput,
+    action: Literal["skip", "unknown", "delete"],
+    year: int,
+    month: int,
+    income_repo: IncomeFactRepository,
+    commitment_repo: CommitmentFactRepository,
+    advice_repo: AdviceRepository,
+) -> tuple[
+    UnresolvedOutput | None,
+    str | None,
+    Literal["answered", "skipped", "unknown"],
+]:
+    """Resolve current question before regenerating queue.
+
+    Parameters
+    ----------
+    advice : AdviceResponse
+        Stored response.
+    question : ClarificationOutput
+        Pending question.
+    action : Literal["skip", "unknown", "delete"]
+        User resolution.
+    year : int
+        Advice year.
+    month : int
+        Advice month.
+    income_repo : IncomeFactRepository
+        Income persistence.
+    commitment_repo : CommitmentFactRepository
+        Obligation persistence.
+    advice_repo : AdviceRepository
+        Advice invalidation.
+
+    Returns
+    -------
+    tuple[UnresolvedOutput | None, str | None, Literal]
+        Carried abstention, transition, and consumed outcome.
+    """
+    neutralize_contested_fact(question, action, income_repo, commitment_repo, advice_repo)
+    resolved = resolve_clarification(advice, year, month, action)
+    resolved_output = resolved.outputs[advice.outputs.index(question)]
+    carried = resolved_output if resolved_output.type == "unresolved" else None
+    transition = (
+        carried.trace.details.transitions[-1]
+        if question.contradiction is not None and carried is not None and carried.trace.details.transitions
+        else None
+    )
+    outcome: Literal["answered", "skipped", "unknown"] = (
+        "skipped" if action == "skip" else "unknown" if action == "unknown" else "answered"
+    )
+    return carried, transition, outcome
+
+
+def finalize_clarification_flow(
+    draft: AdviceDraft,
+    previous_trace: ClarificationTrace,
+    previous_outcome: Literal["answered", "skipped", "unknown"] | None,
+    year: int,
+    month: int,
+    carried_output: UnresolvedOutput | None = None,
+) -> AdviceResponse:
+    """Select next useful question and record capped state.
+
+    Parameters
+    ----------
+    draft : AdviceDraft
+        Candidate decisions and questions.
+    previous_trace : ClarificationTrace
+        Stored session order.
+    previous_outcome : Literal["answered", "skipped", "unknown"] | None
+        Current pending-question result.
+    year : int
+        Advice year.
+    month : int
+        Advice month.
+    carried_output : UnresolvedOutput | None
+        Abstention replacing consumed question.
+
+    Returns
+    -------
+    AdviceResponse
+        One visible question, unresolved queue, and trace.
+    """
+    questions = list(previous_trace.questions)
+    if previous_outcome is not None and questions and questions[-1].outcome == "pending":
+        questions[-1] = questions[-1].model_copy(update={"outcome": previous_outcome})
+    asked_fact_types = {question.fact_type for question in questions}
+    candidates = sorted(
+        (
+            output
+            for output in draft.outputs
+            if output.type == "clarification" and output.fact_type not in asked_fact_types
+        ),
+        key=_clarification_order,
+    )
+    selected = candidates[0] if candidates and len(questions) < 3 else None
+    stop_reason: Literal["question_pending", "no_remaining_decision_impact", "quota_reached"]
+    if selected is not None:
+        questions.append(
+            ClarificationTraceEntry(
+                question_number=len(questions) + 1,
+                fact_type=selected.fact_type,
+                decision_lever=selected.decision_lever,
+                outcome="pending",
+            )
+        )
+        stop_reason = "question_pending"
+    else:
+        stop_reason = "quota_reached" if candidates else "no_remaining_decision_impact"
+
+    outputs: list[DecisionOutput] = []
+    carried_added = False
+    for output in draft.outputs:
+        if output.type != "clarification":
+            outputs.append(output)
+        elif output.fact_type in asked_fact_types:
+            if carried_output is not None and not carried_added:
+                outputs.append(carried_output)
+                carried_added = True
+        elif output is selected:
+            outputs.append(output.model_copy(update={"question_number": len(questions)}))
+        else:
+            limit = (
+                "Plafond de trois questions atteint."
+                if stop_reason == "quota_reached"
+                else "Clarification en attente d'une question plus décisionnelle."
+            )
+            outputs.append(_unresolved_clarification(output, year, month, limit))
+    if carried_output is not None and not carried_added:
+        outputs.append(carried_output)
+    trace = ClarificationTrace(
+        questions_consumed=len(questions),
+        questions=questions,
+        stop_reason=stop_reason,
+    )
+    return AdviceResponse(outputs=outputs, clarification_trace=trace)
 
 
 def record_advice_transition(advice: AdviceResponse, transition: str) -> AdviceResponse:
@@ -1571,13 +1839,14 @@ def record_advice_transition(advice: AdviceResponse, transition: str) -> AdviceR
     outputs: list[DecisionOutput] = []
     for output in advice.outputs:
         if output.type == "clarification":
-            outputs.append(output.model_copy(update={"transitions": [*output.transitions, transition]}))
+            transitions = output.transitions if transition in output.transitions else [*output.transitions, transition]
+            outputs.append(output.model_copy(update={"transitions": transitions}))
             continue
-        details = output.trace.details.model_copy(
-            update={"transitions": [*output.trace.details.transitions, transition]}
-        )
+        current_transitions = output.trace.details.transitions
+        transitions = current_transitions if transition in current_transitions else [*current_transitions, transition]
+        details = output.trace.details.model_copy(update={"transitions": transitions})
         outputs.append(output.model_copy(update={"trace": output.trace.model_copy(update={"details": details})}))
-    return AdviceResponse(outputs=outputs)
+    return AdviceResponse(outputs=outputs, clarification_trace=advice.clarification_trace)
 
 
 def plan_contradiction_resolution(
@@ -1667,7 +1936,7 @@ def neutralize_contested_fact(
 
 
 def validate_income_usage(
-    advice: AdviceResponse,
+    advice: AdviceDraft,
     contexts: list[IncomeFactContext],
     year: int,
     month: int,
@@ -1749,7 +2018,7 @@ def validate_income_usage(
 
 
 def validate_constraint_usage(
-    advice: AdviceResponse,
+    advice: AdviceDraft,
     contexts: list[ConstraintFactContext],
 ) -> None:
     """Reject forged, unavailable, untraced, or out-of-bounds recommendations.
@@ -2119,9 +2388,9 @@ def prepare_observation_context(
 
 
 def enforce_observation_coverage(
-    advice: AdviceResponse,
+    advice: AdviceDraft,
     period_coverages: list[PeriodCoverageContext],
-) -> AdviceResponse:
+) -> AdviceDraft:
     """Reject nonlocal evidence without complete coverage.
 
     Parameters
@@ -2171,7 +2440,7 @@ def enforce_observation_coverage(
                 trace=output.trace.model_copy(update={"details": details}),
             )
         )
-    return AdviceResponse(outputs=outputs)
+    return AdviceDraft(outputs=outputs)
 
 
 def resolve_clarification(
@@ -2211,6 +2480,8 @@ def resolve_clarification(
                 "delete": "Contradiction supprimée : fait supprimé sans ancienne valeur réactivable.",
             }[action]
         label = {
+            "period_coverage": "couverture de la période",
+            "transaction_nature": "nature de la transaction",
             "active_priority": "priorité active",
             "liquid_reserve": "réserve liquide non affectée",
             "safety_floor": "plancher de sécurité",
@@ -2254,5 +2525,5 @@ def resolve_clarification(
                 ),
             )
         )
-    resolved = AdviceResponse(outputs=outputs)
+    resolved = AdviceResponse(outputs=outputs, clarification_trace=advice.clarification_trace)
     return record_advice_transition(resolved, transition) if transition is not None else resolved

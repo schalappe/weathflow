@@ -7,7 +7,12 @@ import {
   createMockAdviceData,
   createMockRecommendationOutput,
 } from "@/__tests__/utils/test-factories";
-import type { AdviceData, EligibilityInfo } from "@/types";
+import type {
+  AdviceData,
+  ClarificationTrace,
+  DeclaredFactType,
+  EligibilityInfo,
+} from "@/types";
 
 vi.mock("@/lib/api-client", () => ({
   getAdvice: vi.fn(),
@@ -397,6 +402,133 @@ describe("AdvicePanel decision outputs", () => {
     expect(
       screen.getByText("Trajectoire d'épargne : aucune action robuste."),
     ).toBeInTheDocument();
+  });
+
+  it("keeps robust advice through the ordered three-question user flow", async () => {
+    const user = userEvent.setup();
+    const recommendation = createMockRecommendationOutput();
+    const questionOrder: DeclaredFactType[] = [
+      "period_coverage",
+      "recurring_obligation",
+      "usual_disposable_income",
+    ];
+    const questions = [
+      {
+        type: "clarification" as const,
+        priority: "high" as const,
+        decision_lever: "amount" as const,
+        answer_ease: "easy" as const,
+        subject: "Couverture",
+        observation: "La période peut être incomplète.",
+        possible_effect: "La couverture change le montant.",
+        question: "Les deux mois couvrent-ils tous vos comptes ?",
+        fact_type: "period_coverage" as const,
+        material_effects: ["Aucune action", "Affecter 600 €"],
+        coverage_months: ["2025-11", "2025-12"],
+      },
+      {
+        type: "clarification" as const,
+        priority: "high" as const,
+        decision_lever: "amount" as const,
+        answer_ease: "moderate" as const,
+        subject: "Obligation récurrente",
+        observation: "600 € restent disponibles.",
+        possible_effect: "L’obligation change le montant.",
+        question: "Quel montant devez-vous payer chaque mois ?",
+        fact_type: "recurring_obligation" as const,
+        material_effects: ["Aucune action", "Affecter 600 €"],
+      },
+      {
+        type: "clarification" as const,
+        priority: "high" as const,
+        decision_lever: "amount" as const,
+        answer_ease: "easy" as const,
+        subject: "Revenu habituel",
+        observation: "600 € restent disponibles.",
+        possible_effect: "Le revenu change le montant soutenable.",
+        question: "Quel est votre revenu disponible habituel ?",
+        fact_type: "usual_disposable_income" as const,
+        material_effects: ["Aucune action", "Affecter 600 €"],
+      },
+    ];
+    const trace = (
+      count: number,
+      stopReason: ClarificationTrace["stop_reason"],
+    ): ClarificationTrace => ({
+      questions_consumed: count,
+      questions: questionOrder.slice(0, count).map((factType, index) => ({
+        question_number: index + 1,
+        fact_type: factType,
+        decision_lever: "amount",
+        outcome:
+          stopReason === "question_pending" && index === count - 1
+            ? "pending"
+            : "skipped",
+      })),
+      stop_reason: stopReason,
+    });
+    mockGetAdvice.mockResolvedValue(
+      loaded(
+        createMockAdviceData({
+          outputs: [recommendation, { ...questions[0], question_number: 1 }],
+          clarification_trace: trace(1, "question_pending"),
+        }),
+      ),
+    );
+    for (const index of [1, 2]) {
+      mockGenerateAdvice.mockResolvedValueOnce({
+        success: true,
+        advice: createMockAdviceData({
+          outputs: [
+            recommendation,
+            { ...questions[index], question_number: index + 1 },
+          ],
+          clarification_trace: trace(index + 1, "question_pending"),
+        }),
+        generated_at: "2026-08-02T12:00:00Z",
+        is_valid: true,
+        was_cached: false,
+      });
+    }
+    mockGenerateAdvice.mockResolvedValueOnce({
+      success: true,
+      advice: createMockAdviceData({
+        outputs: [
+          recommendation,
+          {
+            type: "unresolved",
+            priority: "high",
+            conclusion: "Plancher de sécurité : sujet non conclu.",
+            trace: recommendation.trace,
+          },
+        ],
+        clarification_trace: trace(3, "quota_reached"),
+      }),
+      generated_at: "2026-08-02T12:00:00Z",
+      is_valid: true,
+      was_cached: false,
+    });
+
+    render(<AdvicePanel year={2025} month={12} />);
+
+    for (const question of questions) {
+      expect(await screen.findByText(question.question)).toBeInTheDocument();
+      expect(screen.getAllByText(recommendation.action)).toHaveLength(1);
+      expect(screen.getAllByText("Clarification")).toHaveLength(1);
+      await user.click(screen.getByRole("button", { name: "Passer" }));
+    }
+
+    expect(
+      await screen.findByText("Arrêt : plafond de trois questions atteint."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Clarification")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("3 questions sur 3 consommées"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Couverture de la période — passée"),
+    ).toBeInTheDocument();
+    expect(mockGenerateAdvice).toHaveBeenCalledTimes(3);
   });
 
   it("shows remembered priority and exposes correction and deletion", async () => {
@@ -912,7 +1044,7 @@ describe("AdvicePanel decision outputs", () => {
     );
     mockGenerateAdvice.mockResolvedValue({
       success: true,
-      advice: {
+      advice: createMockAdviceData({
         outputs: [
           {
             type: "unresolved",
@@ -921,7 +1053,7 @@ describe("AdvicePanel decision outputs", () => {
             trace,
           },
         ],
-      },
+      }),
       generated_at: "2026-08-02T12:00:00Z",
       is_valid: true,
       was_cached: false,

@@ -52,9 +52,29 @@ def _add_income_month(db: Session, year: int, month: int, amount: float) -> Mont
 def _income_dependent_advice(*args: object) -> dict[str, object]:
     """Return independent and income-dependent outputs."""
     context = cast(AdviceContext, args[2])
-    income = context.income_facts[0]
     month = cast(MonthData, args[0])
     period = f"{month.year}-{month.month:02d}"
+    observation = {
+        "fact": "Les dépenses essentielles atteignent 1 800 €.",
+        "period": period,
+        "scope": "Dépenses essentielles",
+        "source": "observed_data",
+        "evidence_type": "aggregate",
+        "source_months": [period],
+        "transaction_ids": [],
+    }
+    independent_output = {
+        "type": "no_action",
+        "priority": "low",
+        "conclusion": "Les dépenses essentielles restent stables.",
+        "trace": {
+            "summary": "Aucun changement indépendant du revenu.",
+            "details": {"observations": [observation]},
+        },
+    }
+    income = next((fact for fact in context.income_facts if fact.state != "to_confirm"), None)
+    if income is None:
+        return {"outputs": [independent_output]}
     factors = {"weekly": 52 / 12, "biweekly": 26 / 12, "monthly": 1, "quarterly": 1 / 3, "yearly": 1 / 12}
     conversions = {
         "weekly": "weekly_x_52_div_12",
@@ -75,26 +95,9 @@ def _income_dependent_advice(*args: object) -> dict[str, object]:
         conversion = conversions[frequency]
         normalization_period = period
         decision_amount = max(0, income.amount * factor - 2_300)
-    observation = {
-        "fact": "Les dépenses essentielles atteignent 1 800 €.",
-        "period": period,
-        "scope": "Dépenses essentielles",
-        "source": "observed_data",
-        "evidence_type": "aggregate",
-        "source_months": [period],
-        "transaction_ids": [],
-    }
     return {
         "outputs": [
-            {
-                "type": "no_action",
-                "priority": "low",
-                "conclusion": "Les dépenses essentielles restent stables.",
-                "trace": {
-                    "summary": "Aucun changement indépendant du revenu.",
-                    "details": {"observations": [observation]},
-                },
-            },
+            independent_output,
             {
                 "type": "recommendation",
                 "priority": "high",

@@ -639,6 +639,8 @@ export interface ClarificationOutput {
   possible_effect: string;
   question: string;
   question_number?: number;
+  decision_lever?: DecisionLever;
+  answer_ease?: AnswerEase;
   fact_type: DeclaredFactType;
   material_effects: string[];
   coverage_months?: string[];
@@ -646,6 +648,28 @@ export interface ClarificationOutput {
   linked_transaction_ids?: number[];
   transitions?: string[];
   contradiction?: MaterialContradiction;
+}
+
+export type DecisionLever =
+  | "action_or_priority"
+  | "amount"
+  | "deadline"
+  | "abstention";
+
+export type AnswerEase = "easy" | "moderate" | "hard";
+
+export interface ClarificationTrace {
+  questions_consumed: number;
+  questions: {
+    question_number: number;
+    fact_type: DeclaredFactType;
+    decision_lever: DecisionLever;
+    outcome: "pending" | "answered" | "skipped" | "unknown";
+  }[];
+  stop_reason:
+    | "question_pending"
+    | "no_remaining_decision_impact"
+    | "quota_reached";
 }
 
 export type DecisionOutput =
@@ -656,6 +680,7 @@ export type DecisionOutput =
 
 export interface AdviceData {
   outputs: DecisionOutput[];
+  clarification_trace: ClarificationTrace;
 }
 
 export interface EligibilityInfo {

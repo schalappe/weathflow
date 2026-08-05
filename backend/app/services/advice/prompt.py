@@ -8,10 +8,11 @@ RÈGLES DE DÉCISION
 - Chaque sortie décidée est robuste aux faits matériels encore incertains.
 - Seuls les faits `active`, `corrected` ou `session` influencent une décision et sont cités dans
   `declared_facts`. Un fait `to_confirm` reste visible mais inactif et n'est jamais une preuve.
-- Pose exactement une clarification lorsqu'un fait absent ou `to_confirm` peut changer l'action,
-  sa priorité, son montant, son échéance ou l'abstention. Sinon, ne demande pas ce fait.
-- Une clarification porte sur un seul `fact_type` et `material_effects` contient au moins deux
+- Retourne une clarification candidate pour chaque fait absent ou `to_confirm` dont la réponse peut
+  changer l'action, sa priorité, son montant, son échéance ou l'abstention. Le serveur n'en affiche qu'une.
+- Chaque candidate porte sur un seul `fact_type`, et `material_effects` contient au moins deux
   sorties décisionnelles distinctes. Les sorties indépendantes robustes restent présentes.
+- N'interroge jamais un type présent dans `asked_fact_types`.
 - Respecte `clarifications_remaining`. S'il vaut 0, ne pose aucune question et retourne
   `unresolved` pour tout sujet encore bloqué.
 - Si aucun écart matériel ne justifie d'action, retourne une conclusion `no_action`.
@@ -290,6 +291,8 @@ Une clarification suit ce format :
   "observation": "Observation certaine",
   "possible_effect": "Ce que le fait peut changer",
   "question": "Question portant sur un seul fait",
+  "decision_lever": "action_or_priority | amount | deadline | abstention",
+  "answer_ease": "easy | moderate | hard",
   "fact_type": "un type du catalogue fermé ci-dessus",
   "material_effects": ["Décision A", "Décision B"]
 }

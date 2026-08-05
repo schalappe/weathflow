@@ -10,6 +10,25 @@ from app.repositories.commitment_fact import CommitmentFactType
 from app.repositories.income_fact import IncomeFactType
 from app.services.models import FrozenModel
 
+ClarificationFactType = Literal[
+    "period_coverage",
+    "transaction_nature",
+    "active_priority",
+    "liquid_reserve",
+    "safety_floor",
+    "priority_allocation",
+    "recurring_obligation",
+    "one_off_obligation",
+    "debt_position",
+    "debt_terms",
+    "usual_disposable_income",
+    "expected_one_off_income",
+    "financial_limit",
+    "action_unavailability",
+]
+DecisionLever = Literal["action_or_priority", "amount", "deadline", "abstention"]
+AnswerEase = Literal["easy", "moderate", "hard"]
+
 
 class TransactionSample(FrozenModel):
     """Observed transaction.
@@ -470,6 +489,8 @@ class AdviceContext(DecisionModel):
         Declared income context.
     constraint_facts : list[ConstraintFactContext]
         Financial limits and unavailable actions.
+    asked_fact_types : list[ClarificationFactType]
+        Facts already consumed in current request.
     clarifications_remaining : int
         Questions available before abstention.
     """
@@ -483,6 +504,7 @@ class AdviceContext(DecisionModel):
     commitment_facts: list[CommitmentFactContext] = Field(default_factory=list)
     income_facts: list[IncomeFactContext] = Field(default_factory=list)
     constraint_facts: list[ConstraintFactContext] = Field(default_factory=list)
+    asked_fact_types: list[ClarificationFactType] = Field(default_factory=list, max_length=3)
     clarifications_remaining: int = Field(default=3, ge=0, le=3)
 
 
@@ -932,8 +954,12 @@ class ClarificationOutput(DecisionModel):
     question : str
         User-facing question.
     question_number : int
-        One-based position in the capped flow.
-    fact_type : Literal
+        One-based position in capped flow.
+    decision_lever : DecisionLever
+        Strongest possible decision change.
+    answer_ease : AnswerEase
+        Relative answer effort.
+    fact_type : ClarificationFactType
         Requested closed-catalog fact.
     material_effects : list[str]
         Distinct possible decisions.
@@ -946,22 +972,9 @@ class ClarificationOutput(DecisionModel):
     possible_effect: str = Field(min_length=1)
     question: str = Field(min_length=1)
     question_number: int = Field(default=1, ge=1, le=3)
-    fact_type: Literal[
-        "period_coverage",
-        "transaction_nature",
-        "active_priority",
-        "liquid_reserve",
-        "safety_floor",
-        "priority_allocation",
-        "recurring_obligation",
-        "one_off_obligation",
-        "debt_position",
-        "debt_terms",
-        "usual_disposable_income",
-        "expected_one_off_income",
-        "financial_limit",
-        "action_unavailability",
-    ]
+    decision_lever: DecisionLever = "action_or_priority"
+    answer_ease: AnswerEase = "moderate"
+    fact_type: ClarificationFactType
     material_effects: list[str] = Field(min_length=2)
     coverage_months: list[str] | None = None
     transaction_ids: list[int] | None = None
@@ -1008,30 +1021,106 @@ DecisionOutput = Annotated[
 ]
 
 
-class AdviceResponse(DecisionModel):
-    """Monthly decision contract.
+class ClarificationTraceEntry(DecisionModel):
+    """One consumed clarification.
 
     Attributes
     ----------
-    outputs : list[DecisionOutput]
-        One or more outputs. No type quota.
+    question_number : int
+        One-based order.
+    fact_type : ClarificationFactType
+        Consumed fact.
+    decision_lever : DecisionLever
+        Decision effect.
+    outcome : Literal
+        Current resolution.
     """
 
-    outputs: list[DecisionOutput] = Field(min_length=1)
+    question_number: int = Field(ge=1, le=3)
+    fact_type: ClarificationFactType
+    decision_lever: DecisionLever
+    outcome: Literal["pending", "answered", "skipped", "unknown"]
+
+
+class ClarificationTrace(DecisionModel):
+    """Auditable clarification session.
+
+    Attributes
+    ----------
+    questions_consumed : int
+        Questions shown.
+    questions : list[ClarificationTraceEntry]
+        Ordered history.
+    stop_reason : Literal
+        Pending or terminal reason.
+    """
+
+    questions_consumed: int = Field(default=0, ge=0, le=3)
+    questions: list[ClarificationTraceEntry] = Field(default_factory=list, max_length=3)
+    stop_reason: Literal["question_pending", "no_remaining_decision_impact", "quota_reached"] = (
+        "no_remaining_decision_impact"
+    )
 
     @model_validator(mode="after")
-    def allow_one_clarification(self) -> Self:
-        """Enforce progressive single-card flow.
+    def require_consistent_history(self) -> Self:
+        """Validate count, order, and pending state.
 
         Returns
         -------
         Self
-            Advice with zero or one clarification.
+            Consistent trace.
 
         Raises
         ------
         ValueError
-            Multiple clarification cards.
+            Count, order, or pending state diverges.
+        """
+        if self.questions_consumed != len(self.questions):
+            raise ValueError("questions_consumed must match questions")
+        if [question.question_number for question in self.questions] != list(range(1, self.questions_consumed + 1)):
+            raise ValueError("clarification question numbers must be sequential")
+        has_pending = bool(self.questions and self.questions[-1].outcome == "pending")
+        if (self.stop_reason == "question_pending") != has_pending:
+            raise ValueError("pending stop reason must match final question")
+        return self
+
+
+class AdviceDraft(DecisionModel):
+    """Internal decision outputs before queue selection.
+
+    Attributes
+    ----------
+    outputs : list[DecisionOutput]
+        Candidate decisions and questions.
+    """
+
+    outputs: list[DecisionOutput] = Field(min_length=1)
+
+
+class AdviceResponse(AdviceDraft):
+    """Monthly decisions with visible clarification state.
+
+    Attributes
+    ----------
+    clarification_trace : ClarificationTrace
+        Session count, order, and stop reason.
+    """
+
+    clarification_trace: ClarificationTrace = Field(default_factory=ClarificationTrace)
+
+    @model_validator(mode="after")
+    def allow_one_clarification(self) -> Self:
+        """Enforce one visible question.
+
+        Returns
+        -------
+        Self
+            Progressive response.
+
+        Raises
+        ------
+        ValueError
+            Multiple question cards remain.
         """
         if sum(output.type == "clarification" for output in self.outputs) > 1:
             raise ValueError("advice allows one clarification at a time")

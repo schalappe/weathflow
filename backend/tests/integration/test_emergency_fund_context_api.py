@@ -457,7 +457,35 @@ def test_fourth_material_question_becomes_unresolved(
     db_session.add(
         Advice(
             month_id=month.id,
-            advice_text=json.dumps({"outputs": [current_question]}),
+            advice_text=json.dumps(
+                {
+                    "outputs": [current_question],
+                    "clarification_trace": {
+                        "questions_consumed": 3,
+                        "questions": [
+                            {
+                                "question_number": 1,
+                                "fact_type": "period_coverage",
+                                "decision_lever": "action_or_priority",
+                                "outcome": "skipped",
+                            },
+                            {
+                                "question_number": 2,
+                                "fact_type": "recurring_obligation",
+                                "decision_lever": "action_or_priority",
+                                "outcome": "answered",
+                            },
+                            {
+                                "question_number": 3,
+                                "fact_type": "liquid_reserve",
+                                "decision_lever": "action_or_priority",
+                                "outcome": "pending",
+                            },
+                        ],
+                        "stop_reason": "question_pending",
+                    },
+                }
+            ),
         )
     )
     db_session.commit()
